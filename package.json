@@ -15,7 +15,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.js",
     "db:seed": "node scripts/seed.js",
-    "test:browser": "node scripts/qa/browser.js"
+    "test:browser": "node scripts/qa/browser.js",
+    "media:prepare": "node scripts/prepare-media.js",
+    "test:video": "node scripts/qa/video.js"
   },
   "dependencies": {
     "@alpinejs/csp": "^3.17.5",
@@ -48,6 +50,7 @@
     "@tailwindcss/cli": "^4.3.5",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9.39.5",
+    "ffmpeg-static": "^5.3.0",
     "globals": "^17.14.0",
     "node": "^20.20.2",
     "prettier": "^3.10.1",

@@ -14,6 +14,43 @@ const config = parseEnv({
 });
 const makeApp = (catalog = fixtureCatalog()) => createApp({ config, catalog });
 describe('Milestone 2 public pages', () => {
+  it('renders the hero film with a poster and deferred source', async () => {
+    const response = await request(makeApp()).get('/').expect(200);
+    expect(response.text).toContain('poster="/media/finished-look.webp"');
+    expect(response.text).toContain('data-src="/media/finished-look.mp4"');
+    expect(response.text).toContain('preload="none"');
+    expect(response.text).not.toContain(' autoplay');
+    expect(response.text).not.toContain('Real studio photographs coming soon');
+  });
+  it('serves seekable video with same-origin media policy', async () => {
+    const response = await request(makeApp())
+      .get('/media/finished-look.mp4')
+      .set('Range', 'bytes=0-63')
+      .expect(206);
+    expect(response.headers['content-type']).toContain('video/mp4');
+    expect(response.headers['content-range']).toContain('bytes 0-63/');
+    expect(response.headers['content-security-policy']).toContain(
+      "media-src 'self'",
+    );
+  });
+  it('keeps owner-written home copy while upgrading the old default', async () => {
+    const data = await fixtureCatalog().load();
+    data.settings.seo.pages.home.heading = 'My own studio heading';
+    const response = await request(
+      makeApp(fixtureCatalog({ load: async () => data })),
+    )
+      .get('/')
+      .expect(200);
+    expect(response.text).toContain('My own studio heading');
+    data.settings.seo.pages.home.heading = 'Braids done slowly,';
+    const updated = await request(
+      makeApp(fixtureCatalog({ load: async () => data })),
+    )
+      .get('/')
+      .expect(200);
+    expect(updated.text).toContain('A fresh look.');
+  });
+
   it('keeps public pages useful when the active catalog is empty', async () => {
     const data = await fixtureCatalog().load();
     data.styles = [];
@@ -157,6 +194,30 @@ describe('Milestone 2 public pages', () => {
   });
 });
 describe('owner-only design preview', () => {
+  it('limits failed credentials without counting successful previews or empty challenges', async () => {
+    const app = makeApp(
+      fixtureCatalog({
+        findAdmin: async () => ({ role: 'owner', passwordHash }),
+      }),
+    );
+    for (let i = 0; i < 6; i++) {
+      await request(app).get('/admin/design').expect(401);
+      await request(app)
+        .get('/admin/design')
+        .auth('owner@example.com', 'owner-test-password')
+        .expect(200);
+    }
+    for (let i = 0; i < 5; i++)
+      await request(app)
+        .get('/admin/design')
+        .auth('owner@example.com', 'incorrect')
+        .expect(401);
+    await request(app)
+      .get('/admin/design')
+      .auth('owner@example.com', 'incorrect')
+      .expect(429);
+  });
+
   let passwordHash;
   beforeAll(async () => {
     passwordHash = await argon2.hash('owner-test-password', {

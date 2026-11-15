@@ -1,3 +1,17 @@
 {% macro photo(item, name, hero=false) %}{% if item %}<img src="{{ item.path }}" alt="{{ item.alt }}" width="{{ item.width or 800 }}" height="{{ item.height or 1000 }}" {% if hero %}fetchpriority="high"{% else %}loading="lazy"{% endif %}>{% else %}<div class="photo-empty"><img src="/img/braid-ring.svg" width="100" height="100" alt="" {% if not hero %}loading="lazy"{% endif %}><span class="eyebrow">{{ name }}</span><span class="photo-caption">Real studio photographs coming soon</span></div>{% endif %}{% endmacro %}
-{% macro card(style, large=false) %}<article class="style-card{% if large %} large{% endif %}"><a href="/styles/{{ style.slug }}" class="style-photo">{{ photo(style.photo,style.name) }}</a><div class="style-card-caption"><h3><a href="/styles/{{ style.slug }}">{{ style.name }}</a></h3><p>{% if style.from %}From {{ style.from | money }}{% else %}Price on consultation{% endif %}<span class="duration"> · {{ style.durationMin / 60 }} hrs</span></p></div></article>{% endmacro %}
+{% macro card(style, large=false) %}
+<article class="style-card{% if large %} large{% endif %}{% if not style.photo %} type-card{% endif %}">
+ {% if style.photo %}<a href="/styles/{{ style.slug }}" class="style-photo">{{ photo(style.photo,style.name) }}</a>{% endif %}
+ <div class="style-card-caption"><p class="eyebrow">{{ style.category }}</p><h3><a href="/styles/{{ style.slug }}">{{ style.name }}</a></h3><p>{% if style.from %}From {{ style.from | money }}{% else %}Price on consultation{% endif %}<span class="duration"> · {{ style.durationMin / 60 }} hrs</span></p><a class="style-explore" href="/styles/{{ style.slug }}">Explore the style <span aria-hidden="true">↗</span></a></div>
+</article>
+{% endmacro %}
 {% macro menu(style) %}<section class="menu-panel" id="{{ style.slug }}" aria-label="{{ style.name }} prices"><div class="section-heading"><div><p class="eyebrow">{{ style.category }}</p><h2>{{ style.name }}</h2></div><p>{{ style.durationMin / 60 }} hours reserved</p></div>{% if style.groups.length %}<div class="price-groups">{% for group in style.groups %}<div><h3 class="eyebrow">{{ group.name }}</h3><dl>{% for variant in group.variants %}<div class="price-row"><dt>{{ variant.lengthLabel }}</dt><span aria-hidden="true"></span><dd>{{ variant.priceCents | money }}</dd></div>{% endfor %}</dl></div>{% endfor %}</div>{% else %}<p class="consultation"><strong>Price on consultation.</strong> {% if style.from %}From <strong>{{ style.from | money }}</strong>. {% endif %}Your final price depends on the style and length. Let’s talk through your look before you book.</p>{% endif %}<div class="menu-bottom"><a href="/styles/{{ style.slug }}" class="text-link">About this style <span aria-hidden="true">→</span></a><a href="/book?style={{ style.slug }}" class="button compact">Book {{ style.name }}</a></div></section>{% endmacro %}
+
+{% macro studioVideo(name, description, hero=false) %}
+<div class="studio-video{% if hero %} hero-video{% endif %}" data-studio-player>
+ <video id="film-{{ name }}" muted loop playsinline preload="none" poster="/media/{{ name }}.webp" aria-label="{{ description }}" data-studio-video {% if hero %}data-hero-video{% endif %}><source data-src="/media/{{ name }}.mp4" type="video/mp4">Your browser does not support this video.</video>
+ <button type="button" class="video-control" data-video-toggle aria-controls="film-{{ name }}" aria-pressed="false"><span data-video-icon aria-hidden="true">▶</span><span data-video-label>Play film</span></button>
+ <noscript><a href="/media/{{ name }}.mp4" class="video-fallback">Watch the studio film (MP4)</a></noscript><span class="video-silent">NO SOUND. JUST THE CRAFT.</span>
+ <p class="video-feedback sr-only" data-video-feedback role="status"></p>
+</div>
+{% endmacro %}

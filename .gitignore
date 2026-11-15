@@ -8,3 +8,6 @@ uploads/
 coverage/
 .DS_Store
 Thumbs.db
+
+# Original video masters stay local; publish the prepared web clips instead.
+/docs/design/videos/

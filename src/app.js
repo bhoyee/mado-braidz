@@ -43,6 +43,7 @@ export function createApp({
           imgSrc: ["'self'", 'data:'],
           frameSrc: ["'self'", 'https://maps.google.com'],
           fontSrc: ["'self'"],
+          mediaSrc: ["'self'"],
           objectSrc: ["'none'"],
           frameAncestors: ["'none'"],
           upgradeInsecureRequests: config.NODE_ENV === 'production' ? [] : null,
@@ -57,7 +58,7 @@ export function createApp({
     '/build',
     express.static(fileURLToPath(new URL('../public/build', import.meta.url))),
   );
-  for (const dir of ['fonts', 'img'])
+  for (const dir of ['fonts', 'img', 'media'])
     app.use(
       `/${dir}`,
       express.static(
@@ -111,7 +112,7 @@ export function createApp({
   );
   views.addFilter('money', money);
   app.set('view engine', 'njk');
-  app.use('/admin', designRouter(catalog, limits.login));
+  app.use('/admin', designRouter(catalog, limits.preview));
   app.use(publicRouter(catalog));
   app.use((_req, res) =>
     res.status(404).render('pages/message', {

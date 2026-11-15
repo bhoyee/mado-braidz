@@ -1,3 +1,4 @@
+import { publicSettings } from '../../db/public-defaults.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { marked } from 'marked';
@@ -111,12 +112,16 @@ export function decorateCatalog(data) {
     };
   });
   const b = data.settings.business;
+  const pages = { ...(data.settings.seo?.pages || {}) };
+  // Upgrade only the original scaffold copy; preserve owner-written content.
+  if (!pages.home || pages.home.heading === 'Braids done slowly,')
+    pages.home = publicSettings.seo.pages.home;
   return {
     ...data,
     styles,
     business: b,
     booking: data.settings.booking,
-    pages: data.settings.seo?.pages || {},
+    pages,
     hours: data.settings.hours,
     policy: data.settings.policy,
     phoneDisplay: b.phone === '+14437434979' ? '(443) 743-4979' : b.phone,

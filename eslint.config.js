@@ -8,6 +8,7 @@ export default [
   {
     ignores: [
       'node_modules/**',
+      'tmp/**',
       'public/build/**',
       'coverage/**',
       'src/db/migrations/**',
