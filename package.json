@@ -1,0 +1,55 @@
+{
+  "name": "mado-braidz",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "build": "node scripts/build.js",
+    "lint": "eslint . && prettier --check .",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/seed.js"
+  },
+  "dependencies": {
+    "@alpinejs/csp": "^3.17.5",
+    "alpinejs": "^3.17.5",
+    "argon2": "^0.41.1",
+    "compression": "^1.8.2",
+    "csrf-sync": "^4.2.1",
+    "dotenv": "^18.0.10",
+    "drizzle-orm": "^0.45.4",
+    "express": "^4.22.3",
+    "express-mysql-session": "^3.0.3",
+    "express-rate-limit": "^8.7.4",
+    "express-session": "^1.19.0",
+    "helmet": "^8.3.0",
+    "mysql2": "^3.24.6",
+    "nunjucks": "^3.2.4",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "rotating-file-stream": "^4.0.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@tailwindcss/cli": "^4.3.5",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0",
+    "node": "^20.20.2",
+    "prettier": "^3.10.1",
+    "supertest": "^7.3.2",
+    "tailwindcss": "^4.3.5",
+    "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "mysql2": "^3.24.6",
+    "esbuild": "^0.25.12"
+  }
+}

@@ -1,0 +1,15 @@
+@import 'tailwindcss';
+@source "../views";
+@theme {
+  --color-ink: #15100e;
+  --color-bone: #f6efe7;
+  --color-sand: #e9dccd;
+  --color-magenta: #c8146e;
+  --color-copper: #d1702f;
+}
+@layer base {
+  a:focus-visible {
+    outline: 2px solid var(--color-copper);
+    outline-offset: 4px;
+  }
+}

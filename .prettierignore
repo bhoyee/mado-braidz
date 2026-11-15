@@ -1,0 +1,7 @@
+node_modules
+public/build
+src/db/migrations
+docs
+package-lock.json
+.env
+AGENTS.md
