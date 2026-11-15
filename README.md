@@ -68,7 +68,7 @@ Build locally with `npm ci` and `npm run build`; commit or upload `public/build`
 
 ## Follow-ups
 
-Provide real salon photography, an owner portrait, genuine reviews and owner approval of the biography and draft policies. The supplied logo is included unchanged; an optimized/vector version remains a launch follow-up. Booking, payments, admin actions, and cron processing remain assigned to subsequent milestones.
+Provide real salon photography, an owner portrait, genuine reviews and owner approval of the biography and draft policies. The supplied logo artwork is preserved in a small WebP web copy; a clean vector remains a launch follow-up. Booking, payments, admin actions, and cron processing remain assigned to subsequent milestones.
 
 Dependency overrides keep the session store on patched mysql2 and Drizzle tooling on patched esbuild. `npm audit` reports zero vulnerabilities after installation.
 
@@ -84,9 +84,9 @@ The catalog, prices, business information, booking defaults and public copy come
 
 `/admin/design` is owner-only through a temporary browser HTTP Basic challenge using the **seeded database owner** email and password. Use the credentials from `.env`; after changing them, run `npm run db:seed -- --update-owner`. HTTPS is required in production and attempts are rate limited. This guard protects only the design preview; it does not implement the Milestone 5 admin login, staff permissions or dashboard. Preview controls never create bookings. Keep `ADMIN_PASSWORD` private.
 
-Fonts are self-hosted Latin WOFF2 files copied at build time from Fontsource (licenses in `public/fonts`). The supplied logo is copied unchanged from `docs/design/logo.png` to `public/img/logo.png`. Include `public/fonts` and `public/img` in deployment alongside `public/build`. Public JS is a small same-origin module; native navigation, category filters, price anchors and FAQ disclosures work without JavaScript. Maps make no Google requests until clicked. There are no new environment variables.
+Fonts are self-hosted Latin WOFF2 files copied at build time from Fontsource (licenses in `public/fonts`). The original supplied logo is preserved in `public/img/logo.png`; the layout uses the optimized `public/img/logo.webp` copy prepared from the same artwork. Include `public/fonts` and `public/img` in deployment alongside `public/build`. Public JS is a small same-origin module; native navigation, category filters, price anchors and FAQ disclosures work without JavaScript. Maps make no Google requests until clicked. There are no new environment variables.
 
-For real photographs, public media records must have descriptive alt text and a root-relative `/img/...` path. For this milestone, put approved images under `public/img`; upload handling and private inspiration media come in Milestone 6. Associate `kind=style` records with a style, and use `kind=gallery` for gallery entries. No stock images, invented client work or invented reviews are displayed.
+For real photographs, public media records must have descriptive alt text and a root-relative `/img/...` path. For this milestone, put approved images under `public/img`; upload handling and private inspiration media come in Milestone 6. Associate `kind=style` records with a style, and use `kind=gallery` for gallery entries. The landing page, About page and gallery use frames and short clips from the owner-supplied studio videos. Styles without a verified style photo use type-led listings; a generic studio frame on a style detail is labelled as a look at the craft, not represented as that specific style. No stock images, invented client work or invented reviews are displayed.
 
 Browser checks require local Chrome and the app/MySQL running:
 
@@ -96,4 +96,24 @@ npm run test:browser
 
 This checks 390px and 1440px layouts, WCAG rules, keyboard navigation, category filters, map consent, and owner design controls. It writes local screenshots and results under ignored `tmp/qa`. It uses the seeded owner credentials from `.env`. Unit/Supertest checks (`npm test`) use isolated catalog fixtures and need no running MySQL or fixed port.
 
-Lighthouse mobile audits can be run using a current standalone Lighthouse CLI against `http://localhost:4780` and `/styles/knotless-braids`. Lighthouse 13 requires Node 22+ for its audit runner; the app and browser tests run on Node 20. The audit tool is kept separate from the app's dependencies. Scores cover the current placeholder-photo pages; repeat audits when real imagery and integrations arrive.
+Lighthouse mobile audits can be run using a current standalone Lighthouse CLI against `http://localhost:4780` and `/styles/knotless-braids`. Lighthouse 13 requires Node 22+ for its audit runner; the app and browser tests run on Node 20. The audit tool is kept separate from the app's dependencies. Repeat audits when images, footage or integrations change.
+
+## Studio video and public redesign
+
+The landing page now has a dark video-led hero, an editorial style list, a simplified price preview and real studio film sections. About and Gallery use the same supplied footage. Video playback controls work by mouse or keyboard. The hero may play silently when visible; reduced-motion and data-saver users get a still poster until they choose Play. Other clips load only on demand. Films pause offscreen and in background tabs, and an explicit pause is preserved. Without JavaScript, posters and direct MP4 links remain available.
+
+Web assets are committed under `public/media` and served from `/media` with same-origin CSP and byte-range support. Include **public/media** when deploying alongside public/build, public/fonts and public/img. Ordinary `npm run build` does not require the original videos or FFmpeg.
+
+To regenerate the web clips locally, place `video1.mp4`, `video2.mp4`, and `video3.mp4` in `docs/design/videos`, then run:
+
+```powershell
+npm run media:prepare
+npm run build
+npm run test:video
+```
+
+`media:prepare` uses development-only FFmpeg to crop/trim silent H.264 MP4s and extract WebP posters. The original approximately 56 MB of footage stays local and ignored by Git; the three prepared clips total approximately 3.6 MB, and their three posters approximately 90 KB. No runtime video processing or external video service is needed on cPanel. Do not run the media command against the production app.
+
+Home copy defaults are updated for the redesign. The renderer upgrades the original “Braids done slowly,” scaffold headline while preserving a custom owner-written home heading. New databases get the revised copy from the seed. Business facts and catalog prices still come from MySQL.
+
+Redesign validation: 63 unit/Supertest tests, the 25-case desktop/mobile accessibility check, and the video behavior checks pass. Mobile Lighthouse: Home 99 Performance / 100 Accessibility / 100 Best Practices / 100 SEO; Knotless Braids 99 / 100 / 100 / 100. Current compressed CSS is approximately 9.3 KB gzip and public JS 1.5 KB gzip. `scripts/prepare-logo.js` regenerates the approximately 12 KB WebP logo and is also run by `media:prepare`; the original artwork remains available.
