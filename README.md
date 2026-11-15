@@ -85,9 +85,9 @@ npm run build
 npm run dev
 ```
 
-Open **http://localhost:4780** and use Ctrl+F5 to refresh an existing preview. The landing page uses a supplied knotless-braid photograph, a six-style photographic lookbook, a studio film section and a printed price preview. The owner explicitly requested a new font/design direction: **Manrope** is now the main typeface and **Cormorant Garamond** the editorial accent, replacing the original Section 4 pairing. Both are self-hosted WOFF2 fonts with licenses in `public/fonts`.
+Open **http://localhost:4780** and use Ctrl+F5 to refresh an existing preview. The landing page uses a silent studio video hero, a six-style photographic lookbook and the owner-supplied studio story. The salon header keeps address, daily opening hours and phone visible. The owner explicitly requested a new font/design direction: **Manrope** is now the main typeface and **Cormorant Garamond** the editorial accent, replacing the original Section 4 pairing. Both are self-hosted WOFF2 fonts with licenses in `public/fonts`.
 
-Public routes include `/`, `/styles` (server-rendered category filters), every `/styles/:slug`, `/prices`, `/gallery`, `/about`, `/contact`, policy/privacy/terms drafts and eight area page shells. Prices, durations, business details and public copy come from MySQL. Booking/result/manage paths remain informational holding pages. The disabled contact form never claims to send a message; POST attempts return 503 after CSRF validation. Booking logic and payments are later milestones.
+Public routes include `/`, `/styles` (server-rendered category filters), every `/styles/:slug`, `/our-work`, `/about`, `/contact`, policy/privacy/terms drafts and eight area page shells. Prices, durations, business details and public copy come from MySQL. Booking/result/manage paths remain informational holding pages. The disabled contact form never claims to send a message; POST attempts return 503 after CSRF validation. Booking logic and payments are later milestones.
 
 `/admin/design` uses a temporary browser Basic-auth challenge for the seeded owner account. Use the owner email/password from `.env`; after changing credentials, run `npm run db:seed -- --update-owner`. HTTPS is required in production. Failed credentials are limited; successful preview refreshes and empty browser challenges do not consume the failure quota. Full admin authentication remains Milestone 5.
 
@@ -111,7 +111,7 @@ npm run build
 
 ### Studio films
 
-The three supplied videos remain available as silent 10–12 second clips. All current public films are **play on request**. They pause offscreen/background and preserve a manual pause. Reduced-motion and data-saver browsing never triggers an automatic download. Without JavaScript, posters and direct MP4 links remain available. Google Maps also loads only after a click.
+The three supplied videos remain available as silent 10–12 second clips. The hero may autoplay silently when visible; supporting films on Our Work play only on request. They pause offscreen/background and preserve a manual pause. Reduced-motion and data-saver browsing never triggers an automatic download. Without JavaScript, posters and direct MP4 links remain available. Google Maps also loads only after a click.
 
 Prepared files are committed under `public/media`. To regenerate them locally from `docs/design/videos/video1.mp4`, `video2.mp4`, and `video3.mp4`:
 
@@ -136,6 +136,24 @@ npm run test:video
 
 Browser checks require local Chrome, MySQL and the app running on port 4780. They verify 390px/1440px layouts, WCAG A/AA rules, image decoding, keyboard controls, filters, map consent and owner preview access. Video checks exercise all clips and request-only playback. Reports/screenshots go in ignored `tmp/qa`. Unit/Supertest tests use catalog fixtures and no fixed port or running database.
 
-Current validation: 65 unit/Supertest tests pass; build/lint and browser/video checks pass; npm audit reports zero vulnerabilities. Run current standalone Lighthouse against Home and a style detail when media or layout changes. Its audit runner may require a newer Node version; the app remains Node 20.
+Current validation: 66 unit/Supertest tests pass; build/lint and browser/video checks pass; npm audit reports zero vulnerabilities. Run current standalone Lighthouse against Home and a style detail when media or layout changes. Its audit runner may require a newer Node version; the app remains Node 20.
 
-Final photo-led design Lighthouse mobile scores: **100/100/100/100** for Home and Knotless Braids. Scores apply to the current media and layout; repeat them after future changes.
+Final salon-header/video-hero Lighthouse mobile scores: **98/100/100/100** for Home and **99/100/100/100** for Knotless Braids. Scores apply to the current media and layout; repeat them after future changes.
+
+### Salon header, opening hours and style pricing
+
+The owner confirmed **every day, 6:00 AM–6:00 PM**, in `America/New_York`. These settings replace the original Tuesday–Saturday default; `hours.weekly` now contains seven open days. The header shows the street/city, daily hours, and click-to-call phone on mobile and desktop. Larger salon branding and navigation include **Styles & Prices** and **Our Work**.
+
+Prices are now part of each style. Open `/styles/knotless-braids`, choose Medium / Semi-medium / Small, then see that size's available length prices. The choice is a server-rendered GET URL such as `/styles/knotless-braids?size=small#lengths`, so it works without JavaScript and with back/refresh. Invalid sizes return 400. Only real catalog combinations are shown; no new prices or lengths were invented. Consultation styles keep their consultation path. Choosing a priced length leads to the existing informational booking page; availability/payment logic remains later work.
+
+The old `/prices` URL redirects permanently to `/styles`, and `/gallery` redirects to `/our-work`. The dedicated price page is no longer in navigation. Three AI-labelled knotless size references help compare braid thickness; their optimized assets and metadata are included in the image manifest, with exact built-in generation prompts in `docs/KNOTLESS-SIZE-PROMPTS.json`.
+
+For an existing local database, apply the latest owner-approved hours and About copy explicitly with:
+
+```powershell
+npm run db:seed
+npm run content:sync
+npm run build
+```
+
+`content:sync` updates the `hours` setting and `seo.pages.about` from `src/db/public-defaults.js`, preserving other public copy and all catalog prices. It is an explicit content update, not a startup hook; do not run it over later owner edits unless that overwrite is intended. New databases receive these defaults from the seed. No new environment variables are required.
