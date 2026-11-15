@@ -1,0 +1,154 @@
+{
+  "settings": {
+    "booking": {
+      "depositCents": 3000,
+      "holdMinutes": 30,
+      "stepMinutes": 30,
+      "bufferMinutes": 30,
+      "minNoticeHours": 24,
+      "maxAdvanceDays": 60,
+      "defaultDurationMin": 240
+    },
+    "business": {
+      "name": "Mado African Braidz",
+      "street": "7375 Executive Place",
+      "city": "Lanham",
+      "region": "MD",
+      "postalCode": "20706",
+      "country": "US",
+      "phone": "+14437434979",
+      "timezone": "America/New_York",
+      "url": "https://madoafricanbraidz.com"
+    }
+  },
+  "addons": [
+    {
+      "name": "Head wash",
+      "slug": "head-wash",
+      "priceCents": 2500,
+      "durationMin": 0,
+      "appliesToAll": true
+    }
+  ],
+  "styles": [
+    {
+      "name": "Knotless Braids",
+      "slug": "knotless-braids",
+      "category": "knotless",
+      "featured": true,
+      "variants": [
+        ["medium", "mid_back", 18000],
+        ["medium", "waist", 20000],
+        ["semi_medium", "shoulder", 22000],
+        ["semi_medium", "mid_back", 24000],
+        ["semi_medium", "waist", 26000],
+        ["semi_medium", "top_butt", 30000],
+        ["semi_medium", "under_butt", 32000],
+        ["small", "shoulder", 24000],
+        ["small", "mid_back", 26000],
+        ["small", "waist", 30000],
+        ["small", "top_butt", 32000],
+        ["small", "under_butt", 34000]
+      ]
+    },
+    {
+      "name": "Boho Knotless Braids",
+      "slug": "boho-knotless-braids",
+      "category": "boho",
+      "featured": true,
+      "variants": [
+        ["medium", "mid_back", 24000],
+        ["medium", "waist", 26000],
+        ["medium", "top_butt", 29000],
+        ["medium", "under_butt", 32000],
+        ["semi_medium", "mid_back", 26000],
+        ["semi_medium", "waist", 28000],
+        ["semi_medium", "top_butt", 30000],
+        ["semi_medium", "under_butt", 34000]
+      ]
+    },
+    {
+      "name": "Boho Bob",
+      "slug": "boho-bob",
+      "category": "boho",
+      "variants": [
+        ["medium", null, 20000],
+        ["semi_medium", null, 26000],
+        ["small", null, 28000]
+      ]
+    },
+    {
+      "name": "Senegalese Twist",
+      "slug": "senegalese-twist",
+      "category": "twists",
+      "variants": [
+        ["medium", "mid_back", 18000],
+        ["medium", "waist", 22000],
+        ["medium", "top_butt", 24000]
+      ]
+    },
+    {
+      "name": "Island Twist",
+      "slug": "island-twist",
+      "category": "twists",
+      "featured": true,
+      "variants": [
+        ["medium", "mid_back", 28000],
+        ["medium", "waist", 30000],
+        ["medium", "butt", 32000],
+        ["medium", "under_butt", 34000]
+      ]
+    },
+    {
+      "name": "Fulani Braids",
+      "slug": "fulani-braids",
+      "category": "fulani",
+      "featured": true,
+      "fromPriceCents": 24000,
+      "priceOnConsultation": true,
+      "note": "From $240 depending on style and length"
+    },
+    {
+      "name": "Cornrows",
+      "slug": "cornrows",
+      "category": "other",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Passion Twist",
+      "slug": "passion-twist",
+      "category": "twists",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Marley Twist",
+      "slug": "marley-twist",
+      "category": "twists",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Invisible Locs",
+      "slug": "invisible-locs",
+      "category": "locs",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Soft Locs",
+      "slug": "soft-locs",
+      "category": "locs",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Butterfly Locs",
+      "slug": "butterfly-locs",
+      "category": "locs",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Crochet Braids",
+      "slug": "crochet-braids",
+      "category": "other",
+      "priceOnConsultation": true
+    }
+  ]
+}
