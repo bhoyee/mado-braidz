@@ -1,60 +1,38 @@
-# Milestone 2 — Design system and public pages
+# Milestone 2 — Public site and design library
 
-Implemented locally for the Express/Nunjucks/MySQL application. No Sites hosting, production deployment, or booking engine was added.
+The owner requested a photo-led redesign and a different font pairing. The current design uses Manrope headings/body text, a restrained Cormorant Garamond accent, light paper backgrounds, a supplied portrait hero and a photographic style collection. This explicitly replaces the original Section 4 font choice at the owner's request. The Express/Nunjucks/MySQL stack is unchanged.
 
-## Review
+## Review locally
 
-Start MySQL, then run:
+Start MySQL, then run `npm install`, `npm run db:seed`, `npm run build`, and `npm run dev`. Visit http://localhost:4780; use Ctrl+F5 for an existing preview. `/admin/design` prompts for the seeded owner credentials from `.env`.
 
-```powershell
-npm install
-npm run db:seed
-npm run build
-npm run dev
-```
+## Delivered
 
-Open http://localhost:4780. The owner design library is http://localhost:4780/admin/design; the browser prompts for the seeded owner credentials from `.env`.
+- Public home, collection/filtering, all style details, full price menu, photo/film gallery, About, contact/visit, legal drafts and eight local-area shells.
+- Photos for all 13 catalog styles: four supplied and nine AI-generated hairstyle references. AI references are labelled on the style cards and detail pages and are not claimed as client work. Gallery extras include the supplied sew-in, spring-twist and tribal-crochet photos without changing the service catalog or prices.
+- Responsive AVIF/WebP assets, self-hosted fonts, visible focus indicators, native navigation/FAQs, mobile booking action, owner-only component preview, map consent and request-only studio films.
+- Seeded media metadata retains source provenance. Seed reruns preserve owner photos and captions; responsive metadata for known managed paths can be refreshed. Prices, durations and business facts remain database-backed.
+- All Section 4 design components in `/admin/design`, with example interactions that never create bookings. Temporary preview protection verifies the seeded owner; full admin auth is Milestone 5.
 
-## Scope delivered
+## Assets
 
-- Responsive bone/ink editorial layouts based on `docs/design/landing.png`, the supplied PNG logo, a vector braid motif, self-hosted Fraunces/Figtree, visible copper focus indicators, and a mobile booking action.
-- Database-backed home, style collection/filtering, every seeded style detail, full price menu, gallery, About, contact/visit, policy/privacy/terms drafts, and eight area page shells. Prices, durations, business details and public settings come from MySQL. Owner-supplied studio films and extracted stills now give Home, About and Gallery real imagery. Style listings without individual photos are type-led rather than placeholder panels; no fake reviews are published.
-- Owner-only `/admin/design` with buttons, style/menu components, length chips, add-on control, example date grid/time pills, booking summary, fields/errors, badges, dismissible feedback, empty state, native modal and sample data table. Preview selections have no booking side effects.
-- Native menu/FAQ controls and server-rendered category filtering work without JS. A small same-origin JS file enhances the map, modal and design previews. Maps load only after a click. Motion respects reduced-motion preferences.
-- Safe Markdown for database descriptions, escaped text, safe public image paths, strict CSP, CSRF validation, and a temporary HTTPS-only-in-production owner Basic-auth guard for the design library. The full admin login remains Milestone 5.
+Built-in `image_gen` produced Boho Bob, Senegalese Twist, Fulani Braids, Cornrows, Passion Twist, Marley Twist, Invisible Locs, Soft Locs and Butterfly Locs references. Their final project files are under `public/img/styles` and listed in `src/db/style-image-manifest.json`. Exact prompts: `docs/STYLE-IMAGE-PROMPTS.json`. Original generated PNGs are retained locally under ignored `assets/style-references`; no image-generation API key is needed by the application.
+
+The supplied Knotless, Boho, Island Twist and Crochet images are also optimized under `public/img/styles`. Three additional supplied gallery images are listed in `src/db/gallery-image-manifest.json`. Original supplied files are preserved under ignored `docs/design/imgs`. `npm run images:prepare` resizes/encodes available local originals; the prepared web files are committed, so ordinary builds work without those originals.
+
+Studio clips and posters remain in `public/media`. All films are silent and play only when requested in the current layout. The gallery never autoplays. Keyboard controls, reduced-motion/data-saver behaviour, offscreen/background pausing and manual-pause persistence are checked.
 
 ## Validation
 
-- `npm run build`, `npm run lint`, `npm test`: pass; 63 unit/Supertest tests.
-- `npm run db:migrate`, `npm run db:seed`: pass on the existing local XAMPP database. No schema changes were needed.
-- `npm audit`: zero vulnerabilities.
-- `npm run test:browser`: Chrome at 390px and 1440px, 25 page/viewport checks, WCAG A/AA automated analysis, no horizontal overflow, keyboard skip link/mobile navigation, category filters, delayed map loading, owner access, length selector, modal/Escape and summary controls.
-- Lighthouse 13.6 mobile audits on Home and Knotless Braids: 99 Performance, 100 Accessibility, 100 Best Practices, 100 SEO on both redesigned pages. Reports/screenshots are local in ignored `tmp/qa`. These results include the real studio media and optimized logo.
-- Public CSS is approximately 9.3 KB gzip; public JS approximately 1.5 KB gzip. The supplied logo artwork is preserved in a roughly 12 KB WebP web copy. A vector master remains a follow-up.
+- Build/lint pass; 65 unit/Supertest tests pass.
+- Database seed and reruns pass. The catalog contains all 13 media associations and source labels, plus three gallery extras. No database schema changes were needed.
+- Zero npm audit vulnerabilities.
+- Chrome checks: 25 mobile/desktop page cases, no WCAG A/AA violations or horizontal overflow; responsive images decode; keyboard, filters, delayed map and owner-preview controls pass.
+- All three studio films pass request-only playback and keyboard/pause tests.
+- Final mobile Lighthouse is 100 Performance / 100 Accessibility / 100 Best Practices / 100 SEO on Home and the Knotless Braids detail page. Reports and screenshots are retained locally under ignored `tmp/qa`.
 
-## Assumptions and follow-ups
+## Follow-ups
 
-- Public brand remains “Mado African Braidz”. The supplied logo says “Mado Braids”; its artwork is preserved while the accessible business name follows the spec.
-- The About introduction describes the one-stylist studio and its services; no experience dates, credentials, training history or client claims are invented. Owner review is still needed.
-- Hours are expressed as Tuesday–Saturday by appointment, Sunday–Monday closed, without guessing closing times or parking instructions. Owner confirmation remains needed.
-- Real client photos, an owner portrait, actual social/profile links and genuine reviews are still needed. The gallery handles empty data honestly and renders approved media rows when provided.
-- Policies, privacy and terms are clearly marked drafts. Owner approval and updates describing actual payment/email behavior are needed before launch.
-- `/book` and payment-result/manage-booking paths are informational holding pages. Slot availability, booking state changes and payment processing remain Milestones 3–4. No client appointment data is exposed at placeholder token URLs.
-- The contact form is a disabled preview, with call-to-contact available. Email delivery and Turnstile-backed form handling remain follow-up work; no message is silently accepted or discarded as a success.
-- The area routes are presentation shells. Full local SEO, structured data, sitemaps, canonical redirects, caching, image processing, analytics and launch polishing remain Milestone 8.
-- Local XAMPP MariaDB 10.4 is older than the required MariaDB 10.6+/MySQL 8 deployment target. Repeat database checks on a supported database before deployment.
+Owner review of generated hairstyle accuracy; replace references with verified client/service photos when available. Add an owner portrait, genuine reviews and actual social/profile links. Approve the About introduction and legal drafts before launch. Confirm hours and parking details. Use MySQL 8 or MariaDB 10.6+ for deployment; the local XAMPP database is older.
 
-
-## Public redesign with supplied video
-
-The owner requested a more mature salon direction. The revised pages use a dark editorial hero, stronger type, quieter rectangular actions, real studio imagery, a type-led style collection, a concise price preview and a film journal. The repetitive empty panels and decorative ring placements have been removed from public pages. The original design library and database-backed catalog remain in place.
-
-Source footage was inspected from all three local files in `docs/design/videos`. The finished-look film supplies the hero, and the other clips show the braiding process and detail. Three silent 10–12 second MP4s and WebP stills are prepared by `npm run media:prepare`; only the prepared web assets are committed. Audio is removed, pixel format is broadly compatible, and MP4 metadata is moved to the front for streaming.
-
-Video controls have visible names, keyboard activation and state feedback. Reduced motion and data saver disable automatic downloads/playback. The gallery never auto-downloads films. Offscreen or background films pause, and a visitor's explicit pause is preserved. No-JavaScript users can view posters or open the MP4 links.
-
-Redesign checks: build/lint pass, 63 unit/Supertest tests pass, zero dependency audit findings, and the dedicated `npm run test:video` browser checks pass for all three clips. Tests also verify same-origin media CSP and HTTP byte ranges. The 25-case desktop/mobile WCAG checks pass with no violations or horizontal overflow. Mobile Lighthouse is 99/100/100/100 on Home and the Knotless Braids detail page.
-
-Remaining content: individual photos for each service, an owner portrait, real social/profile links and genuine reviews. No supplied frame is claimed to depict an unrelated service, and no client testimonial or history is invented. The biography and legal drafts still need owner review. Booking, payments and admin implementation remain in their assigned later milestones.
-
-The repeated browser checks exposed a preview access issue: successful owner-preview requests were consuming the sign-in quota. The design preview now counts only failed credential attempts; empty browser challenges and successful owner access do not consume the five-attempt allowance. A regression test verifies both normal refreshes and failed-attempt lockout.
+Booking availability/holds, payments, full admin functionality, email delivery, final SEO/image pipeline and production launch remain in their assigned later milestones. The contact form is a disabled preview and booking-related pages are informational only. No Milestone 3 work was started.
