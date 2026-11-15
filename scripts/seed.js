@@ -1,3 +1,4 @@
+import { publicSettings } from '../src/db/public-defaults.js';
 import { eq, and, isNull } from 'drizzle-orm';
 import argon2 from 'argon2';
 import { z } from 'zod';
@@ -93,7 +94,10 @@ try {
         .insert(s.addons)
         .values(addon)
         .onDuplicateKeyUpdate({ set: { slug: addon.slug } });
-    for (const [key, value] of Object.entries(seedData.settings))
+    for (const [key, value] of Object.entries({
+      ...publicSettings,
+      ...seedData.settings,
+    }))
       await tx
         .insert(s.settings)
         .values({ key, value, updatedAt: new Date() })

@@ -2,6 +2,10 @@ import js from '@eslint/js';
 import globals from 'globals';
 export default [
   {
+    files: ['src/client/**/*.js', 'scripts/qa/**/*.js'],
+    languageOptions: { globals: globals.browser },
+  },
+  {
     ignores: [
       'node_modules/**',
       'public/build/**',

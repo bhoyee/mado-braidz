@@ -1,3 +1,4 @@
+import { fixtureCatalog } from './fixtures/catalog.js';
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
@@ -12,21 +13,27 @@ const input = {
 };
 describe('foundation', () => {
   it('serves health without a database or fixed listening port', async () => {
-    const response = await request(createApp({ config: parseEnv(input) }))
+    const response = await request(
+      createApp({ config: parseEnv(input), catalog: fixtureCatalog() }),
+    )
       .get('/health')
       .expect(200);
     expect(response.body).toEqual({ status: 'ok' });
     expect(response.headers['x-content-type-options']).toBe('nosniff');
   });
-  it('renders the placeholder through Nunjucks', async () => {
-    const response = await request(createApp({ config: parseEnv(input) }))
+  it('renders the home page through Nunjucks', async () => {
+    const response = await request(
+      createApp({ config: parseEnv(input), catalog: fixtureCatalog() }),
+    )
       .get('/')
       .expect(200);
     expect(response.text).toContain('<!doctype html>');
     expect(response.text).toContain('Mado African Braidz');
   });
   it('rejects unsafe form submissions', async () => {
-    await request(createApp({ config: parseEnv(input) }))
+    await request(
+      createApp({ config: parseEnv(input), catalog: fixtureCatalog() }),
+    )
       .post('/contact')
       .send({})
       .expect(403);
