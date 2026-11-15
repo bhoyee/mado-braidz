@@ -13,8 +13,8 @@ export const publicSettings = {
     pages: {
       home: {
         eyebrow: 'African hair braiding studio · Lanham, MD',
-        heading: 'A fresh look.',
-        accent: 'A whole mood.',
+        heading: 'The art of beautiful braids.',
+        accent: 'Made for you.',
         intro:
           'Knotless, boho, twists and locs. Braided by Mado in Lanham, Maryland. A style that’s yours, from the first part to the final turn.',
       },

@@ -14,10 +14,34 @@ const config = parseEnv({
 });
 const makeApp = (catalog = fixtureCatalog()) => createApp({ config, catalog });
 describe('Milestone 2 public pages', () => {
-  it('renders the hero film with a poster and deferred source', async () => {
+  it('gives all 13 styles a photo and discloses the 9 generated references', async () => {
+    const data = decorateCatalog(await fixtureCatalog().load());
+    expect(data.styles.every((style) => Boolean(style.photo))).toBe(true);
+    expect(data.styles.filter((style) => style.photo.generated)).toHaveLength(
+      9,
+    );
+    const generated = await request(makeApp())
+      .get('/styles/boho-bob')
+      .expect(200);
+    expect(generated.text).toContain('AI-generated style reference');
+    const supplied = await request(makeApp())
+      .get('/styles/knotless-braids')
+      .expect(200);
+    expect(supplied.text).not.toContain('AI-generated style reference');
+  });
+  it('serves both responsive sizes for each style reference', async () => {
+    const data = decorateCatalog(await fixtureCatalog().load());
+    for (const style of data.styles)
+      for (const size of style.photo.variants.sizes) {
+        await request(makeApp()).get(size.path).expect(200);
+        if (size.avif) await request(makeApp()).get(size.avif).expect(200);
+      }
+  });
+
+  it('renders the photographic hero and a deferred studio film', async () => {
     const response = await request(makeApp()).get('/').expect(200);
-    expect(response.text).toContain('poster="/media/finished-look.webp"');
-    expect(response.text).toContain('data-src="/media/finished-look.mp4"');
+    expect(response.text).toContain('poster="/media/at-the-chair.webp"');
+    expect(response.text).toContain('data-src="/media/at-the-chair.mp4"');
     expect(response.text).toContain('preload="none"');
     expect(response.text).not.toContain(' autoplay');
     expect(response.text).not.toContain('Real studio photographs coming soon');
@@ -48,7 +72,7 @@ describe('Milestone 2 public pages', () => {
     )
       .get('/')
       .expect(200);
-    expect(updated.text).toContain('A fresh look.');
+    expect(updated.text).toContain('The art of beautiful braids.');
   });
 
   it('keeps public pages useful when the active catalog is empty', async () => {

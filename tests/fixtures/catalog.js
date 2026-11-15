@@ -1,3 +1,10 @@
+import { readFileSync } from 'node:fs';
+const images = JSON.parse(
+  readFileSync(
+    new URL('../../src/db/style-image-manifest.json', import.meta.url),
+    'utf8',
+  ),
+);
 import { seedData, catalogRows } from '../../src/db/seed-data.js';
 import { publicSettings } from '../../src/db/public-defaults.js';
 export function fixtureCatalog(overrides = {}) {
@@ -9,7 +16,11 @@ export function fixtureCatalog(overrides = {}) {
     }),
   );
   const data = {
-    styles: catalogRows().map((s, i) => ({ ...s, id: i + 1, photos: [] })),
+    styles: catalogRows().map((s, i) => ({
+      ...s,
+      id: i + 1,
+      photos: images.filter((image) => image.slug === s.slug),
+    })),
     categories,
     addons: seedData.addons,
     gallery: [],

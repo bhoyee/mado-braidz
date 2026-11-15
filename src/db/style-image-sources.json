@@ -1,0 +1,80 @@
+[
+  {
+    "slug": "knotless-braids",
+    "source": "docs/design/imgs/knotless braids.png",
+    "origin": "supplied",
+    "alt": "Knotless braids with neat scalp sections and long individual lengths"
+  },
+  {
+    "slug": "boho-knotless-braids",
+    "source": "docs/design/imgs/style.jpeg",
+    "origin": "supplied",
+    "alt": "Boho braids with loose blonde and brown curls among the braided lengths"
+  },
+  {
+    "slug": "island-twist",
+    "source": "docs/design/imgs/Island twist-2.png",
+    "origin": "supplied",
+    "alt": "Long island twists with curly texture, photographed from behind"
+  },
+  {
+    "slug": "crochet-braids",
+    "source": "docs/design/imgs/Crochet.png",
+    "origin": "supplied",
+    "alt": "Burgundy crochet curls, photographed from behind"
+  },
+  {
+    "slug": "boho-bob",
+    "source": "assets/style-references/boho-bob.png",
+    "origin": "generated",
+    "alt": "AI hairstyle reference: Short boho braided bob with loose curly tendrils"
+  },
+  {
+    "slug": "senegalese-twist",
+    "source": "assets/style-references/senegalese-twist.png",
+    "origin": "generated",
+    "alt": "AI hairstyle reference: Long smooth Senegalese two-strand rope twists"
+  },
+  {
+    "slug": "fulani-braids",
+    "source": "assets/style-references/fulani-braids.png",
+    "origin": "generated",
+    "alt": "AI hairstyle reference: Fulani braids with scalp cornrows and long individual braids"
+  },
+  {
+    "slug": "cornrows",
+    "source": "assets/style-references/cornrows.png",
+    "origin": "generated",
+    "alt": "AI hairstyle reference: Straight-back cornrows with clearly visible neat scalp rows"
+  },
+  {
+    "slug": "passion-twist",
+    "source": "assets/style-references/passion-twist.png",
+    "origin": "generated",
+    "alt": "AI hairstyle reference: Long passion twists with a soft crinkled two-strand texture"
+  },
+  {
+    "slug": "marley-twist",
+    "source": "assets/style-references/marley-twist.png",
+    "origin": "generated",
+    "alt": "AI hairstyle reference: Textured black Marley twists with a natural kinky finish"
+  },
+  {
+    "slug": "invisible-locs",
+    "source": "assets/style-references/invisible-locs.png",
+    "origin": "generated",
+    "alt": "AI hairstyle reference: Shoulder-length invisible locs with flat-twisted roots"
+  },
+  {
+    "slug": "soft-locs",
+    "source": "assets/style-references/soft-locs.png",
+    "origin": "generated",
+    "alt": "AI hairstyle reference: Long soft faux locs with loosely wrapped cylindrical lengths"
+  },
+  {
+    "slug": "butterfly-locs",
+    "source": "assets/style-references/butterfly-locs.png",
+    "origin": "generated",
+    "alt": "AI hairstyle reference: Shoulder-length distressed butterfly locs with characteristic loops"
+  }
+]

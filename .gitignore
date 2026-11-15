@@ -11,3 +11,7 @@ Thumbs.db
 
 # Original video masters stay local; publish the prepared web clips instead.
 /docs/design/videos/
+
+# Source images remain local; optimized image assets and provenance are tracked.
+/docs/design/imgs/
+/assets/style-references/

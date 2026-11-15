@@ -1,0 +1,68 @@
+[
+  {
+    "slug": "tribal-crochet-detail",
+    "path": "/img/gallery/tribal-crochet-detail-960.webp",
+    "width": 938,
+    "height": 1676,
+    "alt": "Curved cornrows transitioning into burgundy crochet curls",
+    "variants": {
+      "origin": "supplied",
+      "sizes": [
+        {
+          "path": "/img/gallery/tribal-crochet-detail-480.webp",
+          "width": 480,
+          "height": 858
+        },
+        {
+          "path": "/img/gallery/tribal-crochet-detail-960.webp",
+          "width": 938,
+          "height": 1676
+        }
+      ]
+    }
+  },
+  {
+    "slug": "spring-twist-detail",
+    "path": "/img/gallery/spring-twist-detail-960.webp",
+    "width": 863,
+    "height": 1600,
+    "alt": "A close look at spring twists with brown textured ends",
+    "variants": {
+      "origin": "supplied",
+      "sizes": [
+        {
+          "path": "/img/gallery/spring-twist-detail-480.webp",
+          "width": 480,
+          "height": 890
+        },
+        {
+          "path": "/img/gallery/spring-twist-detail-960.webp",
+          "width": 863,
+          "height": 1600
+        }
+      ]
+    }
+  },
+  {
+    "slug": "sew-in-finish",
+    "path": "/img/gallery/sew-in-finish-960.webp",
+    "width": 960,
+    "height": 1621,
+    "alt": "Swept cornrow sections with long black curls and decorative cuffs",
+    "variants": {
+      "origin": "supplied",
+      "sizes": [
+        {
+          "path": "/img/gallery/sew-in-finish-480.webp",
+          "width": 480,
+          "height": 810
+        },
+        {
+          "path": "/img/gallery/sew-in-finish-960.webp",
+          "width": 960,
+          "height": 1621
+        }
+      ]
+    }
+  }
+]

@@ -1,3 +1,4 @@
+import { seedStyleImages } from './seed-style-images.js';
 import { publicSettings } from '../src/db/public-defaults.js';
 import { eq, and, isNull } from 'drizzle-orm';
 import argon2 from 'argon2';
@@ -89,6 +90,7 @@ try {
             .values({ ...variant, styleId: saved.id });
       }
     }
+    await seedStyleImages(tx);
     for (const addon of seedData.addons)
       await tx
         .insert(s.addons)

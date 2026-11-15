@@ -27,6 +27,17 @@ for (const [source, target] of [
     'fraunces-italic-latin.woff2',
   ],
   ['figtree/files/figtree-latin-wght-normal.woff2', 'figtree-latin.woff2'],
+  ['manrope/files/manrope-latin-wght-normal.woff2', 'manrope-latin.woff2'],
+  [
+    'cormorant-garamond/files/cormorant-garamond-latin-wght-normal.woff2',
+    'cormorant-latin.woff2',
+  ],
+  [
+    'cormorant-garamond/files/cormorant-garamond-latin-wght-italic.woff2',
+    'cormorant-italic-latin.woff2',
+  ],
+  ['manrope/LICENSE', 'manrope-LICENSE.txt'],
+  ['cormorant-garamond/LICENSE', 'cormorant-LICENSE.txt'],
   ['fraunces/LICENSE', 'fraunces-LICENSE.txt'],
   ['figtree/LICENSE', 'figtree-LICENSE.txt'],
 ])

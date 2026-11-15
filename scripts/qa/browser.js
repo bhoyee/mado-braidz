@@ -63,11 +63,30 @@ try {
         })),
       };
       results.push(result);
-      if (path === '/' || path === '/styles/knotless-braids')
+      if (path === '/' || path === '/styles/knotless-braids') {
+        for (const img of await page.locator('img').all())
+          await img.scrollIntoViewIfNeeded();
+        await page.evaluate(async () => {
+          await Promise.all(
+            [...document.images].map((img) => img.decode().catch(() => {})),
+          );
+          scrollTo({ top: 0, behavior: 'instant' });
+          await new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          );
+        });
+        const broken = await page.evaluate(() =>
+          [...document.images]
+            .filter((img) => !img.naturalWidth)
+            .map((img) => img.src),
+        );
+        if (broken.length)
+          throw new Error('Broken images: ' + broken.join(', '));
         await page.screenshot({
           path: `tmp/qa/${path === '/' ? 'home' : 'style'}-${width}.png`,
           fullPage: true,
         });
+      }
     }
     await page.goto(root + '/');
     await page.keyboard.press('Tab');

@@ -69,7 +69,31 @@ export function safePhoto(photo) {
     )
   )
     return null;
-  return photo;
+  const variants =
+    typeof photo.variants === 'string'
+      ? JSON.parse(photo.variants)
+      : photo.variants;
+  const sizes = (variants?.sizes || []).filter(
+    (item) =>
+      typeof item.path === 'string' &&
+      /^\/img\/(?:styles|gallery)\/[a-z0-9-]+\.webp$/.test(item.path) &&
+      Number.isInteger(item.width),
+  );
+  return {
+    ...photo,
+    generated: variants?.origin === 'generated',
+    origin: variants?.origin || 'supplied',
+    srcset: sizes.map((item) => `${item.path} ${item.width}w`).join(', '),
+    avifSrcset: sizes
+      .filter(
+        (item) =>
+          typeof item.avif === 'string' &&
+          /^\/img\/styles\/[a-z0-9-]+\.avif$/.test(item.avif),
+      )
+      .map((item) => `${item.avif} ${item.width}w`)
+      .join(', '),
+    avifPath: sizes.at(-1)?.avif,
+  };
 }
 export function decorateCatalog(data) {
   const styles = data.styles.map((style) => {
@@ -114,11 +138,19 @@ export function decorateCatalog(data) {
   const b = data.settings.business;
   const pages = { ...(data.settings.seo?.pages || {}) };
   // Upgrade only the original scaffold copy; preserve owner-written content.
-  if (!pages.home || pages.home.heading === 'Braids done slowly,')
+  if (
+    !pages.home ||
+    ['Braids done slowly,', 'A fresh look.'].includes(pages.home.heading)
+  )
     pages.home = publicSettings.seo.pages.home;
   return {
     ...data,
     styles,
+    heroStyle:
+      styles.find((style) => style.slug === 'knotless-braids') || styles[0],
+    suppliedStyles: styles.filter(
+      (style) => style.photo && !style.photo.generated,
+    ),
     business: b,
     booking: data.settings.booking,
     pages,

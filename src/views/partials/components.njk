@@ -1,7 +1,9 @@
-{% macro photo(item, name, hero=false) %}{% if item %}<img src="{{ item.path }}" alt="{{ item.alt }}" width="{{ item.width or 800 }}" height="{{ item.height or 1000 }}" {% if hero %}fetchpriority="high"{% else %}loading="lazy"{% endif %}>{% else %}<div class="photo-empty"><img src="/img/braid-ring.svg" width="100" height="100" alt="" {% if not hero %}loading="lazy"{% endif %}><span class="eyebrow">{{ name }}</span><span class="photo-caption">Real studio photographs coming soon</span></div>{% endif %}{% endmacro %}
+{% macro photo(item,name,hero=false) %}
+{% if item %}<picture>{% if item.avifSrcset %}<source type="image/avif" srcset="{{ item.avifSrcset }}" sizes="{% if hero %}(max-width:760px) 100vw, 50vw{% else %}(max-width:760px) 45vw, 32vw{% endif %}">{% endif %}<img src="{{ item.path }}" {% if item.srcset %}srcset="{{ item.srcset }}" sizes="{% if hero %}(max-width:760px) 100vw, 50vw{% else %}(max-width:760px) 45vw, 32vw{% endif %}"{% endif %} alt="{{ item.alt }}" width="{{ item.width or 800 }}" height="{{ item.height or 1000 }}" {% if hero %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async"></picture>{% else %}<div class="photo-empty"><span class="eyebrow">{{ name }}</span><span class="photo-caption">Ask Mado about this look.</span></div>{% endif %}
+{% endmacro %}
 {% macro card(style, large=false) %}
 <article class="style-card{% if large %} large{% endif %}{% if not style.photo %} type-card{% endif %}">
- {% if style.photo %}<a href="/styles/{{ style.slug }}" class="style-photo">{{ photo(style.photo,style.name) }}</a>{% endif %}
+ {% if style.photo %}<a href="/styles/{{ style.slug }}" class="style-photo">{{ photo(style.photo,style.name) }}{% if style.photo.generated %}<span class="image-origin">AI style reference</span>{% endif %}</a>{% endif %}
  <div class="style-card-caption"><p class="eyebrow">{{ style.category }}</p><h3><a href="/styles/{{ style.slug }}">{{ style.name }}</a></h3><p>{% if style.from %}From {{ style.from | money }}{% else %}Price on consultation{% endif %}<span class="duration"> · {{ style.durationMin / 60 }} hrs</span></p><a class="style-explore" href="/styles/{{ style.slug }}">Explore the style <span aria-hidden="true">↗</span></a></div>
 </article>
 {% endmacro %}

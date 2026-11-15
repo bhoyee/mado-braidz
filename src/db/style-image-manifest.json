@@ -1,0 +1,314 @@
+[
+  {
+    "slug": "knotless-braids",
+    "path": "/img/styles/knotless-braids-960.webp",
+    "width": 960,
+    "height": 1050,
+    "alt": "Knotless braids with neat scalp sections and long individual lengths",
+    "variants": {
+      "origin": "supplied",
+      "sizes": [
+        {
+          "avif": "/img/styles/knotless-braids-480.avif",
+          "path": "/img/styles/knotless-braids-480.webp",
+          "width": 480,
+          "height": 525
+        },
+        {
+          "avif": "/img/styles/knotless-braids-960.avif",
+          "path": "/img/styles/knotless-braids-960.webp",
+          "width": 960,
+          "height": 1050
+        }
+      ]
+    }
+  },
+  {
+    "slug": "boho-knotless-braids",
+    "path": "/img/styles/boho-knotless-braids-960.webp",
+    "width": 960,
+    "height": 1280,
+    "alt": "Boho braids with loose blonde and brown curls among the braided lengths",
+    "variants": {
+      "origin": "supplied",
+      "sizes": [
+        {
+          "avif": "/img/styles/boho-knotless-braids-480.avif",
+          "path": "/img/styles/boho-knotless-braids-480.webp",
+          "width": 480,
+          "height": 640
+        },
+        {
+          "avif": "/img/styles/boho-knotless-braids-960.avif",
+          "path": "/img/styles/boho-knotless-braids-960.webp",
+          "width": 960,
+          "height": 1280
+        }
+      ]
+    }
+  },
+  {
+    "slug": "island-twist",
+    "path": "/img/styles/island-twist-960.webp",
+    "width": 937,
+    "height": 1678,
+    "alt": "Long island twists with curly texture, photographed from behind",
+    "variants": {
+      "origin": "supplied",
+      "sizes": [
+        {
+          "avif": "/img/styles/island-twist-480.avif",
+          "path": "/img/styles/island-twist-480.webp",
+          "width": 480,
+          "height": 860
+        },
+        {
+          "avif": "/img/styles/island-twist-960.avif",
+          "path": "/img/styles/island-twist-960.webp",
+          "width": 937,
+          "height": 1678
+        }
+      ]
+    }
+  },
+  {
+    "slug": "crochet-braids",
+    "path": "/img/styles/crochet-braids-960.webp",
+    "width": 960,
+    "height": 1280,
+    "alt": "Burgundy crochet curls, photographed from behind",
+    "variants": {
+      "origin": "supplied",
+      "sizes": [
+        {
+          "avif": "/img/styles/crochet-braids-480.avif",
+          "path": "/img/styles/crochet-braids-480.webp",
+          "width": 480,
+          "height": 640
+        },
+        {
+          "avif": "/img/styles/crochet-braids-960.avif",
+          "path": "/img/styles/crochet-braids-960.webp",
+          "width": 960,
+          "height": 1280
+        }
+      ]
+    }
+  },
+  {
+    "slug": "boho-bob",
+    "path": "/img/styles/boho-bob-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI hairstyle reference: Short boho braided bob with loose curly tendrils",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/boho-bob-480.avif",
+          "path": "/img/styles/boho-bob-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/boho-bob-960.avif",
+          "path": "/img/styles/boho-bob-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ]
+    }
+  },
+  {
+    "slug": "senegalese-twist",
+    "path": "/img/styles/senegalese-twist-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI hairstyle reference: Long smooth Senegalese two-strand rope twists",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/senegalese-twist-480.avif",
+          "path": "/img/styles/senegalese-twist-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/senegalese-twist-960.avif",
+          "path": "/img/styles/senegalese-twist-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ]
+    }
+  },
+  {
+    "slug": "fulani-braids",
+    "path": "/img/styles/fulani-braids-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI hairstyle reference: Fulani braids with scalp cornrows and long individual braids",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/fulani-braids-480.avif",
+          "path": "/img/styles/fulani-braids-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/fulani-braids-960.avif",
+          "path": "/img/styles/fulani-braids-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ]
+    }
+  },
+  {
+    "slug": "cornrows",
+    "path": "/img/styles/cornrows-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI hairstyle reference: Straight-back cornrows with clearly visible neat scalp rows",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/cornrows-480.avif",
+          "path": "/img/styles/cornrows-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/cornrows-960.avif",
+          "path": "/img/styles/cornrows-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ]
+    }
+  },
+  {
+    "slug": "passion-twist",
+    "path": "/img/styles/passion-twist-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI hairstyle reference: Long passion twists with a soft crinkled two-strand texture",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/passion-twist-480.avif",
+          "path": "/img/styles/passion-twist-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/passion-twist-960.avif",
+          "path": "/img/styles/passion-twist-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ]
+    }
+  },
+  {
+    "slug": "marley-twist",
+    "path": "/img/styles/marley-twist-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI hairstyle reference: Textured black Marley twists with a natural kinky finish",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/marley-twist-480.avif",
+          "path": "/img/styles/marley-twist-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/marley-twist-960.avif",
+          "path": "/img/styles/marley-twist-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ]
+    }
+  },
+  {
+    "slug": "invisible-locs",
+    "path": "/img/styles/invisible-locs-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI hairstyle reference: Shoulder-length invisible locs with flat-twisted roots",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/invisible-locs-480.avif",
+          "path": "/img/styles/invisible-locs-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/invisible-locs-960.avif",
+          "path": "/img/styles/invisible-locs-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ]
+    }
+  },
+  {
+    "slug": "soft-locs",
+    "path": "/img/styles/soft-locs-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI hairstyle reference: Long soft faux locs with loosely wrapped cylindrical lengths",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/soft-locs-480.avif",
+          "path": "/img/styles/soft-locs-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/soft-locs-960.avif",
+          "path": "/img/styles/soft-locs-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ]
+    }
+  },
+  {
+    "slug": "butterfly-locs",
+    "path": "/img/styles/butterfly-locs-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI hairstyle reference: Shoulder-length distressed butterfly locs with characteristic loops",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/butterfly-locs-480.avif",
+          "path": "/img/styles/butterfly-locs-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/butterfly-locs-960.avif",
+          "path": "/img/styles/butterfly-locs-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ]
+    }
+  }
+]
