@@ -1,0 +1,18 @@
+{
+  "tool": "Built-in image_gen",
+  "purpose": "Labelled knotless braid size references",
+  "prompts": [
+    {
+      "size": "medium",
+      "prompt": "Use case: photorealistic-natural. A 4:5 portrait hairstyle size-guide reference photograph of an adult Black woman with medium-sized knotless box braids with visibly thicker individual plaits and moderately broad, clean square parts, mid-back length black hair. Three-quarter rear angle, scalp and full braided lengths in clear focus, head to waist crop. Simple black top, plain warm ivory studio wall, natural skin texture and soft daylight. Visually accurate braid diameter and spacing. No loose curls, no twists, no hair accessories, no text, no watermark. This image will be explicitly labelled AI-generated size reference, not client work."
+    },
+    {
+      "size": "semi_medium",
+      "prompt": "Use case: photorealistic-natural. A 4:5 portrait hairstyle size-guide reference photograph of an adult Black woman with semi-medium knotless box braids, individual plaits noticeably slimmer than medium braids, balanced small clean square sections, mid-back length black hair. Three-quarter rear angle, scalp and full braided lengths in clear focus, head to waist crop. Simple black top, plain warm ivory studio wall, natural skin texture and soft daylight. Visually accurate braid diameter and spacing. No loose curls, no twists, no hair accessories, no text, no watermark. This image will be explicitly labelled AI-generated size reference, not client work."
+    },
+    {
+      "size": "small",
+      "prompt": "Use case: photorealistic-natural. A 4:5 portrait hairstyle size-guide reference photograph of an adult Black woman with small knotless box braids, many fine slender individual plaits and numerous tiny neat square scalp sections, mid-back length black hair. Three-quarter rear angle, scalp and full braided lengths in clear focus, head to waist crop. Simple black top, plain warm ivory studio wall, natural skin texture and soft daylight. Visually accurate braid diameter and spacing. No loose curls, no twists, no hair accessories, no text, no watermark. This image will be explicitly labelled AI-generated size reference, not client work."
+    }
+  ]
+}

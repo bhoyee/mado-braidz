@@ -38,10 +38,10 @@ describe('Milestone 2 public pages', () => {
       }
   });
 
-  it('renders the photographic hero and a deferred studio film', async () => {
+  it('renders the video hero and a deferred studio film', async () => {
     const response = await request(makeApp()).get('/').expect(200);
-    expect(response.text).toContain('poster="/media/at-the-chair.webp"');
-    expect(response.text).toContain('data-src="/media/at-the-chair.mp4"');
+    expect(response.text).toContain('poster="/media/finished-look.webp"');
+    expect(response.text).toContain('data-src="/media/finished-look.mp4"');
     expect(response.text).toContain('preload="none"');
     expect(response.text).not.toContain(' autoplay');
     expect(response.text).not.toContain('Real studio photographs coming soon');
@@ -78,7 +78,7 @@ describe('Milestone 2 public pages', () => {
   it('keeps public pages useful when the active catalog is empty', async () => {
     const data = await fixtureCatalog().load();
     data.styles = [];
-    for (const path of ['/', '/styles', '/prices']) {
+    for (const path of ['/', '/styles']) {
       const response = await request(
         makeApp(fixtureCatalog({ load: async () => data })),
       )
@@ -101,11 +101,10 @@ describe('Milestone 2 public pages', () => {
   it.each([
     '/',
     '/styles',
-    '/prices',
     '/styles/knotless-braids',
     '/styles/boho-bob',
     '/styles/fulani-braids',
-    '/gallery',
+    '/our-work',
     '/about',
     '/contact',
     '/policies',
@@ -139,11 +138,56 @@ describe('Milestone 2 public pages', () => {
     await request(makeApp()).get('/styles?category=unknown').expect(400);
     await request(makeApp()).get('/styles?category[x]=1').expect(400);
   });
-  it('shows every flyer price and represents null lengths and consultation honestly', async () => {
-    const response = await request(makeApp()).get('/prices').expect(200);
+  it('keeps prices within each style and redirects legacy URLs', async () => {
+    await request(makeApp())
+      .get('/prices')
+      .expect(301)
+      .expect('Location', '/styles');
+    await request(makeApp())
+      .get('/gallery')
+      .expect(301)
+      .expect('Location', '/our-work');
+    const response = await request(makeApp())
+      .get('/styles/knotless-braids?size=small')
+      .expect(200);
     expect(response.text).toContain('$340');
-    expect(response.text).toContain('Standard');
-    expect(response.text).toContain('Price on consultation');
+    expect(response.text).toContain('Under butt');
+    const consultation = await request(makeApp())
+      .get('/styles/fulani-braids')
+      .expect(200);
+    expect(consultation.text).toContain('Price on consultation.');
+  });
+  it('shows the confirmed hours, address, phone and Our Work navigation', async () => {
+    const response = await request(makeApp()).get('/').expect(200);
+    expect(response.text).toContain('6:00 AM–6:00 PM');
+    expect(response.text).toContain('Open daily');
+    expect(response.text).toContain('7375 Executive Place');
+    expect(response.text).toContain('(443) 743-4979');
+    expect(response.text).toContain('Styles &amp; Prices');
+    expect(response.text).toContain('Our Work');
+    expect(response.text).not.toContain('href="/prices"');
+  });
+  it('opens only the selected size lengths using server catalog prices', async () => {
+    const response = await request(makeApp())
+      .get('/styles/knotless-braids?size=medium&price=1')
+      .expect(200);
+    const lengths = response.text
+      .split('id="lengths"')[1]
+      .split('</section>')[0];
+    expect(lengths).toContain('Mid back');
+    expect(lengths).toContain('$180');
+    expect(lengths).toContain('$200');
+    expect(lengths).not.toContain('Shoulder');
+    expect(lengths).not.toContain('$1<');
+    expect(response.text).toContain('knotless-size-medium');
+    expect(response.text).toContain('knotless-size-semi-medium');
+    expect(response.text).toContain('knotless-size-small');
+    await request(makeApp())
+      .get('/styles/knotless-braids?size=unknown')
+      .expect(400);
+    await request(makeApp())
+      .get('/styles/knotless-braids?size[x]=small')
+      .expect(400);
   });
   it('renders 404s for unknown styles, areas and unimplemented private booking tokens', async () => {
     for (const url of [

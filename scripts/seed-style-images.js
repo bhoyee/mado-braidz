@@ -20,7 +20,10 @@ export async function seedStyleImages(tx) {
   ]) {
     const [style] =
       image.kind === 'style'
-        ? await tx.select().from(s.styles).where(eq(s.styles.slug, image.slug))
+        ? await tx
+            .select()
+            .from(s.styles)
+            .where(eq(s.styles.slug, image.styleSlug || image.slug))
         : [];
     if (image.kind === 'style' && !style) continue;
     const [existing] = await tx

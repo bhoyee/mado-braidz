@@ -30,11 +30,16 @@ for (const item of sources) {
   const main = sizes.at(-1);
   manifest.push({
     slug: item.slug,
+    styleSlug: item.styleSlug || item.slug,
     path: main.path,
     width: main.width,
     height: main.height,
     alt: item.alt,
-    variants: { origin: item.origin, sizes },
+    variants: {
+      origin: item.origin,
+      sizes,
+      ...(item.size ? { size: item.size } : {}),
+    },
   });
   console.log(`Prepared ${item.slug} (${item.origin})`);
 }

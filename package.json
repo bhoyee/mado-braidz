@@ -18,7 +18,8 @@
     "test:browser": "node scripts/qa/browser.js",
     "media:prepare": "node scripts/prepare-media.js",
     "test:video": "node scripts/qa/video.js",
-    "images:prepare": "node scripts/prepare-style-images.js"
+    "images:prepare": "node scripts/prepare-style-images.js",
+    "content:sync": "node scripts/sync-public-content.js"
   },
   "dependencies": {
     "@alpinejs/csp": "^3.17.5",

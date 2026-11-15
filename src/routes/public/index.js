@@ -83,6 +83,7 @@ export function safePhoto(photo) {
     ...photo,
     generated: variants?.origin === 'generated',
     origin: variants?.origin || 'supplied',
+    variants,
     srcset: sizes.map((item) => `${item.path} ${item.width}w`).join(', '),
     avifSrcset: sizes
       .filter(
@@ -97,11 +98,19 @@ export function safePhoto(photo) {
 }
 export function decorateCatalog(data) {
   const styles = data.styles.map((style) => {
+    const allPhotos = (style.photos || []).map(safePhoto).filter(Boolean);
     const prices = style.variants.map((v) => v.priceCents);
     const from = prices.length ? Math.min(...prices) : style.fromPriceCents;
     const groups = [...new Set(style.variants.map((v) => v.size))].map(
       (size) => ({
+        key: size || 'standard',
         name: label(size),
+        from: Math.min(
+          ...style.variants
+            .filter((v) => v.size === size)
+            .map((v) => v.priceCents),
+        ),
+        photo: allPhotos.find((photo) => photo.variants?.size === size),
         variants: style.variants
           .filter((v) => v.size === size)
           .map((v) => ({
@@ -115,8 +124,8 @@ export function decorateCatalog(data) {
       ...style,
       from,
       groups,
-      photos: (style.photos || []).map(safePhoto).filter(Boolean),
-      photo: (style.photos || []).map(safePhoto).find(Boolean),
+      photos: allPhotos.filter((photo) => !photo.variants?.size),
+      photo: allPhotos.find((photo) => !photo.variants?.size) || allPhotos[0],
       longHtml: style.longDesc
         ? sanitizeHtml(marked.parse(style.longDesc), {
             allowedTags: [
@@ -222,7 +231,19 @@ export function publicRouter(catalog) {
   router.get('/styles/:slug', (req, res, next) => {
     const style = res.locals.styles.find((s) => s.slug === req.params.slug);
     if (!style) return next();
-    res.render('pages/style', {
+    const result = z.string().max(24).optional().safeParse(req.query.size);
+    const selectedSize = result.success
+      ? result.data || (style.groups.length === 1 ? style.groups[0].key : null)
+      : null;
+    const selectedGroup = style.groups.find(
+      (group) => group.key === selectedSize,
+    );
+    const invalidSize =
+      !result.success || (Boolean(result.data) && !selectedGroup);
+    res.status(invalidSize ? 400 : 200).render('pages/style', {
+      selectedSize: invalidSize ? null : selectedSize,
+      selectedGroup: invalidSize ? null : selectedGroup,
+      invalidSize,
       title:
         style.seoTitle ||
         `${style.name} in Lanham, MD | ${res.locals.business.name}`,
@@ -230,8 +251,9 @@ export function publicRouter(catalog) {
       style,
     });
   });
-  router.get('/prices', render('prices', 'The price menu'));
-  router.get('/gallery', render('gallery', 'Fresh from the chair'));
+  router.get('/prices', (_req, res) => res.redirect(301, '/styles'));
+  router.get('/gallery', (_req, res) => res.redirect(301, '/our-work'));
+  router.get('/our-work', render('gallery', 'Our Work'));
   router.get('/about', render('about', 'Meet Mado'));
   router.get('/contact', (req, res) =>
     res.render('pages/contact', {

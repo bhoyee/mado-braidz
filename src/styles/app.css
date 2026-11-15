@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @source '../views';
 @import './home.css';
+@import './salon.css';
 
 @theme {
   --color-ink: #15100e;

@@ -76,5 +76,29 @@
     "source": "assets/style-references/butterfly-locs.png",
     "origin": "generated",
     "alt": "AI hairstyle reference: Shoulder-length distressed butterfly locs with characteristic loops"
+  },
+  {
+    "slug": "knotless-size-medium",
+    "styleSlug": "knotless-braids",
+    "size": "medium",
+    "source": "assets/style-references/knotless-size-medium.png",
+    "origin": "generated",
+    "alt": "AI size reference: medium knotless box braids, showing scalp sections and braid thickness"
+  },
+  {
+    "slug": "knotless-size-semi-medium",
+    "styleSlug": "knotless-braids",
+    "size": "semi_medium",
+    "source": "assets/style-references/knotless-size-semi_medium.png",
+    "origin": "generated",
+    "alt": "AI size reference: semi-medium knotless box braids, showing scalp sections and braid thickness"
+  },
+  {
+    "slug": "knotless-size-small",
+    "styleSlug": "knotless-braids",
+    "size": "small",
+    "source": "assets/style-references/knotless-size-small.png",
+    "origin": "generated",
+    "alt": "AI size reference: small knotless box braids, showing scalp sections and braid thickness"
   }
 ]

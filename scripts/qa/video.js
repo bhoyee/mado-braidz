@@ -4,7 +4,7 @@ const root = 'http://localhost:4780';
 try {
   for (const preference of ['reduce', 'no-preference']) {
     const context = await browser.newContext({
-      viewport: { width: 390, height: 900 },
+      viewport: { width: 390, height: 1000 },
       reducedMotion: preference,
     });
     const page = await context.newPage();
@@ -13,15 +13,22 @@ try {
       if (r.url().endsWith('.mp4')) downloads++;
     });
     await page.goto(root + '/');
-    await page.waitForTimeout(1000);
-    if (downloads) throw new Error('Video downloaded before request');
-    const player = page.locator('[data-studio-player]').first();
+    const player = page.locator('.hero-video');
     await player.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1100);
+    if (preference === 'reduce' && downloads)
+      throw new Error('Reduced-motion browsing auto-downloaded video');
+    if (preference === 'no-preference')
+      await page.waitForFunction(
+        () => !document.querySelector('[data-hero-video]').paused,
+      );
     const button = player.locator('button');
+    if (!(await player.locator('video').evaluate((v) => v.paused)))
+      await button.click();
     await button.focus();
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => {
-      const video = document.querySelector('[data-studio-video]');
+      const video = document.querySelector('[data-hero-video]');
       return !video.paused && video.currentTime > 0;
     });
     if (!(await button.innerText()).includes('Pause film'))
@@ -29,15 +36,15 @@ try {
     await page.keyboard.press('Enter');
     if (!(await player.locator('video').evaluate((v) => v.paused)))
       throw new Error('Keyboard pause failed');
-    await page.locator('h1').scrollIntoViewIfNeeded();
+    await page.locator('#the-edit').scrollIntoViewIfNeeded();
     await player.scrollIntoViewIfNeeded();
     await page.waitForTimeout(600);
     if (!(await player.locator('video').evaluate((v) => v.paused)))
       throw new Error('Manual pause was not preserved');
-    await page.goto(root + '/gallery');
+    await page.goto(root + '/our-work');
     const count = downloads;
     await page.waitForTimeout(600);
-    if (count !== downloads) throw new Error('Gallery eagerly loaded films');
+    if (count !== downloads) throw new Error('Our Work eagerly loaded films');
     for (const film of await page.locator('[data-studio-player]').all()) {
       await film.scrollIntoViewIfNeeded();
       await film.locator('button').click();
@@ -62,11 +69,11 @@ try {
   const page = await saver.newPage();
   await page.goto(root + '/');
   await page.waitForTimeout(600);
-  if (await page.locator('video source').getAttribute('src'))
+  if (await page.locator('[data-hero-video] source').getAttribute('src'))
     throw new Error('Data saver loaded video');
   await saver.close();
   console.log(
-    'PASS: request-only films, reduced-motion and data-saver browsing, all three clips, keyboard play/pause, and pause persistence',
+    'PASS: hero autoplay with preference safeguards, request-only Our Work films, keyboard play/pause, all clips, and pause persistence',
   );
 } finally {
   await browser.close();

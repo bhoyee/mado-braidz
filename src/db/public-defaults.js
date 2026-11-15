@@ -1,7 +1,22 @@
 export const publicSettings = {
   hours: {
+    summary: 'Open daily · 6:00 AM–6:00 PM',
+    daysLabel: 'Open daily',
+    timeLabel: '6:00 AM–6:00 PM',
     description:
-      'Tuesday–Saturday, by appointment. Sunday and Monday closed. Call to confirm your start time.',
+      'Monday–Friday, 6:00 AM–6:00 PM. Saturday–Sunday, 6:00 AM–6:00 PM. Eastern time.',
+    timezone: 'America/New_York',
+    weekly: Object.fromEntries(
+      [
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+      ].map((day) => [day, { open: '06:00', close: '18:00', closed: false }]),
+    ),
   },
   policy: {
     rescheduleHours: 48,
@@ -19,11 +34,17 @@ export const publicSettings = {
           'Knotless, boho, twists and locs. Braided by Mado in Lanham, Maryland. A style that’s yours, from the first part to the final turn.',
       },
       about: {
-        heading: 'Every part placed by the same hands.',
+        heading: 'Where Beauty Meets the Art of Braiding',
         intro:
-          'Mado African Braidz is a one-stylist braiding studio in Lanham, Maryland. From your first part to the finishing touches, your appointment is time set aside for you.',
+          'At Mado Braids, we believe braids are more than just a hairstyle—they are a form of self-expression, confidence, and beauty.',
         story:
-          'Choose from knotless braids, boho styles, twists, locs and Fulani braids. Have a particular look in mind? Call before your appointment so we can talk about your hair, your length and the finish you want.',
+          'We are passionate about creating beautiful, long-lasting braided styles that make every client feel confident and effortlessly gorgeous. From classic protective styles to trendy, customized looks, we pay close attention to detail to ensure every braid is neat, polished, and tailored to you.',
+        values: [
+          'Expert Braiding Techniques',
+          'Comfortable, Long-Lasting Styles',
+          'Warm, Welcoming Service',
+          'A Blend of Modern & Traditional Looks',
+        ],
       },
       faq: [
         {

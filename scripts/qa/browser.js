@@ -19,8 +19,10 @@ try {
       '/',
       '/styles',
       '/styles/knotless-braids',
-      '/prices',
-      '/gallery',
+      '/styles/knotless-braids?size=medium',
+      '/styles/knotless-braids?size=semi_medium',
+      '/styles/knotless-braids?size=small',
+      '/our-work',
       '/about',
       '/contact',
       '/policies',
@@ -99,14 +101,22 @@ try {
       await page.locator('.mobile-nav summary').click();
       await page
         .getByRole('navigation', { name: 'Mobile navigation' })
-        .getByRole('link', { name: 'Prices', exact: true })
+        .getByRole('link', { name: 'Styles & Prices', exact: true })
         .click();
-      if (!page.url().endsWith('/prices'))
+      if (!page.url().endsWith('/styles'))
         throw new Error('Mobile navigation failed');
     }
     await page.goto(root + '/styles?category=boho');
     if ((await page.locator('.style-card').count()) !== 2)
       throw new Error('Server category filter failed');
+    await page.goto(root + '/styles/knotless-braids');
+    await page.locator('.size-choice[href*="size=small"]').click();
+    if ((await page.locator('.length-price').count()) !== 5)
+      throw new Error('Small size lengths did not render');
+    if (!(await page.locator('#lengths').innerText()).includes('$340'))
+      throw new Error('Small price was incorrect');
+    if (!page.url().includes('size=small#lengths'))
+      throw new Error('Size selection was not preserved in URL');
     await page.goto(root + '/contact');
     if (await page.locator('iframe').count())
       throw new Error('Map loaded without consent');

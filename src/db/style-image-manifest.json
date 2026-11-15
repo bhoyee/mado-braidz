@@ -1,6 +1,7 @@
 [
   {
     "slug": "knotless-braids",
+    "styleSlug": "knotless-braids",
     "path": "/img/styles/knotless-braids-960.webp",
     "width": 960,
     "height": 1050,
@@ -25,6 +26,7 @@
   },
   {
     "slug": "boho-knotless-braids",
+    "styleSlug": "boho-knotless-braids",
     "path": "/img/styles/boho-knotless-braids-960.webp",
     "width": 960,
     "height": 1280,
@@ -49,6 +51,7 @@
   },
   {
     "slug": "island-twist",
+    "styleSlug": "island-twist",
     "path": "/img/styles/island-twist-960.webp",
     "width": 937,
     "height": 1678,
@@ -73,6 +76,7 @@
   },
   {
     "slug": "crochet-braids",
+    "styleSlug": "crochet-braids",
     "path": "/img/styles/crochet-braids-960.webp",
     "width": 960,
     "height": 1280,
@@ -97,6 +101,7 @@
   },
   {
     "slug": "boho-bob",
+    "styleSlug": "boho-bob",
     "path": "/img/styles/boho-bob-960.webp",
     "width": 960,
     "height": 1200,
@@ -121,6 +126,7 @@
   },
   {
     "slug": "senegalese-twist",
+    "styleSlug": "senegalese-twist",
     "path": "/img/styles/senegalese-twist-960.webp",
     "width": 960,
     "height": 1200,
@@ -145,6 +151,7 @@
   },
   {
     "slug": "fulani-braids",
+    "styleSlug": "fulani-braids",
     "path": "/img/styles/fulani-braids-960.webp",
     "width": 960,
     "height": 1200,
@@ -169,6 +176,7 @@
   },
   {
     "slug": "cornrows",
+    "styleSlug": "cornrows",
     "path": "/img/styles/cornrows-960.webp",
     "width": 960,
     "height": 1200,
@@ -193,6 +201,7 @@
   },
   {
     "slug": "passion-twist",
+    "styleSlug": "passion-twist",
     "path": "/img/styles/passion-twist-960.webp",
     "width": 960,
     "height": 1200,
@@ -217,6 +226,7 @@
   },
   {
     "slug": "marley-twist",
+    "styleSlug": "marley-twist",
     "path": "/img/styles/marley-twist-960.webp",
     "width": 960,
     "height": 1200,
@@ -241,6 +251,7 @@
   },
   {
     "slug": "invisible-locs",
+    "styleSlug": "invisible-locs",
     "path": "/img/styles/invisible-locs-960.webp",
     "width": 960,
     "height": 1200,
@@ -265,6 +276,7 @@
   },
   {
     "slug": "soft-locs",
+    "styleSlug": "soft-locs",
     "path": "/img/styles/soft-locs-960.webp",
     "width": 960,
     "height": 1200,
@@ -289,6 +301,7 @@
   },
   {
     "slug": "butterfly-locs",
+    "styleSlug": "butterfly-locs",
     "path": "/img/styles/butterfly-locs-960.webp",
     "width": 960,
     "height": 1200,
@@ -309,6 +322,84 @@
           "height": 1200
         }
       ]
+    }
+  },
+  {
+    "slug": "knotless-size-medium",
+    "styleSlug": "knotless-braids",
+    "path": "/img/styles/knotless-size-medium-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI size reference: medium knotless box braids, showing scalp sections and braid thickness",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/knotless-size-medium-480.avif",
+          "path": "/img/styles/knotless-size-medium-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/knotless-size-medium-960.avif",
+          "path": "/img/styles/knotless-size-medium-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ],
+      "size": "medium"
+    }
+  },
+  {
+    "slug": "knotless-size-semi-medium",
+    "styleSlug": "knotless-braids",
+    "path": "/img/styles/knotless-size-semi-medium-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI size reference: semi-medium knotless box braids, showing scalp sections and braid thickness",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/knotless-size-semi-medium-480.avif",
+          "path": "/img/styles/knotless-size-semi-medium-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/knotless-size-semi-medium-960.avif",
+          "path": "/img/styles/knotless-size-semi-medium-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ],
+      "size": "semi_medium"
+    }
+  },
+  {
+    "slug": "knotless-size-small",
+    "styleSlug": "knotless-braids",
+    "path": "/img/styles/knotless-size-small-960.webp",
+    "width": 960,
+    "height": 1200,
+    "alt": "AI size reference: small knotless box braids, showing scalp sections and braid thickness",
+    "variants": {
+      "origin": "generated",
+      "sizes": [
+        {
+          "avif": "/img/styles/knotless-size-small-480.avif",
+          "path": "/img/styles/knotless-size-small-480.webp",
+          "width": 480,
+          "height": 600
+        },
+        {
+          "avif": "/img/styles/knotless-size-small-960.avif",
+          "path": "/img/styles/knotless-size-small-960.webp",
+          "width": 960,
+          "height": 1200
+        }
+      ],
+      "size": "small"
     }
   }
 ]

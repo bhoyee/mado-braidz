@@ -19,7 +19,9 @@ export function fixtureCatalog(overrides = {}) {
     styles: catalogRows().map((s, i) => ({
       ...s,
       id: i + 1,
-      photos: images.filter((image) => image.slug === s.slug),
+      photos: images.filter(
+        (image) => (image.styleSlug || image.slug) === s.slug,
+      ),
     })),
     categories,
     addons: seedData.addons,
