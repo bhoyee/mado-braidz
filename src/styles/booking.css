@@ -92,8 +92,7 @@
 }
 .booking-slots {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 24px;
   margin: 20px 0 32px;
 }
 .booking-slots .slot {
@@ -156,9 +155,6 @@
   }
   .booking-layout .booking-summary dd {
     text-align: left;
-  }
-  .booking-slots {
-    grid-template-columns: 1fr;
   }
   .booking-progress {
     gap: 12px;
@@ -378,4 +374,38 @@
 .booking-select-menu [role='option'].is-active {
   background: var(--color-violet-deep);
   color: #fff;
+}
+
+.booking-time-period {
+  min-width: 0;
+}
+.booking-time-period h3 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+.booking-time-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.booking-time-grid .slot {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 10px;
+  text-align: center;
+  font-size: 14px;
+}
+.booking-period-empty {
+  color: var(--muted);
+  font-size: 14px;
+}
+@media (min-width: 700px) {
+  .booking-time-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1200px) {
+  .booking-time-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }

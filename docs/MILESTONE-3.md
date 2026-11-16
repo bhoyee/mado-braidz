@@ -43,3 +43,5 @@ Milestone 4 adds Stripe Checkout, payment confirmation, cancel/resume, expiry st
 The compact booking introduction now shows a yellow included-hair badge and a policy banner for the $30 USD non-refundable deposit applied to the total. Style, size and length menus support bounded scrolling, touch gestures, mouse hover colours, arrows/Home/End, typeahead, Enter, Escape and outside-click dismissal. Native selects remain the underlying form values. Actual touch scrolling and keyboard selection are included in the browser checks.
 
 Booking contact numbers are restricted to valid US numbers on the server. Form errors use red inline messages and borders with short labels such as “Required field”, “Invalid email” and “Invalid phone number”. The policy is a full-width bold banner; it stays on one line on wide screens and wraps on mobile.
+
+Appointment times are grouped by their Eastern start time: Morning before noon, Afternoon from noon to before 5pm, and Evening from 5pm. Each section uses two columns on phones, three on medium screens and four on large screens. Periods with no eligible starts show a short empty message; full times stay disabled.

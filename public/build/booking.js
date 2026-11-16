@@ -493,23 +493,56 @@ if (root) {
         '/api/availability/day?' + query() + '&date=' + date,
       );
       if (current !== timeSerial) return;
+      const periods = [
+        { key: 'morning', name: 'Morning', slots: [] },
+        { key: 'afternoon', name: 'Afternoon', slots: [] },
+        { key: 'evening', name: 'Evening', slots: [] },
+      ];
+      const easternHour = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        hour: '2-digit',
+        hourCycle: 'h23',
+      });
       for (const slot of data.slots) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'slot';
-        button.textContent =
-          slot.label + (slot.available ? '' : ' · Fully booked');
-        button.disabled = !slot.available;
-        button.setAttribute('aria-pressed', String(slot.startAt === startAt));
-        button.addEventListener('click', () => {
-          startAt = slot.startAt;
-          $('summary-time').textContent =
-            date + ' · ' + slot.label + ' Eastern';
-          for (const b of $('booking-slots').children)
-            b.setAttribute('aria-pressed', String(b === button));
-          persist();
-        });
-        $('booking-slots').append(button);
+        const hour = Number(easternHour.format(new Date(slot.startAt)));
+        periods[hour < 12 ? 0 : hour < 17 ? 1 : 2].slots.push(slot);
+      }
+      for (const period of periods) {
+        const section = document.createElement('section');
+        section.className = 'booking-time-period';
+        const heading = document.createElement('h3');
+        heading.id = 'booking-period-' + period.key;
+        heading.textContent = period.name;
+        section.setAttribute('aria-labelledby', heading.id);
+        section.append(heading);
+        const grid = document.createElement('div');
+        grid.className = 'booking-time-grid';
+        section.append(grid);
+        if (!period.slots.length) {
+          const empty = document.createElement('p');
+          empty.className = 'booking-period-empty';
+          empty.textContent = 'No available times.';
+          section.append(empty);
+        }
+        for (const slot of period.slots) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'slot';
+          button.textContent =
+            slot.label + (slot.available ? '' : ' · Fully booked');
+          button.disabled = !slot.available;
+          button.setAttribute('aria-pressed', String(slot.startAt === startAt));
+          button.addEventListener('click', () => {
+            startAt = slot.startAt;
+            $('summary-time').textContent =
+              date + ' · ' + slot.label + ' Eastern';
+            for (const b of $('booking-slots').querySelectorAll('button'))
+              b.setAttribute('aria-pressed', String(b === button));
+            persist();
+          });
+          grid.append(button);
+        }
+        $('booking-slots').append(section);
       }
       $('booking-time-status').textContent = data.slots.some((s) => s.available)
         ? 'Available starts for ' + date + ' · Eastern time'

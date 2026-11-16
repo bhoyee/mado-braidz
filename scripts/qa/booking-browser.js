@@ -147,6 +147,41 @@ try {
       .click();
     await page.locator('#booking-calendar button:enabled').first().click();
     await page.locator('#booking-slots button:enabled').first().click();
+    assert.deepEqual(
+      await page.locator('.booking-time-period h3').allTextContents(),
+      ['Morning', 'Afternoon', 'Evening'],
+    );
+    const columns = await page
+      .locator('.booking-time-grid')
+      .first()
+      .evaluate(
+        (el) => getComputedStyle(el).gridTemplateColumns.split(' ').length,
+      );
+    assert.equal(columns, width === 390 ? 2 : 4);
+    for (const period of await page.locator('.booking-time-period').all()) {
+      const name = await period.locator('h3').innerText();
+      for (const text of await period.locator('button').allTextContents()) {
+        const match = text.match(/^(\d+):\d+ (AM|PM)/);
+        const hour = (Number(match[1]) % 12) + (match[2] === 'PM' ? 12 : 0);
+        assert.equal(
+          hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening',
+          name,
+        );
+      }
+    }
+    const times = page.locator('#booking-slots button:enabled');
+    if ((await times.count()) > 1) {
+      await times.nth(1).click();
+      assert.equal(
+        await page.locator('#booking-slots button[aria-pressed=true]').count(),
+        1,
+      );
+    }
+    await page.screenshot({
+      path: `tmp/qa/booking-time-periods-${width}.png`,
+      fullPage: true,
+    });
+
     await check(3);
     await page
       .getByRole('button', { name: 'Your details', exact: true })
