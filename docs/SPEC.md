@@ -826,7 +826,7 @@ The site handles money and personal data, so security and the booking tests are 
 ```text
 NODE_ENV=production
 APP_URL=https://madoafricanbraidz.com
-PORT=3000
+PORT=4780
 SESSION_SECRET=
 DATABASE_URL=mysql://user:pass@localhost:3306/mado
 STRIPE_SECRET_KEY=sk_test_...
