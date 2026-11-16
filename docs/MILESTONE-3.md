@@ -15,10 +15,10 @@ The owner corrected the appointment interval to **30 minutes**. The salon has sh
 
 ## Validation
 
-- Build and lint pass; 83 unit/Supertest tests pass.
+- Build and lint pass; 91 unit/Supertest tests pass.
 - Four additional real database integration tests pass in an isolated, randomly named temporary database. Twenty simultaneous HTTP requests commit exactly three holds and return 17 capacity conflicts. Service-level concurrency also verifies capacity three and capacity one. Failed requests leave no partial client/booking records.
 - Pricing tests cover tampering, wrong/inactive variants, duplicate/ineligible extras, capped deposits, duration changes and consultation pricing. Availability tests cover staggered overlap, half-open boundaries, holds expiring, buffers, time blocks, hours, notice/advance limits and both 2026 DST changes, including nonexistent/repeated local times.
-- Fifteen Chrome/axe cases pass across 390px/1440px: all four steps, the three open selection menus, and expanded mobile summary, with no tested WCAG A/AA violations or horizontal overflow. Grey-out, back/forward, refresh and successful unpaid hold messaging pass. Browser tests use synthetic in-memory data and an ephemeral app port; real appointment data is untouched.
+- Seventeen Chrome/axe cases pass across 390px/1440px: all four steps, the three open selection menus, and expanded mobile summary, with no tested WCAG A/AA violations or horizontal overflow. Grey-out, back/forward, refresh and successful unpaid hold messaging pass. Browser tests use synthetic in-memory data and an ephemeral app port; real appointment data is untouched.
 - `npm test` deliberately skips the database suite. Run `npm run test:db` to enable it. The test runner creates and removes only its own `mado_booking_test_*` database, using DATABASE_URL or optional TEST_DATABASE_URL; test credentials need database creation privileges.
 
 ## Run locally
@@ -41,3 +41,5 @@ Open http://localhost:4780/book. `content:sync` explicitly applies the approved 
 Milestone 4 adds Stripe Checkout, payment confirmation, cancel/resume, expiry state cleanup, and late-payment capacity conflict handling. Confirmation email, full admin workflows and launch checks remain in their later milestones. Individual stylist selection, separate staff calendars and payroll are outside the shared-capacity requirement. Remote deployment still awaits working hosting access; the user chose the main domain rather than a preview domain. This milestone does not deploy the server or process money.
 
 The compact booking introduction now shows a yellow included-hair badge and a policy banner for the $30 USD non-refundable deposit applied to the total. Style, size and length menus support bounded scrolling, touch gestures, mouse hover colours, arrows/Home/End, typeahead, Enter, Escape and outside-click dismissal. Native selects remain the underlying form values. Actual touch scrolling and keyboard selection are included in the browser checks.
+
+Booking contact numbers are restricted to valid US numbers on the server. Form errors use red inline messages and borders with short labels such as “Required field”, “Invalid email” and “Invalid phone number”. The policy is a full-width bold banner; it stays on one line on wide screens and wraps on mobile.

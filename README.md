@@ -204,6 +204,8 @@ npm run test:booking:browser
 
 Follow-ups: Stripe checkout, webhook confirmation, late-payment conflict handling, expiry state cleanup, email delivery, full admin workflows and production deployment remain in later milestones or the separate hosting task. No confirmed booking can be created through the current public flow.
 
-Milestone 3 validation: **83 unit/Supertest tests**, **4 real database integration tests**, and **15 mobile/desktop accessibility cases** pass. Details: [docs/MILESTONE-3.md](docs/MILESTONE-3.md).
+Milestone 3 validation: **91 unit/Supertest tests**, **4 real database integration tests**, and **17 mobile/desktop accessibility cases** pass. Details: [docs/MILESTONE-3.md](docs/MILESTONE-3.md).
 
 Booking page controls use scrollable, touch-friendly menus for style, braid size and length, with keyboard/typeahead support and purple hover/selection feedback. The compact intro highlights included hair in yellow and displays the non-refundable deposit policy.
+
+Booking contact numbers are restricted to valid US numbers on the server. Form errors use red inline messages and borders with short labels such as “Required field”, “Invalid email” and “Invalid phone number”. The policy is a full-width bold banner; it stays on one line on wide screens and wraps on mobile.

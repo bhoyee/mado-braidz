@@ -227,7 +227,7 @@ The public site has 10 page types, all server-rendered. The booking wizard runs 
 1. **Style.** Pick a style, then size (Medium, Semi-Medium, Small) and length (Shoulder, Mid Back, Waist, Top Butt, Under Butt). Only valid combinations show, each with its price.
 2. **Add-ons.** Toggle cards: Head wash +$25 and 100% human hair upgrade +$40 (seeded). Hair with 50% human hair is already included; never charge that base hair again. Admin can add more (beads, take-down).
 3. **Date and time.** Month calendar showing only days with free starts. Pick a start time. Each pill shows start and end ("8:00 AM – 12:00 PM").
-4. **Your details and payment.** Name, phone, email, notes, optional inspiration photo, policy checkbox (required), marketing emails checkbox (optional, unticked). Choose **Pay $30 deposit now** or **Pay in full now**. The summary shows: style price, add-ons, total, paid today, due at appointment.
+4. **Your details and payment.** Name, US phone number (reject non-US numbers with “Invalid phone number”), email, notes, optional inspiration photo, policy checkbox (required), marketing emails checkbox (optional, unticked). Choose **Pay $30 deposit now** or **Pay in full now**. The summary shows: style price, add-ons, total, paid today, due at appointment.
 
 The button "Continue to secure payment" creates the hold and redirects to Stripe Checkout. The summary panel stays visible through every step. State lives in the URL query plus `sessionStorage`, so the back button and refresh work.
 

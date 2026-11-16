@@ -1,3 +1,4 @@
+import { holdSchema } from '../src/routes/public/booking.js';
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import { DateTime } from 'luxon';
@@ -323,6 +324,19 @@ describe('booking HTTP boundary', () => {
       await agent
         .post('/api/bookings/hold')
         .set('x-csrf-token', csrf)
+        .send({ ...validHold, phone: '+2348031234567' })
+        .expect(400)
+        .expect((r) => {
+          expect(r.body.message).toBe('Invalid phone number');
+          expect(r.body.fields).toContainEqual({
+            field: 'phone',
+            message: 'Invalid phone number',
+          });
+        });
+
+      await agent
+        .post('/api/bookings/hold')
+        .set('x-csrf-token', csrf)
         .send({ ...validHold, subtotalCents: 1 })
         .expect(400);
       await agent
@@ -425,3 +439,25 @@ describe('booking HTTP boundary', () => {
     }
   });
 });
+
+it.each(['+2348031234567', '+442079460018', '+14165551234', 'invalid'])(
+  'rejects non-US or invalid phone %s',
+  (phone) => {
+    const result = holdSchema.safeParse({ ...validHold, phone });
+    expect(result.success).toBe(false);
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ['phone'],
+        message: 'Invalid phone number',
+      }),
+    );
+  },
+);
+it.each(['4437434979', '(443) 743-4979', '14437434979', '+14437434979'])(
+  'normalizes a valid US phone %s',
+  (phone) => {
+    expect(holdSchema.parse({ ...validHold, phone }).phone).toBe(
+      '+14437434979',
+    );
+  },
+);

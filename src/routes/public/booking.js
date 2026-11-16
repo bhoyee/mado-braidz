@@ -1,3 +1,4 @@
+import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
 import { Router } from 'express';
 import { z } from 'zod';
 import { DateTime } from 'luxon';
@@ -39,11 +40,16 @@ export const holdSchema = selectionSchema
     phone: z
       .string()
       .trim()
-      .transform((v) => v.replace(/[\s().-]/g, ''))
-      .refine(
-        (v) => /^\+[1-9]\d{7,14}$/.test(v),
-        'Use an international phone number, e.g. +14437434979.',
-      ),
+      .transform((value) => {
+        const clean = value.replace(/[\s().-]/g, '');
+        if (!/^\+?\d+$/.test(clean)) return null;
+        const phone = parsePhoneNumberFromString(clean, {
+          defaultCountry: 'US',
+          extract: false,
+        });
+        return phone?.country === 'US' && phone.isValid() ? phone.number : null;
+      })
+      .refine((value) => value !== null, 'Invalid phone number'),
     notes: z.string().trim().max(2000).default(''),
     policyAccepted: z.literal(true),
     marketingConsent: z.boolean().default(false),
@@ -235,7 +241,9 @@ export function bookingRouter(repository, config) {
     if (err instanceof z.ZodError)
       return res.status(400).json({
         error: 'INVALID_INPUT',
-        message: 'Check your choices and contact details.',
+        message: err.issues.some((issue) => issue.path[0] === 'phone')
+          ? 'Invalid phone number'
+          : 'Check required fields',
         fields: err.issues.map((i) => ({
           field: i.path.join('.'),
           message: i.message,

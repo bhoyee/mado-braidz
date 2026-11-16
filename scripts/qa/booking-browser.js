@@ -157,7 +157,45 @@ try {
     await page
       .getByLabel('Email', { exact: true })
       .fill('browser@example.test');
+
+    await page
+      .getByRole('button', { name: 'Hold this time for 30 minutes' })
+      .click();
+    assert.equal(
+      await page.locator('#booking-phone-error').innerText(),
+      'Required field',
+    );
+    assert.equal(
+      await page.locator('#booking-phone').getAttribute('aria-invalid'),
+      'true',
+    );
+    await page.getByLabel('Phone', { exact: true }).fill('+2348031234567');
+    await page.getByLabel('Phone', { exact: true }).blur();
+    assert.equal(
+      await page.locator('#booking-phone-error').innerText(),
+      'Invalid phone number',
+    );
+    assert.equal(
+      await page
+        .locator('#booking-phone-error')
+        .evaluate((el) => getComputedStyle(el).color),
+      'rgb(179, 38, 30)',
+    );
+    assert.equal(
+      await page
+        .locator('#booking-phone')
+        .evaluate((el) => getComputedStyle(el).borderColor),
+      'rgb(179, 38, 30)',
+    );
+    await check('red validation');
     await page.getByLabel('Phone', { exact: true }).fill('4437434979');
+    await page.getByLabel('Phone', { exact: true }).blur();
+    assert.equal(
+      await page.locator('#booking-phone').getAttribute('aria-invalid'),
+      null,
+    );
+    await page.getByRole('checkbox', { name: /I accept the/ }).check();
+
     await check(4);
     await page.goBack();
     await page.locator('[data-booking-step="3"]:visible').waitFor();

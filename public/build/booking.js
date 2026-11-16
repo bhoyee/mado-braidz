@@ -222,6 +222,70 @@ if (root) {
     $('booking-error').hidden = !message;
     if (message) $('booking-error').focus();
   };
+  function fieldError(input, message) {
+    const control = document.getElementById(input.id + '-trigger') || input;
+    const id = input.id + '-error';
+    let note = document.getElementById(id);
+    if (!note) {
+      note = document.createElement('p');
+      note.id = id;
+      note.className = 'booking-field-error';
+      (input.closest('label') || control).after(note);
+    }
+    note.textContent = message;
+    note.hidden = !message;
+    for (const element of [input, control]) {
+      if (message) element.setAttribute('aria-invalid', 'true');
+      else element.removeAttribute('aria-invalid');
+      const described = new Set(
+        (element.getAttribute('aria-describedby') || '')
+          .split(' ')
+          .filter(Boolean),
+      );
+      if (message) described.add(id);
+      else described.delete(id);
+      if (described.size)
+        element.setAttribute('aria-describedby', [...described].join(' '));
+      else element.removeAttribute('aria-describedby');
+    }
+    (
+      document.querySelector(`label[for="${input.id}"]`) ||
+      input.closest('label')
+    )?.classList.toggle('is-invalid', Boolean(message));
+    return !message;
+  }
+  function validateField(input) {
+    const value = input.value.trim();
+    let message = '';
+    if (input.type === 'checkbox')
+      message = input.required && !input.checked ? 'Accept the policy' : '';
+    else if (input.required && !value) message = 'Required field';
+    else if (input.id === 'booking-name' && value.length < 2)
+      message = 'Enter your name';
+    else if (input.id === 'booking-email' && input.validity.typeMismatch)
+      message = 'Invalid email';
+    else if (input.id === 'booking-phone' && value) {
+      const digits = value.replace(/[\s().-]/g, '');
+      if (!/^(?:\+?1)?[2-9]\d{2}[2-9]\d{6}$/.test(digits))
+        message = 'Invalid phone number';
+    }
+    return fieldError(input, message);
+  }
+  const detailFields = [
+    'booking-name',
+    'booking-email',
+    'booking-phone',
+    'booking-policy',
+  ].map($);
+  detailFields.forEach((input) => {
+    input.addEventListener('blur', () => validateField(input));
+    input.addEventListener(
+      input.type === 'checkbox' ? 'change' : 'input',
+      () => {
+        if (input.getAttribute('aria-invalid') === 'true') validateField(input);
+      },
+    );
+  });
   const selection = () => ({
     styleId: Number(style.value),
     ...(variant.value ? { styleVariantId: Number(variant.value) } : {}),
@@ -481,16 +545,19 @@ if (root) {
     }
   }
   style.addEventListener('change', () => {
+    fieldError(style, '');
     chooseStyle();
     refreshQuote();
     persist();
   });
   size.addEventListener('change', () => {
+    fieldError(size, '');
     chooseSize();
     refreshQuote();
     persist();
   });
   variant.addEventListener('change', () => {
+    fieldError(variant, '');
     refreshQuote();
     persist();
   });
@@ -503,12 +570,21 @@ if (root) {
     });
   for (const button of form.querySelectorAll('[data-book-next]'))
     button.addEventListener('click', async () => {
-      if (!quote)
-        return error(
-          'Choose a valid style, size and length and wait for the price.',
-        );
-      if (step === 3 && !startAt)
-        return error('Choose an available date and start time.');
+      if (!quote) {
+        const missing = [
+          style,
+          ...($('booking-variant-fields').hidden ? [] : [size, variant]),
+        ].filter((input) => !input.value);
+        missing.forEach((input) => fieldError(input, 'Required field'));
+        if (missing.length) {
+          (
+            document.getElementById(missing[0].id + '-trigger') || missing[0]
+          ).focus();
+          return;
+        }
+        return error('Check your selection');
+      }
+      if (step === 3 && !startAt) return error('Select a time');
       await showStep(step + 1);
     });
   for (const button of form.querySelectorAll('[data-book-back]'))
@@ -542,7 +618,14 @@ if (root) {
     if (step !== 4) {
       return error('Complete all four steps before holding a time.');
     }
-    if (!form.reportValidity() || !quote || !startAt) return;
+    const valid = detailFields.map(validateField).every(Boolean);
+    if (!valid) {
+      detailFields
+        .find((input) => input.getAttribute('aria-invalid') === 'true')
+        ?.focus();
+      return;
+    }
+    if (!quote || !startAt) return error('Select a time');
     const file = $('booking-inspiration').files[0];
     if (file && file.size > 8 * 1024 * 1024)
       return error('Choose an image smaller than 8 MB.');
@@ -597,6 +680,30 @@ if (root) {
         startAt = '';
         await showStep(3);
         error(e.message + ' Select another available start.');
+      } else if (e.data?.fields?.length) {
+        const fields = {
+          name: $('booking-name'),
+          email: $('booking-email'),
+          phone: $('booking-phone'),
+          policyAccepted: $('booking-policy'),
+        };
+        let first;
+        for (const issue of e.data.fields) {
+          const input = fields[issue.field];
+          if (input) {
+            fieldError(
+              input,
+              issue.field === 'phone'
+                ? 'Invalid phone number'
+                : issue.field === 'email'
+                  ? 'Invalid email'
+                  : 'Required field',
+            );
+            first ||= input;
+          }
+        }
+        if (first) first.focus();
+        else error('Check required fields');
       } else error(e.message);
     } finally {
       button.disabled = false;
