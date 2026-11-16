@@ -498,10 +498,7 @@ if (root) {
         button.type = 'button';
         button.className = 'slot';
         button.textContent =
-          slot.label +
-          (slot.available
-            ? ` · ${slot.remaining} ${slot.remaining === 1 ? 'place' : 'places'} left`
-            : ' · Fully booked');
+          slot.label + (slot.available ? '' : ' · Fully booked');
         button.disabled = !slot.available;
         button.setAttribute('aria-pressed', String(slot.startAt === startAt));
         button.addEventListener('click', () => {
