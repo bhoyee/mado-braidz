@@ -138,3 +138,150 @@ document.querySelectorAll('[data-studio-player]').forEach((player) => {
     }
   });
 });
+
+// Hero films: silent loops that start on their own, with no controls.
+// They never load for reduced-motion or data-saver visitors (poster only),
+// and pause whenever they are off screen or the tab is hidden.
+const heroClips = [...document.querySelectorAll('video[data-hero-video]')];
+if (heroClips.length && !reducedMotion.matches && !saveData) {
+  const visible = new Set();
+  const start = (video) => {
+    const source = video.querySelector('source');
+    if (!source.getAttribute('src')) {
+      source.src = source.dataset.src;
+      video.load();
+    }
+    video.play().catch(() => {});
+  };
+  const sync = (video) => {
+    if (visible.has(video) && !document.hidden && !reducedMotion.matches)
+      start(video);
+    else video.pause();
+  };
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) visible.add(entry.target);
+          else visible.delete(entry.target);
+          sync(entry.target);
+        }),
+      { threshold: 0.2 },
+    );
+    heroClips.forEach((video) => observer.observe(video));
+  } else heroClips.forEach((video) => (visible.add(video), sync(video)));
+  document.addEventListener('visibilitychange', () => heroClips.forEach(sync));
+  reducedMotion.addEventListener('change', () => heroClips.forEach(sync));
+}
+
+// Price menu tabs: show one style's prices at a time. Without JavaScript the
+// tab row stays hidden and every price grid is shown in turn.
+const priceTabs = document.querySelector('[data-price-tabs]');
+if (priceTabs) {
+  const buttons = [...priceTabs.querySelectorAll('[data-panel]')];
+  const panels = buttons.map((b) => document.getElementById(b.dataset.panel));
+  priceTabs.hidden = false;
+  priceTabs.setAttribute('role', 'tablist');
+  buttons.forEach((button, i) => {
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-controls', panels[i].id);
+    panels[i].setAttribute('role', 'tabpanel');
+    panels[i].setAttribute('aria-labelledby', button.id);
+    panels[i].removeAttribute('aria-label');
+    panels[i].tabIndex = 0;
+  });
+  const select = (index, focus) => {
+    buttons.forEach((button, i) => {
+      const on = i === index;
+      button.setAttribute('aria-selected', String(on));
+      button.tabIndex = on ? 0 : -1;
+      panels[i].hidden = !on;
+    });
+    if (focus) buttons[index].focus();
+    // Keep the chosen tab visible in the scrollable row without moving the page.
+    const b = buttons[index];
+    const left = b.offsetLeft - priceTabs.offsetLeft;
+    if (
+      left < priceTabs.scrollLeft ||
+      left + b.offsetWidth > priceTabs.scrollLeft + priceTabs.clientWidth
+    )
+      priceTabs.scrollTo({ left: left - 16, behavior: 'smooth' });
+  };
+  buttons.forEach((button, i) => {
+    button.addEventListener('click', () => select(i, false));
+    button.addEventListener('keydown', (event) => {
+      const last = buttons.length - 1;
+      const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: last }[
+        event.key
+      ];
+      if (next === undefined) return;
+      event.preventDefault();
+      select((next + buttons.length) % buttons.length, true);
+    });
+  });
+  select(0, false);
+}
+
+// Styles page live search: filters style blocks and their price tiles as you
+// type. A style shows when every word matches it; if the words only match some
+// options (e.g. "waist"), just those tiles show. The form still submits to the
+// server when JavaScript is unavailable.
+const styleSearch = document.querySelector('[data-style-search]');
+if (styleSearch) {
+  const input = styleSearch.querySelector('input[type="search"]');
+  const blocks = [...document.querySelectorAll('.catalog-style[data-search]')];
+  const count = document.querySelector('[data-result-count]');
+  const empty = document.querySelector('[data-search-empty]');
+  const words = (text) =>
+    text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .split(' ')
+      .filter(Boolean);
+  const apply = () => {
+    const query = words(input.value);
+    let shown = 0;
+    blocks.forEach((block) => {
+      const base = block.dataset.search;
+      const options = [...block.querySelectorAll('[data-option]')];
+      const styleMatch = query.every((w) => base.includes(w));
+      let any = styleMatch;
+      options.forEach((option) => {
+        const ok =
+          styleMatch ||
+          query.every((w) => `${base} ${option.dataset.option}`.includes(w));
+        option.hidden = !ok;
+        if (ok) any = true;
+      });
+      block.querySelectorAll('.option-group').forEach((group) => {
+        group.hidden = ![...group.querySelectorAll('[data-option]')].some(
+          (o) => !o.hidden,
+        );
+      });
+      block.hidden = !any;
+      if (any) shown += 1;
+    });
+    count.textContent = `${shown} ${shown === 1 ? 'style' : 'styles'} to explore`;
+    if (empty) empty.hidden = shown > 0;
+    const url = new URL(location.href);
+    if (input.value.trim()) url.searchParams.set('q', input.value.trim());
+    else url.searchParams.delete('q');
+    history.replaceState(null, '', url);
+  };
+  input.addEventListener('input', apply);
+  if (input.value.trim()) apply();
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && input.value) {
+      input.value = '';
+      apply();
+    }
+  });
+  styleSearch.addEventListener('submit', (event) => {
+    event.preventDefault();
+    apply();
+    input.blur();
+  });
+}

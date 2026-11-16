@@ -1,19 +1,52 @@
 {% macro photo(item,name,hero=false) %}
-{% if item %}<picture>{% if item.avifSrcset %}<source type="image/avif" srcset="{{ item.avifSrcset }}" sizes="{% if hero %}(max-width:760px) 100vw, 50vw{% else %}(max-width:760px) 45vw, 32vw{% endif %}">{% endif %}<img src="{{ item.path }}" {% if item.srcset %}srcset="{{ item.srcset }}" sizes="{% if hero %}(max-width:760px) 100vw, 50vw{% else %}(max-width:760px) 45vw, 32vw{% endif %}"{% endif %} alt="{{ item.alt }}" width="{{ item.width or 800 }}" height="{{ item.height or 1000 }}" {% if hero %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async"></picture>{% else %}<div class="photo-empty"><span class="eyebrow">{{ name }}</span><span class="photo-caption">Ask Mado about this look.</span></div>{% endif %}
+{% if item %}<picture>{% if item.avifSrcset %}<source type="image/avif" srcset="{{ item.avifSrcset }}" sizes="{% if hero %}(max-width:760px) 100vw, 50vw{% else %}(max-width:760px) 50vw, 33vw{% endif %}">{% endif %}<img src="{{ item.path }}" {% if item.srcset %}srcset="{{ item.srcset }}" sizes="{% if hero %}(max-width:760px) 100vw, 50vw{% else %}(max-width:760px) 50vw, 33vw{% endif %}"{% endif %} alt="{{ item.alt }}" width="{{ item.width or 800 }}" height="{{ item.height or 1000 }}" {% if hero %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async"></picture>{% else %}<div class="photo-empty"><span class="eyebrow">{{ name }}</span><span class="photo-caption">Ask Mado about this look.</span></div>{% endif %}
 {% endmacro %}
-{% macro card(style, large=false) %}
-<article class="style-card{% if large %} large{% endif %}{% if not style.photo %} type-card{% endif %}">
- {% if style.photo %}<a href="/styles/{{ style.slug }}" class="style-photo">{{ photo(style.photo,style.name) }}{% if style.photo.generated %}<span class="image-origin">AI style reference</span>{% endif %}</a>{% endif %}
- <div class="style-card-caption"><p class="eyebrow">{{ style.category }}</p><h3><a href="/styles/{{ style.slug }}">{{ style.name }}</a></h3><p>{% if style.from %}From {{ style.from | money }}{% else %}Price on consultation{% endif %}<span class="duration"> · {{ style.durationMin / 60 }} hrs</span></p>{% if style.groups.length %}<div class="card-sizes" aria-label="{{ style.name }} sizes">{% for group in style.groups %}<a href="/styles/{{ style.slug }}?size={{ group.key }}#lengths">{{ group.name }} <span>{{ group.from | money }}+</span></a>{% endfor %}</div>{% endif %}<a class="style-explore" href="/styles/{{ style.slug }}#size-guide">View sizes &amp; prices <span aria-hidden="true">↗</span></a></div>
-</article>
+
+{% macro card(style) %}
+{# The whole card is one link; name and price sit on the photo. #}
+<a class="style-card" href="/styles/{{ style.slug }}">
+  <div class="style-photo">{{ photo(style.photo,style.name) }}</div>
+  <div class="style-card-overlay">
+    <span class="style-card-category">{{ style.category }}</span>
+    <h3>{{ style.name }}</h3>
+    <p class="style-card-price">{% if style.from %}From <strong>{{ style.from | money }}</strong>{% else %}Price on consultation{% endif %}</p>
+    <span class="style-card-go" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M7 17 17 7M9 7h8v8"/></svg></span>
+  </div>
+</a>
 {% endmacro %}
-{% macro menu(style) %}<section class="menu-panel" id="{{ style.slug }}" aria-label="{{ style.name }} prices"><div class="section-heading"><div><p class="eyebrow">{{ style.category }}</p><h2>{{ style.name }}</h2></div><p>{{ style.durationMin / 60 }} hours reserved</p></div>{% if style.groups.length %}<div class="price-groups">{% for group in style.groups %}<div><h3 class="eyebrow">{{ group.name }}</h3><dl>{% for variant in group.variants %}<div class="price-row"><dt>{{ variant.lengthLabel }}</dt><span aria-hidden="true"></span><dd>{{ variant.priceCents | money }}</dd></div>{% endfor %}</dl></div>{% endfor %}</div>{% else %}<p class="consultation"><strong>Price on consultation.</strong> {% if style.from %}From <strong>{{ style.from | money }}</strong>. {% endif %}Your final price depends on the style and length. Let’s talk through your look before you book.</p>{% endif %}<div class="menu-bottom"><a href="/styles/{{ style.slug }}" class="text-link">About this style <span aria-hidden="true">→</span></a><a href="/book?style={{ style.slug }}" class="button compact">Book {{ style.name }}</a></div></section>{% endmacro %}
+
+{% macro menu(style) %}
+<section class="menu-panel" id="{{ style.slug }}" aria-label="{{ style.name }} prices">
+  <div class="menu-panel-head"><div><p class="eyebrow">{{ style.category }}</p><h2>{{ style.name }}</h2></div><p>{{ style.durationMin / 60 }} hours reserved</p></div>
+  {% if style.groups.length %}
+  <div class="price-groups">{% for group in style.groups %}<div><h3 class="eyebrow">{{ group.name }}</h3><dl>{% for variant in group.variants %}<div class="price-row"><dt>{{ variant.lengthLabel }}</dt><span aria-hidden="true"></span><dd>{{ variant.priceCents | money }}</dd></div>{% endfor %}</dl></div>{% endfor %}</div>
+  {% else %}
+  <p class="consultation"><strong>Price on consultation.</strong> {% if style.from %}From <strong>{{ style.from | money }}</strong>. {% endif %}Your final price depends on the style and length. Let’s talk through your look before you book.</p>
+  {% endif %}
+  <div class="menu-bottom"><a href="/styles/{{ style.slug }}" class="text-link">About this style</a><a href="/book?style={{ style.slug }}" class="button compact">Book {{ style.name }}</a></div>
+</section>
+{% endmacro %}
 
 {% macro studioVideo(name, description, hero=false) %}
 <div class="studio-video{% if hero %} hero-video{% endif %}" data-studio-player>
- <video id="film-{{ name }}" muted loop playsinline preload="none" poster="/media/{{ name }}.webp" aria-label="{{ description }}" data-studio-video {% if hero %}data-hero-video{% endif %}><source data-src="/media/{{ name }}.mp4" type="video/mp4">Your browser does not support this video.</video>
- <button type="button" class="video-control" data-video-toggle aria-controls="film-{{ name }}" aria-pressed="false"><span data-video-icon aria-hidden="true">▶</span><span data-video-label>Play film</span></button>
- <noscript><a href="/media/{{ name }}.mp4" class="video-fallback">Watch the studio film (MP4)</a></noscript><span class="video-silent">NO SOUND. JUST THE CRAFT.</span>
- <p class="video-feedback sr-only" data-video-feedback role="status"></p>
+  <video id="film-{{ name }}" muted loop playsinline preload="none" poster="{{ media(name + '.webp') }}" aria-label="{{ description }}" data-studio-video {% if hero %}data-hero-video{% endif %}><source data-src="{{ media(name + '.mp4') }}" type="video/mp4">Your browser does not support this video.</video>
+  <button type="button" class="video-control" data-video-toggle aria-controls="film-{{ name }}" aria-pressed="false"><span data-video-icon aria-hidden="true">▶</span><span data-video-label>Play film</span></button>
+  <noscript><a href="{{ media(name + '.mp4') }}" class="video-fallback">Watch the studio film (MP4)</a></noscript>
+  <p class="video-feedback sr-only" data-video-feedback role="status"></p>
 </div>
+{% endmacro %}
+
+{% macro ring(label, id) %}
+<svg class="ring-stamp" viewBox="0 0 200 200" role="img" aria-label="{{ label }}">
+  <defs><path id="ring-path-{{ id }}" d="M100,100 m-74,0 a74,74 0 1,1 148,0 a74,74 0 1,1 -148,0"/></defs>
+  <circle cx="100" cy="100" r="96" class="ring-disc"/>
+  <text class="ring-text"><textPath href="#ring-path-{{ id }}" textLength="460">{{ label }}</textPath></text>
+  <g class="ring-braid" aria-hidden="true">{% for i in range(0, 12) %}<path transform="rotate({{ i * 30 }} 100 100)" d="M100 52 c-7 0 -7 8 0 12 c7 -4 7 -12 0 -12Z"/>{% endfor %}</g>
+</svg>
+{% endmacro %}
+
+{# Hero films: silent, looping, start on their own (JS), no controls.
+   Reduced-motion and data-saver visitors keep the poster frame. #}
+{% macro heroFilm(name, description) %}
+<video class="hero-clip" muted loop playsinline preload="none" disablepictureinpicture poster="{{ media(name + '.webp') }}" aria-label="{{ description }}" data-hero-video><source data-src="{{ media(name + '.mp4') }}" type="video/mp4"></video>
 {% endmacro %}

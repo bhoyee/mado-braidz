@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+import { statSync } from 'node:fs';
 import { createDatabase } from './db/index.js';
 import { createCatalogService } from './services/catalogService.js';
 import { publicRouter, money } from './routes/public/index.js';
@@ -111,6 +113,20 @@ export function createApp({
     },
   );
   views.addFilter('money', money);
+  // Versioned media URLs: the file's modified time is appended, so browsers
+  // fetch a regenerated clip or poster instead of replaying a cached copy.
+  const mediaDir = fileURLToPath(new URL('../public/media', import.meta.url));
+  views.addGlobal('media', (file) => {
+    const safe = String(file).replace(/[^a-z0-9._-]/gi, '');
+    try {
+      const version = Math.floor(
+        statSync(join(mediaDir, safe)).mtimeMs,
+      ).toString(36);
+      return `/media/${safe}?v=${version}`;
+    } catch {
+      return `/media/${safe}`;
+    }
+  });
   app.set('view engine', 'njk');
   app.use('/admin', designRouter(catalog, limits.preview));
   app.use(publicRouter(catalog));

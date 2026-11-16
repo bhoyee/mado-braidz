@@ -1,4 +1,12 @@
 export const publicSettings = {
+  // Owner-confirmed social profiles (footer icons). Facebook uses a search
+  // link until the exact page address is confirmed.
+  social: {
+    instagram: 'https://www.instagram.com/madohairbraids/',
+    tiktok: 'https://www.tiktok.com/@magdaline',
+    facebook: 'https://www.facebook.com/search/top?q=Mado%20Braids',
+    google: '',
+  },
   hours: {
     summary: 'Open daily · 6:00 AM–6:00 PM',
     daysLabel: 'Open daily',
@@ -27,11 +35,9 @@ export const publicSettings = {
   seo: {
     pages: {
       home: {
-        eyebrow: 'African hair braiding studio · Lanham, MD',
-        heading: 'The art of beautiful braids.',
-        accent: 'Made for you.',
+        heading: 'Where beauty meets the art of braiding.',
         intro:
-          'Knotless, boho, twists and locs. Braided by Mado in Lanham, Maryland. A style that’s yours, from the first part to the final turn.',
+          'Beautiful, long-lasting braided styles that leave you feeling confident and effortlessly gorgeous.',
       },
       about: {
         heading: 'Where Beauty Meets the Art of Braiding',

@@ -1,3 +1,28 @@
-{% extends "layouts/base.njk" %}{% from "partials/components.njk" import photo,studioVideo %}
-{% block content %}<section class="wrap page-head"><p class="eyebrow">Studio journal / Film &amp; detail</p><h1>Our<br><em>work.</em></h1><p class="intro">A closer look at the craft, from the first part to the finished style. Filmed in the studio.</p></section>
-<section class="wrap section"><div class="gallery-grid supplied-gallery">{% for style in suppliedStyles %}<figure><a href="/styles/{{ style.slug }}">{{ photo(style.photo,style.name) }}</a><figcaption class="photo-note">{{ style.name }}</figcaption></figure>{% endfor %}{% for item in gallery %}<figure>{{ photo(item,item.alt) }}<figcaption class="photo-note">{{ item.alt }}</figcaption></figure>{% endfor %}</div><h2 class="gallery-films-heading">Behind the chair.</h2><div class="film-gallery"><figure>{{ studioVideo('finished-look','A finished braided style from several angles') }}<figcaption><span>01 / THE FINISHED LOOK</span><h2>That final turn.</h2><p>A fresh finish, seen from every side.</p></figcaption></figure><figure>{{ studioVideo('braid-detail','A close view of braided sections and textured lengths') }}<figcaption><span>02 / UP CLOSE</span><h2>Every part matters.</h2><p>A closer look at the sections and lengths.</p></figcaption></figure><figure>{{ studioVideo('at-the-chair','Hands finishing a client’s braids') }}<figcaption><span>03 / THE PROCESS</span><h2>Made by hand.</h2><p>A moment behind the chair.</p></figcaption></figure></div></section>{% endblock %}
+{% extends "layouts/base.njk" %}
+{% from "partials/components.njk" import photo, studioVideo %}
+{% block content %}
+<section class="page-head">
+  <div class="wrap">
+    <p class="eyebrow">Our work</p>
+    <h1>Fresh from <em>the chair.</em></h1>
+    <p class="intro">Real styles from the studio, from the first part to the final turn.</p>
+  </div>
+</section>
+<section class="wrap section">
+  <div class="gallery-grid">
+    {% for style in suppliedStyles %}<figure><a href="/styles/{{ style.slug }}">{{ photo(style.photo,style.name) }}</a><figcaption>{{ style.name }}</figcaption></figure>{% endfor %}
+    {% for item in gallery %}<figure>{{ photo(item,item.alt) }}<figcaption>{{ item.alt }}</figcaption></figure>{% endfor %}
+  </div>
+</section>
+<section class="films-section" aria-labelledby="films-heading">
+  <div class="wrap">
+    <p class="eyebrow eyebrow-light">Studio films</p>
+    <h2 id="films-heading">Behind <em>the chair.</em></h2>
+    <div class="film-gallery">
+      <figure><div class="arch-frame">{{ studioVideo('studio-knotless','A client turns and smiles, showing her finished knotless braids') }}</div><figcaption><span>01</span><h3>That final turn</h3><p>Waist-length knotless, seen from every side.</p></figcaption></figure>
+      <figure><div class="arch-frame">{{ studioVideo('transformation','Spring twists from the first parted section to the finished look') }}</div><figcaption><span>02</span><h3>Before &amp; after</h3><p>Spring twists, start to finish.</p></figcaption></figure>
+      <figure><div class="arch-frame">{{ studioVideo('at-the-chair','Hands finishing a client’s braids') }}</div><figcaption><span>03</span><h3>Made by hand</h3><p>A moment behind the chair.</p></figcaption></figure>
+    </div>
+  </div>
+</section>
+{% endblock %}

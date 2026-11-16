@@ -1,15 +1,132 @@
 {% extends "layouts/base.njk" %}
-{% from "partials/components.njk" import photo,card,studioVideo %}
+{% from "partials/components.njk" import photo, card, studioVideo, heroFilm %}
 {% block content %}
-<section class="atelier-hero wrap">
- <div class="atelier-copy"><p class="eyebrow">African hair braiding · {{ business.city }}, {{ business.region }}</p><h1>{{ pages.home.heading }}</h1><p class="atelier-deck">Knotless braids, twists &amp; locs.<br>Thoughtfully braided. Completely you.</p><div class="atelier-actions"><a href="/book" class="button">Book your appointment <span aria-hidden="true">↗</span></a><a href="/styles" class="text-link">Explore the styles <span aria-hidden="true">→</span></a></div><div class="atelier-meta"><span>ONE STYLIST.<br>YOUR TIME.</span><p>{{ booking.depositCents | money }} deposit, applied to your total.<br>Find your style. We’ll take it from there.</p></div></div>
- <figure class="atelier-portrait atelier-hero-film">{{ studioVideo('finished-look','A finished braided style, shown from several angles',true) }}<figcaption><span>In the studio / the finished look</span><a href="/our-work">See our work <span aria-hidden="true">↗</span></a></figcaption></figure>
-</section>
-<div class="atelier-ribbon"><div class="wrap"><span>KNOTLESS</span><span aria-hidden="true">/</span><span>BOHO</span><span aria-hidden="true">/</span><span>TWISTS</span><span aria-hidden="true">/</span><span>LOCS</span><span aria-hidden="true">/</span><span>FULANI</span></div></div>
-<section class="wrap atelier-collection section" id="the-edit"><div class="atelier-heading"><div><p class="eyebrow">01 / The lookbook</p><h2>A style for<br><em>every version of you.</em></h2></div><div><p>A little length. A little texture.<br>A look that feels entirely your own.</p><a href="/styles" class="text-link">View the full collection <span aria-hidden="true">↗</span></a></div></div><div class="atelier-style-grid">{% for style in styles %}{% if loop.index <= 6 %}{{ card(style) }}{% endif %}{% else %}<p>Call the studio to talk through the look you have in mind.</p>{% endfor %}</div><p class="atelier-image-note">AI-generated images are labelled as style references. They illustrate the hairstyle and are not client photographs.</p></section>
-<section class="atelier-studio"><div class="wrap atelier-studio-grid"><div class="atelier-studio-film">{{ studioVideo('at-the-chair','Hands finishing a client’s braids at the studio') }}<p class="film-note">In Mado’s chair / filmed in the studio</p></div><div class="atelier-studio-copy"><p class="eyebrow">02 / The person behind the part</p><h2>{{ pages.about.heading }}</h2><p>{{ pages.about.intro }}</p><p>{{ pages.about.story }}</p><ul class="studio-values">{% for value in pages.about.values %}<li>{{ value }}</li>{% endfor %}</ul><a class="text-link" href="/about">Meet the studio <span aria-hidden="true">↗</span></a></div></div></section>
 
-<section class="atelier-visual"><div class="wrap"><div class="atelier-heading"><div><p class="eyebrow">04 / In the details</p><h2>Turn heads.<br><em>Stay yourself.</em></h2></div><a class="text-link" href="/our-work">Explore our work <span aria-hidden="true">↗</span></a></div><div class="atelier-photo-strip">{% for style in suppliedStyles %}{% if loop.index<=3 %}<a href="/styles/{{ style.slug }}">{{ photo(style.photo,style.name) }}<span>{{ style.name }} <span aria-hidden="true">↗</span></span></a>{% endif %}{% endfor %}</div></div></section>
-<section class="wrap section atelier-visit">{% include "partials/visit.njk" %}</section>
+{# ── Hero: one real clip filling its half, the owner's words beside it ── #}
+<section class="hero" aria-labelledby="hero-heading">
+  <div class="hero-copy">
+    <h1 id="hero-heading">{{ pages.home.heading }}</h1>
+    {% if pages.home.intro %}<p class="hero-intro">{{ pages.home.intro }}</p>{% endif %}
+    <div class="hero-actions">
+      <a href="/book" class="button large hero-book">Book your chair</a>
+      <a href="/styles" class="hero-link">See styles &amp; prices</a>
+    </div>
+  </div>
+  <div class="hero-film">{{ heroFilm('studio-knotless','A client smiles and swings her finished knotless braids in front of the Mado Braids sign at the studio') }}</div>
+</section>
+
+{# ── How it works: a compact route card tucked into the hero's edge ──── #}
+<section class="journey" aria-labelledby="journey-heading">
+  <div class="wrap">
+    <div class="journey-panel">
+      <h2 id="journey-heading">Four steps to <em>your chair.</em></h2>
+      <ol class="journey-steps">
+        <li><h3>Choose your look</h3><p>Pick a style, a size and a length. You’ll see the price before anything else.</p></li>
+        <li><h3>Hold your time</h3><p>A {{ booking.depositCents | money }} deposit reserves your chair and is taken off your total.</p></li>
+        <li><h3>Arrive ready</h3><p>Come with hair washed and detangled, and bring your braiding hair. Or add a head wash.</p></li>
+        <li><h3>Leave with your look</h3><p>Relax in the chair. The balance is paid at your appointment.</p></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+{# ── Signature styles ─────────────────────────────────────────── #}
+<section class="section wrap" aria-labelledby="styles-heading">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Signature styles</p>
+      <h2 id="styles-heading">Find the style that <em>feels like you.</em></h2>
+    </div>
+    <div class="section-head-aside">
+      <p>Every price is listed up front. Choose a style, then a size and a length.</p>
+      <a href="/styles" class="text-link">View all {{ styles.length }} styles</a>
+    </div>
+  </div>
+  <div class="style-grid">
+    {% for style in styles %}{% if loop.index <= 6 %}{{ card(style) }}{% endif %}{% else %}<p>Call the studio to talk through the look you have in mind.</p>{% endfor %}
+  </div>
+</section>
+
+{# ── The price menu: one style at a time, prices as a size × length grid ── #}
+<section class="menu-section" aria-labelledby="menu-heading">
+  <div class="wrap">
+    <div class="menu-head">
+      <div>
+        <p class="eyebrow eyebrow-light">The price menu</p>
+        <h2 id="menu-heading">Every style. <em>Every price.</em></h2>
+      </div>
+      <ul class="menu-notes-top">
+        <li><strong>{{ booking.depositCents | money }} deposit</strong> holds your chair, taken off your total</li>
+        {% for addon in addons %}<li><strong>{{ addon.name }} +{{ addon.priceCents | money }}</strong></li>{% endfor %}
+        <li><strong>Bring your braiding hair</strong>, we’ll tell you what and how much</li>
+      </ul>
+    </div>
+
+    <div class="price-tabs" data-price-tabs hidden aria-label="Choose a style">
+      {% for style in styles %}{% if style.matrix %}<button type="button" class="price-tab" id="tab-{{ style.slug }}" data-panel="panel-{{ style.slug }}">{{ style.name }}</button>{% endif %}{% endfor %}
+      {% for style in consultStyles %}{% if style.from %}<button type="button" class="price-tab" id="tab-{{ style.slug }}" data-panel="panel-{{ style.slug }}">{{ style.name }}</button>{% endif %}{% endfor %}
+      <button type="button" class="price-tab" id="tab-other-styles" data-panel="panel-other-styles">Other styles</button>
+    </div>
+
+    <div class="price-panels">
+      {% for style in styles %}{% if style.matrix %}
+      <section class="price-panel" id="panel-{{ style.slug }}" aria-label="{{ style.name }} prices">
+        <div class="price-panel-head">
+          <h3>{{ style.name }}</h3>
+          <div class="price-panel-links"><a class="button compact light" href="/book?style={{ style.slug }}">Book this style</a><a class="price-details" href="/styles/{{ style.slug }}">Details</a></div>
+        </div>
+        <div class="price-matrix-wrap">
+          <table class="price-matrix">
+            <caption class="sr-only">{{ style.name }} prices by length and size</caption>
+            <thead><tr><th scope="col">Length</th>{% for size in style.matrix.sizes %}<th scope="col">{{ size }}</th>{% endfor %}</tr></thead>
+            <tbody>{% for row in style.matrix.rows %}<tr><th scope="row">{{ row.label }}</th>{% for cell in row.cells %}<td>{% if cell %}{{ cell | money }}{% else %}<span class="na" aria-label="Not available">–</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
+          </table>
+        </div>
+      </section>
+      {% endif %}{% endfor %}
+      {% for style in consultStyles %}{% if style.from %}
+      <section class="price-panel" id="panel-{{ style.slug }}" aria-label="{{ style.name }} prices">
+        <div class="price-panel-head">
+          <h3>{{ style.name }}</h3>
+          <div class="price-panel-links"><a class="button compact light" href="/book?style={{ style.slug }}">Book this style</a><a class="price-details" href="/styles/{{ style.slug }}">Details</a></div>
+        </div>
+        <div class="price-feature-wrap"><p class="price-feature">From <strong>{{ style.from | money }}</strong></p><p>Depending on style and length.</p></div>
+      </section>
+      {% endif %}{% endfor %}
+      <section class="price-panel" id="panel-other-styles" aria-label="Other styles">
+        <div class="price-panel-head">
+          <h3>Other styles</h3>
+          <div class="price-panel-links"><a class="button compact light" href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></div>
+        </div>
+        <div class="price-feature-wrap">
+          <ul class="other-styles">{% for style in consultStyles %}{% if not style.from %}<li><a href="/styles/{{ style.slug }}">{{ style.name }}</a></li>{% endif %}{% endfor %}</ul>
+          <p class="price-note">Price on consultation.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</section>
+
+{# ── The studio: two films (play on request) beside her own words ─────── #}
+<section class="studio-section" aria-labelledby="studio-heading">
+  <div class="wrap studio-grid">
+    <div class="studio-films">
+      <figure class="studio-film-main"><div class="arch-frame">{{ studioVideo('studio-tour','Inside the Lanham studio: the wood-slat wall with the Mado sign, arched mirrors and styling chairs') }}</div><figcaption>The Lanham studio</figcaption></figure>
+      <figure class="studio-film-side"><div class="rounded-frame">{{ studioVideo('at-the-chair','Braiding a client in a purple cape') }}</div><figcaption>At the chair</figcaption></figure>
+    </div>
+    <div class="studio-copy">
+      <p class="eyebrow">The studio</p>
+      <h2 id="studio-heading">Inside the <em>studio.</em></h2>
+      <p class="studio-statement">{{ pages.about.intro }}</p>
+      <p class="studio-story">{{ pages.about.story }}</p>
+      <ul class="values-grid">{% for value in pages.about.values %}<li>{{ value }}</li>{% endfor %}</ul>
+      <div class="button-row">
+        <a class="button" href="/about">Meet Mado</a>
+        <a class="button outline" href="/contact">Plan your visit</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 {% include "partials/faq.njk" %}
 {% endblock %}

@@ -13,34 +13,27 @@ try {
       if (r.url().endsWith('.mp4')) downloads++;
     });
     await page.goto(root + '/');
-    const player = page.locator('.hero-video');
-    await player.scrollIntoViewIfNeeded();
+    // Hero clips: autoplay, no controls, pause off screen, resume on return.
     await page.waitForTimeout(1100);
     if (preference === 'reduce' && downloads)
       throw new Error('Reduced-motion browsing auto-downloaded video');
-    if (preference === 'no-preference')
+    if (await page.locator('.hero button').count())
+      throw new Error('Hero should have no video controls');
+    if (preference === 'no-preference') {
+      await page.waitForFunction(() => {
+        const video = document.querySelector('[data-hero-video]');
+        return !video.paused && video.currentTime > 0;
+      });
+      await page.locator('#styles-heading').scrollIntoViewIfNeeded();
+      await page.evaluate(() => window.scrollBy(0, 1200));
+      await page.waitForFunction(
+        () => document.querySelector('[data-hero-video]').paused,
+      );
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.waitForFunction(
         () => !document.querySelector('[data-hero-video]').paused,
       );
-    const button = player.locator('button');
-    if (!(await player.locator('video').evaluate((v) => v.paused)))
-      await button.click();
-    await button.focus();
-    await page.keyboard.press('Enter');
-    await page.waitForFunction(() => {
-      const video = document.querySelector('[data-hero-video]');
-      return !video.paused && video.currentTime > 0;
-    });
-    if (!(await button.innerText()).includes('Pause film'))
-      throw new Error('Playback state not announced');
-    await page.keyboard.press('Enter');
-    if (!(await player.locator('video').evaluate((v) => v.paused)))
-      throw new Error('Keyboard pause failed');
-    await page.locator('#the-edit').scrollIntoViewIfNeeded();
-    await player.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(600);
-    if (!(await player.locator('video').evaluate((v) => v.paused)))
-      throw new Error('Manual pause was not preserved');
+    }
     await page.goto(root + '/our-work');
     const count = downloads;
     await page.waitForTimeout(600);
@@ -73,7 +66,7 @@ try {
     throw new Error('Data saver loaded video');
   await saver.close();
   console.log(
-    'PASS: hero autoplay with preference safeguards, request-only Our Work films, keyboard play/pause, all clips, and pause persistence',
+    'PASS: hero autoplay without controls (pauses off screen, safeguards for reduced motion and data saver), request-only Our Work films and all clips',
   );
 } finally {
   await browser.close();

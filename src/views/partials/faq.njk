@@ -1,1 +1,10 @@
-<section class="wrap section faq-layout"><div><p class="eyebrow">Before you book</p><h2>Good questions.</h2><p>Anything else?<br> <a class="text-link" href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></p></div><div>{% for faq in pages.faq %}<details class="faq" {% if loop.first %}open{% endif %}><summary>{{ faq.question }}<span aria-hidden="true">+</span></summary><p>{{ faq.answer }}</p></details>{% endfor %}</div></section>
+<section class="faq-section" aria-labelledby="faq-heading">
+<div class="section wrap faq-layout">
+  <div>
+    <p class="eyebrow">Before you book</p>
+    <h2 id="faq-heading">Good <em>questions.</em></h2>
+    <p>Anything else? <a class="text-link" href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></p>
+  </div>
+  <div class="faq-list">{% for faq in pages.faq %}<details class="faq" {% if loop.first %}open{% endif %}><summary>{{ faq.question }}<span class="faq-icon" aria-hidden="true"></span></summary><p>{{ faq.answer }}</p></details>{% endfor %}</div>
+</div>
+</section>

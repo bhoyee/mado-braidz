@@ -1,1 +1,20 @@
-{% extends "layouts/base.njk" %}{% from "partials/components.njk" import studioVideo %}{% block content %}<section class="wrap page-head"><p class="eyebrow">Meet Mado</p><h1>{{ pages.about.heading }}</h1></section><section class="wrap section about-grid"><div class="about-studio-film">{{ studioVideo('at-the-chair','A moment of braiding at the salon') }}<p class="film-note">In the studio / the work behind the look</p></div><div class="prose"><h2>Who we are</h2><p class="intro">{{ pages.about.intro }}</p><p>{{ pages.about.story }}</p><ul class="studio-values">{% for value in pages.about.values %}<li>{{ value }}</li>{% endfor %}</ul><p>You’ll find us at {{ business.street }} in {{ business.city }}, {{ business.region }}.</p><a href="/contact" class="button outline">Plan your visit <span aria-hidden="true">↗</span></a></div></section>{% endblock %}
+{% extends "layouts/base.njk" %}
+{% from "partials/components.njk" import studioVideo, ring %}
+{% block content %}
+<section class="page-head">
+  <div class="wrap">
+    <p class="eyebrow">Our story</p>
+    <h1>{{ pages.about.heading }}</h1>
+  </div>
+</section>
+<section class="wrap section about-grid">
+  <figure class="about-film"><div class="arch-frame">{{ studioVideo('studio-tour','Inside the Lanham studio: the wood-slat wall with the Mado sign, arched mirrors and styling chairs') }}</div><figcaption>The Lanham studio</figcaption>{{ ring('MADO · AFRICAN BRAIDZ · LANHAM MD · ', 'about') }}</figure>
+  <div class="prose">
+    <p class="lead">{{ pages.about.intro }}</p>
+    <p>{{ pages.about.story }}</p>
+    <ul class="values-grid">{% for value in pages.about.values %}<li>{{ value }}</li>{% endfor %}</ul>
+    <p>You’ll find us at {{ business.street }} in {{ business.city }}, {{ business.region }}.</p>
+    <div class="button-row"><a href="/book" class="button">Book your chair</a><a href="/contact" class="button outline">Plan your visit</a></div>
+  </div>
+</section>
+{% endblock %}

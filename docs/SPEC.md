@@ -149,29 +149,33 @@ uploads/  (outside webroot, symlinked or served by route)
 
 The look is an editorial salon magazine: warm black and bone backgrounds, the logo's magenta and copper used sparingly, big real photography of braids, and confident serif type. It should feel like a boutique studio, not a template. The braided ring in the logo is the signature motif.
 
-### Palette (taken from the logo)
+### Palette (owner decision, Nov 2026: purple-led)
+
+The owner asked for purple as the brand colour; it also matches the purple ring on the studio sign. This replaces the original magenta/copper palette. Solid colours only, never gradients.
 
 | Token | Hex | Use |
 | --- | --- | --- |
-| `ink` | #15100E | Warm near-black: main dark background, body text on light |
-| `cocoa` | #2A1C16 | Dark surfaces, cards on dark, footer |
-| `bone` | #F6EFE7 | Main light background (never pure white) |
-| `sand` | #E9DCCD | Dividers, subtle panels |
-| `magenta` | #C8146E | Brand pink from "Mado". Primary buttons, key accents. White text on it passes AA. |
-| `magenta-soft` | #F7D6E6 | Pink tint for selected states |
-| `copper` | #D1702F | Orange from "Braids" and the braid ring. Secondary accent, price highlights, thin rules. |
-| `gold-line` | #B8935A | Hairline borders only (nods to the flyer) |
+| `night` | #1C0F26 | Deep aubergine: hero, price menu, footer; body text on light |
+| `plum` | #2E1640 | Dark surfaces and cards on night |
+| `violet` | #7B3FC4 | Primary: buttons, links, focus rings, selected states. White text on it is 6.3:1. |
+| `violet-deep` | #5F2D9E | Hover, eyebrow labels, prices on light, closing band |
+| `lilac` | #CDB6F2 | Accent text on dark (italic heading words, labels) |
+| `mist` | #F4EEFB | Soft lilac panels, page headers |
+| `cream` | #FBF7F2 | Main light background (never pure white) |
+| `linen` | #F2EBE2 | Alternate warm panels |
+| `gold` | #E0B26A | Prices and hairlines on dark only |
+| `magenta` | #C8146E | Logo only |
 | `success` / `danger` | #2F7D4F / #B3261E | System states |
 
-Rule: about 70% neutrals (ink, bone), 20% photography, 10% magenta and copper. Never gradients between magenta and copper. Have Codex check every text/background pair for WCAG AA contrast.
+Rule: warm neutrals and photography carry most of each page; violet is the action colour; dark plum sections give rhythm. Signature shape: the arch (from the studio's arched mirrors) on hero, style and film frames, plus the braided ring stamp.
 
 ### Typography
 
-- Display: **Fraunces** (variable, use the soft, high-contrast settings) for headings and big price figures.
+- Display: **Fraunces** (variable, SOFT axis at 100) for headings and big price figures; italic for one accent phrase per heading.
 - Body and UI: **Figtree** for text, buttons and forms.
 - The script "Mado" lives only in the logo SVG. Don't use a script font for headings.
 - Self-host both as WOFF2 subsets with `font-display: swap`. Preload the display font.
-- Scale: 14, 16, 18, 22, 28, 40, 56, 80 px. Headings get tight tracking (-0.02em); small caps labels get wide tracking (0.14em, uppercase, 12 px), like "BRAIDS" in the logo.
+- Body is 17 px on mobile and 18 px on desktop. Display scale: 22–30, 34–60, 44–112 px (fluid). Headings get tight tracking (-0.02em); small caps labels get wide tracking (0.14em, uppercase, 12 px), like "BRAIDS" in the logo.
 
 ### What makes it look hand-made, not AI-generated
 

@@ -109,11 +109,19 @@ npm run build
 
 `images:prepare` uses Sharp for deterministic resizing/encoding. It does not call image generation. Style-source mappings are in `src/db/style-image-sources.json`; gallery mappings are in `src/db/gallery-image-sources.json`. Do not relabel an AI reference as a real client photograph.
 
+The braid length guide shown on style pages ("See the length guide") is prepared from `docs/design/Braids-Length-Guide.png` into `public/img/guides` (AVIF + WebP at 600/1100 widths). The web files are committed; regenerate them with `npm run images:guides` if the source image changes.
+
 ### Studio films
 
-The three supplied videos remain available as silent 10–12 second clips. The hero may autoplay silently when visible; supporting films on Our Work play only on request. They pause offscreen/background and preserve a manual pause. Reduced-motion and data-saver browsing never triggers an automatic download. Without JavaScript, posters and direct MP4 links remain available. Google Maps also loads only after a click.
+Silent clips are cut from the supplied videos in `docs/design/videos` (`video1.mp4`–`video5.mp4`, kept local/ignored):
 
-Prepared files are committed under `public/media`. To regenerate them locally from `docs/design/videos/video1.mp4`, `video2.mp4`, and `video3.mp4`:
+- `studio-knotless` — the home hero (video5). It starts on its own when visible, loops, and has no controls; it never loads for reduced-motion or data-saver visitors (they see the poster) and pauses offscreen or in a background tab.
+- `studio-tour` and `at-the-chair` — the home studio section; they play only when the visitor presses play.
+- `transformation`, `braid-detail` and `studio-space` — used on Our Work / About or kept for later.
+
+Media URLs carry a version stamp (`/media/<name>.mp4?v=…`, from the file's modified time), so a regenerated clip is never hidden by a browser's cached copy. Without JavaScript, posters and direct MP4 links remain available. Google Maps also loads only after a click.
+
+Prepared files are committed under `public/media`. To regenerate them locally:
 
 ```powershell
 npm run media:prepare

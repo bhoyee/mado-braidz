@@ -44,6 +44,55 @@ The header now combines full address, daily hours, phone, larger logo/name treat
 
 Styles own their pricing: choose a size, then see only its valid lengths and server catalog prices. Knotless has three visual choices with AI-labelled Medium, Semi-medium and Small references. Size and length browsing works with JavaScript disabled. The main style reference and starting price follow the selected size. Other styles show only their seeded size groups; consultation styles keep a personal-quote path.
 
-`/our-work` replaces Gallery, with `/gallery` retained as a permanent redirect. `/prices` permanently redirects to `/styles`; there is no separate price page in the public navigation. The hero uses the supplied finished-look film with a poster, accessible play/pause, reduced-motion/data-saver safeguards and offscreen/background pausing.
+`/our-work` replaces Gallery, with `/gallery` retained as a permanent redirect. `/prices` permanently redirects to `/styles`; there is no separate price page in the public navigation. The hero uses the supplied studio film with a poster, accessible play/pause, reduced-motion/data-saver safeguards and offscreen/background pausing.
 
 Additional generated assets: `public/img/styles/knotless-size-medium-*`, `knotless-size-semi-medium-*` and `knotless-size-small-*`, with exact built-in tool prompts in `docs/KNOTLESS-SIZE-PROMPTS.json`. These are illustrative size guides, not client photographs or promises of an exact result.
+
+
+## Purple redesign (owner request)
+
+The owner asked for purple and for type that suits a modern braid salon. The public site was redesigned on the same routes and data:
+
+- Palette is now purple-led (night, plum, violet, lilac on cream/linen; gold for prices on dark). SPEC Section 4 is updated with the tokens.
+- Type returns to Fraunces (soft axis) for display and Figtree for body/UI, at 17–18 px body size. Manrope and Cormorant were removed.
+- Home: dark plum hero with the real studio film, category band, signature styles in arch cards, a printed-style price menu, four booking steps beside a before/after film, the studio (tour + chair films), a real-work strip, visit, FAQ.
+- Films (`npm run media:prepare`, sources in ignored `docs/design/videos`): `studio-knotless` (hero: video5 43–54 s only, the knotless client smiling in front of the studio sign, kept at full height and framed near the top so the sign shows above her; the owner chose this single clip over two-clip and four-clip montages. Renamed from `finished-look` so browsers cannot replay a stale cached clip. Note: video5 never shows the full sign; the top is outside the original frame throughout), `transformation` (video3, spring twist before/after), `studio-tour` (video4, first 14 s only), `at-the-chair` (video2, cropped to the cape), `braid-detail` (video1, not used on the home page). video1 was otherwise skipped because it was filmed in a living room.
+- Single stylesheet `src/styles/app.css`; `home.css` and `salon.css` were removed. `consultStyles` was added to the public template data.
+- Validation: 66 tests pass, lint clean, browser QA 29/29 page cases with no WCAG A/AA violations or horizontal overflow.
+
+### Hero revision
+
+The hero no longer uses decorative devices (circular text stamp, offset arch outline, italic tagline, statistics row), which made it feel template- or AI-generated, and it no longer repeats the hours, style list or second Book button. It is now one heading, one line, one action, beside the hero film shown full height and uncropped, labelled "Real client · filmed in our Lanham studio".
+
+Video choice: video5 is the only clip that shows the finished result, a happy client and the real studio sign together. video3 (spring twists, before/after) opens in a living room and stays in "How it works"; video4 is an empty room with storage clutter; video1 and video2 were filmed in a living room. The hero now uses video5 43–54 s, when the client faces the camera.
+
+The default home heading/intro changed; the old default "The art of beautiful braids." is auto-upgraded at render, like earlier defaults.
+
+### Style cards
+
+Style cards (home, Styles, area pages) now place the name, category and "from" price on the photo over a dark fade; the whole card is one link. At the owner's request the cards no longer show the duration, size chips or the "AI style reference" badge, and the home page no longer carries the AI-image note. The AI disclosure remains on each style detail page beneath the main photo. Home section labels are no longer numbered.
+
+### Price menu
+
+The home price menu now shows the full list (every size, length and price, plus Fulani "from" and the consultation styles), rendered from the catalog and matching the owner's current flyer, instead of repeating the cards' "from" prices. Three columns on desktop, two on tablets, a swipeable row on phones. Length labels now read "Shoulder length" and "Waist length" to match the flyer.
+The price menu was then reworked to stay short: deposit/head-wash/hair notes sit beside the heading, a row of style tabs shows one style at a time, and each style's prices appear as a length × size grid (built from the catalog as `style.matrix`). Without JavaScript every grid is shown in turn.
+
+### Studio section
+
+The home studio section now shows one silent, autoplaying film of the real room (`studio-space`: video4 12–16.5 s and 22–26.5 s joined with a fade, skipping the storage carts and the moments where the person filming is reflected in a mirror) in a tall arch, beside the owner's statement, story, a 2×2 values grid and "Meet Mado" / "Plan your visit". The film comes first on phones. `scripts/prepare-media.js` now has a reusable `buildMontage()` used for the hero and this film.
+
+### Home page trimmed, footer
+
+The home page no longer has the Our Work strip or the Visit section (both remain on their own pages; the footer gained a "Get directions" link). The footer now shows accepted payment methods (Visa, Mastercard, American Express, Discover, Cash App, Zelle, cash) as inline badges and "Powered by GiddyHost" (linking to giddyhost.com). Social icons (Instagram, TikTok, Facebook, Google reviews) render from `settings.business.social` — https links only, each shown only when set; Instagram and TikTok are set; Facebook uses a search link until the exact page address is confirmed. Defaults live in `src/db/public-defaults.js` (`publicSettings.social`); a `business.social` setting overrides them.
+At the owner's request the studio section went back to the two original films (`studio-tour` and `at-the-chair`) with play buttons instead of autoplay, keeping the new text layout; films come first on phones. The `studio-space` clip is still generated but no longer used on the page.
+
+The "Your next appointment / Make room for a new look" closing band was removed from the shared layout (every page): the sticky header's "Book your chair", the mobile Book/Call bar, the hero and each price panel already cover booking. The FAQ now sits on a full-width soft blush band (`--color-blush` #F9E3ED, the logo pink softened; all text passes AA on it). The About page values use the same 2×2 `values-grid` as the home studio section.
+
+### Styles page catalog
+
+`/styles` now lists every bookable option instead of summary cards: each style is one block (photo, category, name, Details link) with its sizes and lengths as price tiles, each linking to `/book?style=&size=&length=&variant=` (the same format the style detail page uses). Category filters work as before. Consultation styles show their "from" price or "Price on consultation" with Book-a-consultation and Call tiles. The home page signature cards are unchanged and still link to style details.
+`/styles` also has a live search box (`?q=`). Typing filters instantly in the browser: a style shows when every word matches its name/category, otherwise only the size/length tiles that match ("waist" → just waist-length options). The address updates as you type, Escape clears it, and without JavaScript the form submits and the server hides non-matching styles (all styles in the category are still sent, so clearing the search restores them).
+
+### Length guide
+
+Style pages with lengths now have a "Not sure which length? See the length guide" panel just above "Choose your size". It opens in place and only then loads the owner's guide image (`public/img/guides`, prepared by `npm run images:guides` from `docs/design/Braids-Length-Guide.png`). The caption explains that top butt and under butt sit just above and below the guide's butt-length mark. Not shown for size-only (Boho Bob) or consultation styles.

@@ -21,23 +21,13 @@ copyFileSync(
 copyFileSync('src/client/site.js', 'public/build/site.js');
 mkdirSync('public/fonts', { recursive: true });
 for (const [source, target] of [
-  ['fraunces/files/fraunces-latin-wght-normal.woff2', 'fraunces-latin.woff2'],
+  // Fraunces with the SOFT axis: a warm, rounded display serif.
+  ['fraunces/files/fraunces-latin-soft-normal.woff2', 'fraunces-latin.woff2'],
   [
-    'fraunces/files/fraunces-latin-wght-italic.woff2',
+    'fraunces/files/fraunces-latin-soft-italic.woff2',
     'fraunces-italic-latin.woff2',
   ],
   ['figtree/files/figtree-latin-wght-normal.woff2', 'figtree-latin.woff2'],
-  ['manrope/files/manrope-latin-wght-normal.woff2', 'manrope-latin.woff2'],
-  [
-    'cormorant-garamond/files/cormorant-garamond-latin-wght-normal.woff2',
-    'cormorant-latin.woff2',
-  ],
-  [
-    'cormorant-garamond/files/cormorant-garamond-latin-wght-italic.woff2',
-    'cormorant-italic-latin.woff2',
-  ],
-  ['manrope/LICENSE', 'manrope-LICENSE.txt'],
-  ['cormorant-garamond/LICENSE', 'cormorant-LICENSE.txt'],
   ['fraunces/LICENSE', 'fraunces-LICENSE.txt'],
   ['figtree/LICENSE', 'figtree-LICENSE.txt'],
 ])

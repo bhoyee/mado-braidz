@@ -1,7 +1,77 @@
-{% extends "layouts/base.njk" %}{% from "partials/components.njk" import photo %}{% block content %}{% set displayPhoto = selectedGroup.photo or style.photo %}<section class="wrap style-detail"><div><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/styles">Styles</a><span aria-hidden="true">/</span><span>{{ style.name }}</span></nav><p class="eyebrow">{{ style.category }} · {{ style.durationMin / 60 }} hours</p><h1>{{ style.name }}</h1><p class="intro">{{ style.shortDesc or 'Made for your chosen length and your everyday life. Talk to Mado about the finish you have in mind.' }}</p><p class="style-price">{% if selectedGroup %}{{ selectedGroup.name }} · From {{ selectedGroup.from | money }}{% elif style.from %}From {{ style.from | money }}{% else %}Price on consultation{% endif %}</p><p>{{ booking.depositCents | money }} deposit, applied toward your total.</p><a href="#size-guide" class="button">See sizes &amp; prices <span aria-hidden="true">↗</span></a></div><figure class="detail-photo">{% if displayPhoto %}{{ photo(displayPhoto,style.name,true) }}{% if displayPhoto.generated %}<figcaption>AI-generated style reference. This illustrates the hairstyle; it is not a photograph of a client.</figcaption>{% endif %}{% else %}<img src="/media/braid-detail.webp" width="478" height="500" alt="A closer look at braiding technique in the studio" fetchpriority="high"><figcaption>Inside the studio / a look at the craft</figcaption>{% endif %}</figure></section><section class="wrap section"><section class="style-configurator" id="size-guide" aria-labelledby="size-heading">
- <p class="eyebrow">Your style, your way</p><h2 id="size-heading">{% if style.groups.length %}Choose your size.{% else %}Price on consultation.{% endif %}</h2><p class="size-intro">{% if style.groups.length %}Start with the braid size, then explore the available lengths and prices.{% else %}Tell Mado about your chosen look and length for a personal quote.{% endif %}</p>
- {% if invalidSize %}<p class="notice" role="alert">Choose one of the sizes shown below.</p>{% endif %}
- {% if style.groups.length %}<div class="size-choice-grid">{% for group in style.groups %}<a class="size-choice{% if selectedSize==group.key %} selected{% endif %}" href="/styles/{{ style.slug }}?size={{ group.key }}#lengths" {% if selectedSize==group.key %}aria-current="true"{% endif %}>{% if group.photo %}<div class="size-photo">{{ photo(group.photo,group.name) }}{% if group.photo.generated %}<span class="image-origin">AI size reference</span>{% endif %}</div>{% else %}<div class="size-type-preview" aria-hidden="true"><span>{{ loop.index }}</span><span>{{ group.name }}</span></div>{% endif %}<div class="size-choice-caption"><h3>{{ group.name }}</h3><span>From {{ group.from | money }}</span><p>{{ group.variants.length }} {% if group.variants.length==1 %}length{% else %}lengths{% endif %} available <span aria-hidden="true">↗</span></p></div></a>{% endfor %}</div>
- <section id="lengths" class="length-options" aria-labelledby="length-heading"><p class="eyebrow">The length &amp; the price</p><h2 id="length-heading">{% if selectedGroup %}{{ selectedGroup.name }} {{ style.name | lower }}{% else %}How long do you love it?{% endif %}</h2>{% if selectedGroup %}<p class="size-intro">Choose a length below. Prices are for the braiding service; your {{ booking.depositCents | money }} deposit is applied to the total.</p><div class="length-price-grid">{% for variant in selectedGroup.variants %}<a class="length-price" href="/book?style={{ style.slug }}&amp;size={{ selectedGroup.key }}&amp;length={{ variant.length or 'standard' }}&amp;variant={{ variant.id or loop.index }}"><span>{{ variant.lengthLabel }}</span><strong>{{ variant.priceCents | money }}</strong><span class="length-action">Choose this look <span aria-hidden="true">↗</span></span></a>{% endfor %}</div>{% else %}<p class="size-intro">Select a size above to see the lengths available for your chosen size.</p>{% endif %}</section>
- {% else %}<div class="consultation-panel"><h3>Let’s find your look together.</h3><p>{% if style.from %}From {{ style.from | money }}. {% endif %}Your final price depends on the finish and length. Call Mado for a consultation before booking.</p><a class="button" href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></div>{% endif %}
-</section><div class="detail-notes"><div><h2>A little preparation.</h2><p>Bring your braiding hair and arrive washed and detangled, unless you’ve arranged a head wash. Call to confirm which hair and how much to bring.</p></div><div><h2>Time for the details.</h2><p>We reserve {{ style.durationMin / 60 }} hours for this style. Your size and length may change the time needed. Let’s discuss your look before the appointment.</p></div></div>{% if style.longHtml %}<div class="prose">{{ style.longHtml | safe }}</div>{% endif %}{% if style.photos.length > 1 %}<div class="gallery-grid">{% for item in style.photos %}{% if not loop.first %}<figure>{{ photo(item,item.alt) }}</figure>{% endif %}{% endfor %}</div>{% endif %}</section>{% include "partials/faq.njk" %}{% endblock %}
+{% extends "layouts/base.njk" %}
+{% from "partials/components.njk" import photo %}
+{% block content %}
+{% set displayPhoto = selectedGroup.photo or style.photo %}
+<section class="style-hero">
+  <div class="wrap style-detail">
+    <div class="style-detail-copy">
+      <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/styles">Styles</a><span aria-hidden="true">/</span><span aria-current="page">{{ style.name }}</span></nav>
+      <p class="eyebrow">{{ style.category }} · {{ style.durationMin / 60 }} hours</p>
+      <h1>{{ style.name }}</h1>
+      <p class="intro">{{ style.shortDesc or 'Made for your chosen length and your everyday life. Talk to Mado about the finish you have in mind.' }}</p>
+      <p class="style-price">{% if selectedGroup %}<span>{{ selectedGroup.name }} · from</span> {{ selectedGroup.from | money }}{% elif style.from %}<span>From</span> {{ style.from | money }}{% else %}Price on consultation{% endif %}</p>
+      <p class="small-muted">{{ booking.depositCents | money }} deposit, applied toward your total.</p>
+      <div class="button-row">
+        <a href="#size-guide" class="button">{% if style.groups.length %}Choose size &amp; length{% else %}Ask for a quote{% endif %}</a>
+        <a href="tel:{{ business.phone }}" class="button outline">Call {{ phoneDisplay }}</a>
+      </div>
+    </div>
+    <figure class="detail-photo">
+      <div class="arch-frame">{% if displayPhoto %}{{ photo(displayPhoto,style.name,true) }}{% else %}<img src="{{ media('braid-detail.webp') }}" width="478" height="500" alt="A closer look at braiding technique in the studio" fetchpriority="high">{% endif %}</div>
+      {% if displayPhoto and displayPhoto.generated %}<figcaption>AI-generated style reference. This illustrates the hairstyle; it is not a photograph of a client.</figcaption>{% elif not displayPhoto %}<figcaption>Inside the studio · a look at the craft</figcaption>{% endif %}
+    </figure>
+  </div>
+</section>
+
+<section class="wrap section style-configurator" id="size-guide" aria-labelledby="size-heading">
+  {% if style.groups.length and not style.lengthless %}
+  {# Length guide: opens in place; the image only loads once it is opened. #}
+  <details class="length-guide">
+    <summary><span class="length-guide-label">Not sure which length?</span> <span class="length-guide-cta">See the length guide</span><span class="length-guide-icon" aria-hidden="true"></span></summary>
+    <figure>
+      <picture>
+        <source type="image/avif" srcset="/img/guides/braid-length-guide-600.avif 600w, /img/guides/braid-length-guide-1100.avif 1100w" sizes="(max-width: 760px) 100vw, 560px">
+        <img src="/img/guides/braid-length-guide-1100.webp" srcset="/img/guides/braid-length-guide-600.webp 600w, /img/guides/braid-length-guide-1100.webp 1100w" sizes="(max-width: 760px) 100vw, 560px" width="1100" height="1206" loading="lazy" decoding="async" alt="Braid length guide on a client's back, marking shoulder, upper back, bra, mid back, lower back, waist and butt length from top to bottom">
+      </picture>
+      <figcaption>Lengths are measured down the back with the hair hanging straight. Top butt and under butt sit just above and just below the butt-length mark. Between two lengths? Ask Mado when you book.</figcaption>
+    </figure>
+  </details>
+  {% endif %}
+  <p class="eyebrow"><span class="num">01</span> Your size</p>
+  <h2 id="size-heading">{% if style.groups.length %}Choose your <em>size.</em>{% else %}Price on consultation.{% endif %}</h2>
+  <p class="size-intro">{% if style.groups.length %}Start with the braid size, then see the lengths and prices for it.{% else %}Tell Mado about your chosen look and length for a personal quote.{% endif %}</p>
+  {% if invalidSize %}<p class="notice" role="alert">Choose one of the sizes shown below.</p>{% endif %}
+  {% if style.groups.length %}
+  <div class="size-choice-grid">
+    {% for group in style.groups %}
+    <a class="size-choice{% if selectedSize==group.key %} selected{% endif %}" href="/styles/{{ style.slug }}?size={{ group.key }}#lengths" {% if selectedSize==group.key %}aria-current="true"{% endif %}>
+      {% if group.photo %}<div class="size-photo">{{ photo(group.photo,group.name) }}</div>{% endif %}
+      <div class="size-choice-caption"><h3>{{ group.name }}</h3><p><span class="from">from {{ group.from | money }}</span> · {{ group.variants.length }} {% if group.variants.length==1 %}length{% else %}lengths{% endif %}</p></div>
+    </a>
+    {% endfor %}
+  </div>
+  <section id="lengths" class="length-options" aria-labelledby="length-heading">
+    <p class="eyebrow"><span class="num">02</span> Length &amp; price</p>
+    <h2 id="length-heading">{% if selectedGroup %}{{ selectedGroup.name }} {{ style.name | lower }}{% else %}How long do you <em>love it?</em>{% endif %}</h2>
+    {% if selectedGroup %}
+    <p class="size-intro">Prices are for the braiding service. Your {{ booking.depositCents | money }} deposit comes off the total.</p>
+    <div class="length-price-grid">
+      {% for variant in selectedGroup.variants %}<a class="length-price" href="/book?style={{ style.slug }}&amp;size={{ selectedGroup.key }}&amp;length={{ variant.length or 'standard' }}&amp;variant={{ variant.id or loop.index }}"><span class="length-name">{{ variant.lengthLabel }}</span><strong>{{ variant.priceCents | money }}</strong><span class="length-action">Choose this look</span></a>{% endfor %}
+    </div>
+    {% else %}
+    <p class="size-intro">Select a size above to see its lengths and prices.</p>
+    {% endif %}
+  </section>
+  {% else %}
+  <div class="consultation-panel"><h3>Let’s find your look together.</h3><p>{% if style.from %}From {{ style.from | money }}. {% endif %}Your final price depends on the finish and length. Call Mado for a consultation before booking.</p><a class="button" href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></div>
+  {% endif %}
+</section>
+
+<section class="wrap detail-notes" aria-label="Before your appointment">
+  <div><h2>A little preparation</h2><p>Bring your braiding hair and arrive washed and detangled, unless you’ve booked a head wash. Call to confirm which hair and how much to bring.</p></div>
+  <div><h2>Time in the chair</h2><p>We reserve {{ style.durationMin / 60 }} hours for this style. Your size and length may change that, so let’s talk it through before the day.</p></div>
+</section>
+{% if style.longHtml %}<div class="wrap prose section-tight">{{ style.longHtml | safe }}</div>{% endif %}
+{% if style.photos.length > 1 %}<div class="wrap gallery-grid section-tight">{% for item in style.photos %}{% if not loop.first %}<figure>{{ photo(item,item.alt) }}</figure>{% endif %}{% endfor %}</div>{% endif %}
+{% include "partials/faq.njk" %}
+{% endblock %}

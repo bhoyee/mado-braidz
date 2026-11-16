@@ -1,1 +1,78 @@
-{% extends "layouts/base.njk" %}{% from "partials/components.njk" import card %}{% block content %}<section class="wrap page-head"><p class="eyebrow">The collection</p><h1>The style<br><em>collection.</em></h1><p class="intro">Knotless, boho, twists, locs and more. Choose your look, then make it your own with the right size and length.</p></section><section class="wrap section collection"><nav class="filter-bar" aria-label="Filter styles"><a href="/styles" class="chip" {% if not selected %}aria-current="page"{% endif %}>All styles</a>{% for category in categories %}<a class="chip" href="/styles?category={{ category.slug }}" {% if selected==category.slug %}aria-current="page"{% endif %}>{{ category.name }}</a>{% endfor %}</nav><p class="small result-count" role="status">{{ filtered.length }} styles to explore</p>{% if not filtered.length %}<div class="empty-editorial"><h2>A new collection is taking shape.</h2><p>Call the studio to talk about the style you have in mind.</p><a href="tel:{{ business.phone }}" class="button outline">Call {{ phoneDisplay }}</a></div>{% endif %}<div class="style-grid">{% for style in filtered %}{{ card(style) }}{% endfor %}</div></section>{% endblock %}
+{% extends "layouts/base.njk" %}
+{% from "partials/components.njk" import photo %}
+{% block content %}
+<section class="page-head">
+  <div class="wrap">
+    <p class="eyebrow">Styles &amp; prices</p>
+    <h1>The style <em>collection.</em></h1>
+    <p class="intro">Pick a category, then choose your size and length. Every option shows its price, so you know your total before you book.</p>
+  </div>
+</section>
+
+<section class="wrap section collection">
+  <form class="style-search" action="/styles" method="get" role="search" data-style-search>
+    <label for="style-search-input" class="sr-only">Search styles</label>
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="style-search-input" type="search" name="q" value="{{ query }}" placeholder="Search styles or lengths, e.g. knotless, waist, locs" autocomplete="off" enterkeyhint="search">
+    {% if selected %}<input type="hidden" name="category" value="{{ selected }}">{% endif %}
+    <button type="submit" class="button compact">Search</button>
+  </form>
+  <nav class="filter-bar" aria-label="Filter styles">
+    <a href="/styles{% if query %}?q={{ query | urlencode }}{% endif %}" class="chip" {% if not selected %}aria-current="page"{% endif %}>All styles</a>
+    {% for category in categories %}<a class="chip" href="/styles?category={{ category.slug }}{% if query %}&amp;q={{ query | urlencode }}{% endif %}" {% if selected==category.slug %}aria-current="page"{% endif %}>{{ category.name }}</a>{% endfor %}
+  </nav>
+  <p class="result-count" role="status" data-result-count>{{ matchCount }} {% if matchCount == 1 %}style{% else %}styles{% endif %} to explore</p>
+  <aside class="collection-note">
+    <p><strong>{{ booking.depositCents | money }} deposit</strong> holds your chair and comes off your total.{% for addon in addons %} {{ addon.name }} +{{ addon.priceCents | money }}.{% endfor %} Bring your own braiding hair.</p>
+  </aside>
+
+  <div class="empty-editorial" data-search-empty {% if matchCount or not query %}hidden{% endif %}><h2>No styles match that search.</h2><p>Try another word, or call the studio and tell us the look you have in mind.</p><a href="tel:{{ business.phone }}" class="button outline">Call {{ phoneDisplay }}</a></div>
+  {% if not filtered.length and not query %}
+  <div class="empty-editorial"><h2>A new collection is taking shape.</h2><p>Call the studio to talk about the style you have in mind.</p><a href="tel:{{ business.phone }}" class="button outline">Call {{ phoneDisplay }}</a></div>
+  {% endif %}
+
+  <div class="catalog">
+    {% for style in filtered %}
+    <article class="catalog-style" id="{{ style.slug }}" aria-labelledby="name-{{ style.slug }}" data-search="{{ style.searchCore }}" {% if style.searchHidden %}hidden{% endif %}>
+      <a class="catalog-photo" href="/styles/{{ style.slug }}" tabindex="-1" aria-hidden="true">{{ photo(style.photo, style.name) }}</a>
+      <div class="catalog-body">
+        <div class="catalog-head">
+          <div>
+            <p class="catalog-category">{{ style.category }}</p>
+            <h2 id="name-{{ style.slug }}"><a href="/styles/{{ style.slug }}">{{ style.name }}</a></h2>
+          </div>
+          <a class="catalog-details" href="/styles/{{ style.slug }}">Details</a>
+        </div>
+
+        {% if style.groups.length %}
+          {% if style.lengthless %}
+          <ul class="option-grid">
+            {% for group in style.groups %}{% set v = group.variants[0] %}
+            <li data-option="{{ group.name | lower }}"><a class="option-tile" href="/book?style={{ style.slug }}&amp;size={{ group.key }}&amp;length=standard&amp;variant={{ v.id or loop.index }}"><span class="option-name">{{ group.name }}</span><strong>{{ v.priceCents | money }}</strong><span class="option-book">Book<span class="sr-only"> {{ style.name }}, {{ group.name }}</span></span></a></li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          {% for group in style.groups %}
+          <div class="option-group">
+          <h3 class="option-size">{{ group.name }}</h3>
+          <ul class="option-grid">
+            {% for v in group.variants %}
+            <li data-option="{{ group.name | lower }} {{ v.lengthLabel | lower }}"><a class="option-tile" href="/book?style={{ style.slug }}&amp;size={{ group.key }}&amp;length={{ v.length or 'standard' }}&amp;variant={{ v.id or loop.index }}"><span class="option-name">{{ v.lengthLabel }}</span><strong>{{ v.priceCents | money }}</strong><span class="option-book">Book<span class="sr-only"> {{ style.name }}, {{ group.name }}, {{ v.lengthLabel }}</span></span></a></li>
+            {% endfor %}
+          </ul>
+          </div>
+          {% endfor %}
+          {% endif %}
+        {% else %}
+          <p class="option-consult">{% if style.from %}From <strong>{{ style.from | money }}</strong>, depending on style and length.{% else %}Price on consultation.{% endif %} The {{ booking.depositCents | money }} deposit holds your chair; your final price is agreed with Mado.</p>
+          <ul class="option-grid">
+            <li data-option="consultation book"><a class="option-tile option-tile-wide" href="/book?style={{ style.slug }}"><span class="option-name">Consultation</span><strong>{% if style.from %}From {{ style.from | money }}{% else %}Ask for a quote{% endif %}</strong><span class="option-book">Book<span class="sr-only"> a {{ style.name }} consultation</span></span></a></li>
+            <li data-option="call phone"><a class="option-tile option-tile-wide option-tile-call" href="tel:{{ business.phone }}"><span class="option-name">Talk it through</span><strong>{{ phoneDisplay }}</strong><span class="option-book">Call</span></a></li>
+          </ul>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -40,15 +40,20 @@ describe('Milestone 2 public pages', () => {
 
   it('renders the video hero and a deferred studio film', async () => {
     const response = await request(makeApp()).get('/').expect(200);
-    expect(response.text).toContain('poster="/media/finished-look.webp"');
-    expect(response.text).toContain('data-src="/media/finished-look.mp4"');
+    // Media URLs carry a version stamp so browsers never replay a stale clip.
+    expect(response.text).toMatch(
+      /poster="\/media\/studio-knotless\.webp\?v=[a-z0-9]+"/,
+    );
+    expect(response.text).toMatch(
+      /data-src="\/media\/studio-knotless\.mp4\?v=[a-z0-9]+"/,
+    );
     expect(response.text).toContain('preload="none"');
     expect(response.text).not.toContain(' autoplay');
     expect(response.text).not.toContain('Real studio photographs coming soon');
   });
   it('serves seekable video with same-origin media policy', async () => {
     const response = await request(makeApp())
-      .get('/media/finished-look.mp4')
+      .get('/media/studio-knotless.mp4')
       .set('Range', 'bytes=0-63')
       .expect(206);
     expect(response.headers['content-type']).toContain('video/mp4');
@@ -72,7 +77,7 @@ describe('Milestone 2 public pages', () => {
     )
       .get('/')
       .expect(200);
-    expect(updated.text).toContain('The art of beautiful braids.');
+    expect(updated.text).toContain('Where beauty meets the art of braiding.');
   });
 
   it('keeps public pages useful when the active catalog is empty', async () => {
@@ -136,6 +141,18 @@ describe('Milestone 2 public pages', () => {
     expect(response.text).toContain('Knotless Braids');
     expect(response.text).not.toContain('Boho Bob');
     await request(makeApp()).get('/styles?category=unknown').expect(400);
+    // Search hides non-matching styles (still sent, so live search can restore them).
+    const searched = await request(makeApp())
+      .get('/styles?q=boho%20bob')
+      .expect(200);
+    expect(searched.text).toMatch(/id="boho-bob"[^>]*data-search="[^"]*"\s*>/);
+    expect(searched.text).toMatch(/id="knotless-braids"[^>]*\shidden>/);
+    expect(searched.text).toContain('1 style to explore');
+    const none = await request(makeApp()).get('/styles?q=zzzz').expect(200);
+    expect(none.text).toContain('0 styles to explore');
+    expect(none.text).toContain('No styles match that search.');
+    // A malformed query is ignored rather than failing the page.
+    await request(makeApp()).get('/styles?q[x]=1').expect(200);
     await request(makeApp()).get('/styles?category[x]=1').expect(400);
   });
   it('keeps prices within each style and redirects legacy URLs', async () => {

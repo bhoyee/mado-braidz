@@ -10,7 +10,7 @@ execFileSync(
     '-i',
     'docs/design/logo.png',
     '-vf',
-    'scale=144:144',
+    'scale=192:192',
     '-frames:v',
     '1',
     '-c:v',

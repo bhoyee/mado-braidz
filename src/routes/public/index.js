@@ -38,6 +38,16 @@ export const areas = {
     copy: 'Your next style, a little closer to home. Clients from Landover can explore Fulani braids, twists and locs, then call the Lanham studio for a consultation.',
   },
 };
+// Display order for lengths in price grids (null = no length, e.g. Boho Bob).
+const LENGTH_ORDER = [
+  'shoulder',
+  'mid_back',
+  'waist',
+  'top_butt',
+  'butt',
+  'under_butt',
+  null,
+];
 export const label = (value) =>
   ({
     semi_medium: 'Semi-medium',
@@ -45,8 +55,8 @@ export const label = (value) =>
     top_butt: 'Top butt',
     under_butt: 'Under butt',
     butt: 'Butt length',
-    shoulder: 'Shoulder',
-    waist: 'Waist',
+    shoulder: 'Shoulder length',
+    waist: 'Waist length',
     medium: 'Medium',
     small: 'Small',
   })[value] ||
@@ -96,6 +106,56 @@ export function safePhoto(photo) {
     avifPath: sizes.at(-1)?.avif,
   };
 }
+// Social profiles shown in the footer: only https links for known networks,
+// in a fixed order. Empty or missing entries are simply not shown.
+const SOCIAL_NETWORKS = [
+  ['instagram', 'Instagram'],
+  ['tiktok', 'TikTok'],
+  ['facebook', 'Facebook'],
+  ['google', 'Google reviews'],
+];
+export function socialLinks(social = {}) {
+  return SOCIAL_NETWORKS.flatMap(([key, name]) => {
+    const url = typeof social?.[key] === 'string' ? social[key].trim() : '';
+    return /^https:\/\/[^\s"'<>]+$/.test(url) ? [{ key, name, url }] : [];
+  });
+}
+// Style search: lower-case words only, so "Mid-back" and "mid back" match.
+export const searchWords = (text) =>
+  String(text ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+// Everything a visitor might type about a style: name, category, sizes, lengths.
+export const styleSearchText = (style) =>
+  searchWords(
+    [
+      style.name,
+      style.category,
+      ...style.groups.flatMap((g) => [
+        g.name,
+        ...g.variants.map((v) => v.lengthLabel),
+      ]),
+      style.groups.length ? '' : 'consultation',
+    ].join(' '),
+  );
+// Just the style's own words (name, category); sizes and lengths are matched
+// per option tile in the browser, so "waist" shows only waist-length options.
+export const styleCoreSearchText = (style) =>
+  searchWords(
+    [
+      style.name,
+      style.category,
+      style.groups.length ? '' : 'consultation',
+    ].join(' '),
+  );
+export const matchesSearch = (text, query) =>
+  searchWords(query)
+    .split(' ')
+    .filter(Boolean)
+    .every((word) => text.includes(word));
 export function decorateCatalog(data) {
   const styles = data.styles.map((style) => {
     const allPhotos = (style.photos || []).map(safePhoto).filter(Boolean);
@@ -123,6 +183,25 @@ export function decorateCatalog(data) {
     return {
       ...style,
       from,
+      // Price grid for the home menu: lengths down the side, sizes across.
+      matrix: groups.length
+        ? {
+            sizes: groups.map((group) => group.name),
+            rows: LENGTH_ORDER.filter((length) =>
+              style.variants.some((v) => (v.length ?? null) === length),
+            ).map((length) => ({
+              label: length ? label(length) : 'All lengths',
+              cells: groups.map(
+                (group) =>
+                  group.variants.find((v) => (v.length ?? null) === length)
+                    ?.priceCents ?? null,
+              ),
+            })),
+          }
+        : null,
+      // True when variants differ only by size (e.g. Boho Bob), not length.
+      lengthless:
+        style.variants.length > 0 && style.variants.every((v) => !v.length),
       groups,
       photos: allPhotos.filter((photo) => !photo.variants?.size),
       photo: allPhotos.find((photo) => !photo.variants?.size) || allPhotos[0],
@@ -149,7 +228,12 @@ export function decorateCatalog(data) {
   // Upgrade only the original scaffold copy; preserve owner-written content.
   if (
     !pages.home ||
-    ['Braids done slowly,', 'A fresh look.'].includes(pages.home.heading)
+    [
+      'Braids done slowly,',
+      'A fresh look.',
+      'The art of beautiful braids.',
+      'Knotless braids, twists & locs in Lanham, MD.',
+    ].includes(pages.home.heading)
   )
     pages.home = publicSettings.seo.pages.home;
   return {
@@ -157,10 +241,12 @@ export function decorateCatalog(data) {
     styles,
     heroStyle:
       styles.find((style) => style.slug === 'knotless-braids') || styles[0],
+    consultStyles: styles.filter((style) => !style.groups.length),
     suppliedStyles: styles.filter(
       (style) => style.photo && !style.photo.generated,
     ),
     business: b,
+    social: socialLinks(b.social ?? publicSettings.social),
     booking: data.settings.booking,
     pages,
     hours: data.settings.hours,
@@ -220,12 +306,28 @@ export function publicRouter(catalog) {
         backUrl: '/styles',
         backLabel: 'See all styles',
       });
+    // Free-text search (also works without JavaScript); anything odd is ignored.
+    const q = z.string().max(60).optional().safeParse(req.query.q);
+    const query = q.success ? (q.data ?? '').trim() : '';
+    // Every style in the category is sent; non-matches are hidden, so the live
+    // search can bring them back when the query changes.
+    const filtered = res.locals.styles
+      .filter((s) => !category.data || s.category === category.data)
+      .map((s) => {
+        const searchText = styleSearchText(s);
+        return {
+          ...s,
+          searchText,
+          searchCore: styleCoreSearchText(s),
+          searchHidden: Boolean(query) && !matchesSearch(searchText, query),
+        };
+      });
     res.render('pages/styles', {
       title: `Braiding styles | ${res.locals.business.name}`,
       selected: category.data,
-      filtered: res.locals.styles.filter(
-        (s) => !category.data || s.category === category.data,
-      ),
+      query,
+      filtered,
+      matchCount: filtered.filter((s) => !s.searchHidden).length,
     });
   });
   router.get('/styles/:slug', (req, res, next) => {
