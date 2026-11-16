@@ -33,14 +33,14 @@ Studio clips and posters remain in `public/media`. All films are silent. The her
 
 ## Follow-ups
 
-Owner review of generated hairstyle accuracy; replace references with verified client/service photos when available. Add an owner portrait, genuine reviews and actual social/profile links. Approve the About introduction and legal drafts before launch. Hours are confirmed as daily 6:00 AM–6:00 PM Eastern; parking details remain to be confirmed. Use MySQL 8 or MariaDB 10.6+ for deployment; the local XAMPP database is older.
+Owner review of generated hairstyle accuracy; replace references with verified client/service photos when available. Add an owner portrait, genuine reviews and actual social/profile links. Approve the About introduction and legal drafts before launch. Hours were amended to Mon–Sat 6:00 AM–9:00 PM and Sun 10:00 AM–6:00 PM Eastern; parking details remain to be confirmed. Use MySQL 8 or MariaDB 10.6+ for deployment; the local XAMPP database is older.
 
 Booking availability/holds, payments, full admin functionality, email delivery, final SEO/image pipeline and production launch remain in their assigned later milestones. The contact form is a disabled preview and booking-related pages are informational only. No Milestone 3 work was started.
 
 
 ## Owner-requested header and price browsing
 
-The header now combines full address, daily hours, phone, larger logo/name treatment, stronger menu typography and booking action. Hours were explicitly confirmed by the owner as Monday–Friday and Saturday–Sunday, 6:00 AM–6:00 PM. `content:sync` applies this confirmation and the supplied “Where Beauty Meets the Art of Braiding” copy to an existing local database without changing prices.
+The header now combines full address, daily hours, phone, larger logo/name treatment, stronger menu typography and booking action. The latest owner amendment confirms Monday–Saturday, 6:00 AM–9:00 PM and Sunday, 10:00 AM–6:00 PM. `content:sync` applies this confirmation and the supplied “Where Beauty Meets the Art of Braiding” copy to an existing local database without changing prices.
 
 Styles own their pricing: choose a size, then see only its valid lengths and server catalog prices. Knotless has three visual choices with AI-labelled Medium, Semi-medium and Small references. Size and length browsing works with JavaScript disabled. The main style reference and starting price follow the selected size. Other styles show only their seeded size groups; consultation styles keep a personal-quote path.
 
@@ -96,3 +96,7 @@ The "Your next appointment / Make room for a new look" closing band was removed 
 ### Length guide
 
 Style pages with lengths now have a "Not sure which length? See the length guide" panel just above "Choose your size". It opens in place and only then loads the owner's guide image (`public/img/guides`, prepared by `npm run images:guides` from `docs/design/Braids-Length-Guide.png`). The caption explains that top butt and under butt sit just above and below the guide's butt-length mark. Not shown for size-only (Boho Bob) or consultation styles.
+
+## Booking rule amendment
+
+Shared salon capacity is three simultaneous clients, including staggered starts every 30 minutes. Milestone 3 will enforce the maximum occupancy over each full appointment and buffer, with active holds consuming capacity. Individual staff selection remains out of scope. Hair with 50% human hair is included; the optional 100% human hair upgrade costs $40. The seed and explicit content sync include these settings; the public hair guidance, FAQ and schedules have been updated. This amendment does not implement the booking engine.
