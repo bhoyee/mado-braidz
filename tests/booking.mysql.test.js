@@ -1,3 +1,5 @@
+import { createPaymentService } from '../src/services/paymentService.js';
+import { fakeStripe, paidEvent, paymentConfig } from './fixtures/stripe.js';
 import request from 'supertest';
 import { DateTime } from 'luxon';
 import { createApp } from '../src/app.js';
@@ -59,6 +61,11 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       repository = createBookingRepository(db);
     }, 30000);
     beforeEach(async () => {
+      await db.delete(s.checkoutAttempts);
+      await db.delete(s.payments);
+      await db.delete(s.stripeEvents);
+      await db.delete(s.jobs);
+      await db.delete(s.notifications);
       await db.delete(s.bookingAddons);
       await db.delete(s.bookings);
       await db.delete(s.clients);
@@ -145,6 +152,86 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       expect(results.filter((r) => r.status === 201)).toHaveLength(3);
       expect(results.filter((r) => r.status === 409)).toHaveLength(17);
       expect(await db.select().from(s.bookings)).toHaveLength(3);
+    }, 30000);
+    it('persists exactly one payment, event and confirmation job under parallel signed-event processing', async () => {
+      const service = createBookingService(
+        repository,
+        () => now,
+        paymentConfig.SESSION_SECRET,
+      );
+      const provider = fakeStripe(),
+        payments = createPaymentService(
+          repository,
+          provider,
+          paymentConfig,
+          () => now,
+        );
+      const hold = await service.createHold(validHold);
+      const session = await payments.checkout(hold.ref, hold.manageToken);
+      await Promise.all(
+        Array.from({ length: 12 }, () =>
+          payments.handleEvent(
+            paidEvent(provider.sessions.get(session.sessionId)),
+          ),
+        ),
+      );
+      const [row] = await db.select().from(s.bookings);
+      expect(row).toMatchObject({
+        status: 'confirmed',
+        paymentStatus: 'deposit_paid',
+        paidCents: 3000,
+        balanceCents: 15000,
+      });
+      expect(await db.select().from(s.payments)).toHaveLength(1);
+      expect(await db.select().from(s.stripeEvents)).toHaveLength(1);
+      expect(await db.select().from(s.jobs)).toHaveLength(1);
+      expect(await db.select().from(s.notifications)).toHaveLength(1);
+    }, 30000);
+    it('refunds a late payment with real capacity locks and a durable refund task', async () => {
+      let current = now;
+      const service = createBookingService(
+        repository,
+        () => current,
+        paymentConfig.SESSION_SECRET,
+      );
+      const provider = fakeStripe(),
+        payments = createPaymentService(
+          repository,
+          provider,
+          paymentConfig,
+          () => current,
+        );
+      const hold = await service.createHold(validHold),
+        session = await payments.checkout(hold.ref, hold.manageToken);
+      current = now.plus({ minutes: 31 });
+      await service.releaseHold(hold.id, 'expired', true);
+      await Promise.all(
+        Array.from({ length: 3 }, () => service.createHold(validHold)),
+      );
+      await payments.handleEvent(
+        paidEvent(provider.sessions.get(session.sessionId)),
+      );
+      const [row] = await db
+        .select()
+        .from(s.bookings)
+        .where(eq(s.bookings.id, hold.id));
+      expect(row).toMatchObject({
+        status: 'payment_conflict',
+        paymentStatus: 'refunded',
+        paidCents: 0,
+      });
+      expect((await db.select().from(s.payments)).map((p) => p.type)).toEqual([
+        'deposit',
+        'refund',
+      ]);
+      expect(
+        (
+          await db
+            .select()
+            .from(s.jobs)
+            .where(eq(s.jobs.type, 'refundConflict'))
+        )[0].status,
+      ).toBe('done');
     }, 30000);
     it('blocks staggered overlaps, snapshots addon money, and admits an expired hold replacement', async () => {
       const service = createBookingService(repository, () => now);

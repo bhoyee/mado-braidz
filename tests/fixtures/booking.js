@@ -19,6 +19,11 @@ export async function memoryBookingRepository() {
   const rows = [],
     clients = [],
     media = [];
+  const attempts = [],
+    payments = [],
+    events = [],
+    jobs = [],
+    notifications = [];
   let tail = Promise.resolve();
   const repository = {
     data,
@@ -26,6 +31,73 @@ export async function memoryBookingRepository() {
     clients,
     media,
     timeBlocks: [],
+    attemptRows: attempts,
+    paymentRows: payments,
+    eventRows: events,
+    jobRows: jobs,
+    notificationRows: notifications,
+    bookingById: async (id) => rows.find((r) => r.id === id),
+    bookingByRef: async (ref) => rows.find((r) => r.ref === ref),
+    bookingByToken: async (hash) =>
+      rows.find((r) => r.manageTokenHash === hash),
+    bookingByRequest: async (key) =>
+      rows.find((r) => r.checkoutRequestKey === key),
+    saveBooking: async (id, values) =>
+      Object.assign(
+        rows.find((r) => r.id === id),
+        values,
+      ),
+    client: async (id) => clients[id - 1],
+    attempt: async (id) => attempts.find((a) => a.id === id),
+    attempts: async (id) => attempts.filter((a) => a.bookingId === id),
+    attemptBySession: async (id) =>
+      attempts.find((a) => a.stripeSessionId === id),
+    insertAttempt: async (values) => attempts.push({ ...values }),
+    saveAttempt: async (id, values) =>
+      Object.assign(
+        attempts.find((a) => a.id === id),
+        values,
+      ),
+    payments: async (id) => payments.filter((p) => p.bookingId === id),
+    paymentByIntent: async (id) =>
+      payments.find(
+        (p) => p.stripePaymentIntentId === id && p.type !== 'refund',
+      ),
+    insertPayment: async (values) => payments.push({ ...values }),
+    event: async (id, type, receivedAt) => {
+      let row = events.find((e) => e.id === id);
+      if (!row) {
+        row = { id, type, receivedAt };
+        events.push(row);
+      }
+      return row;
+    },
+    finishEvent: async (id, processedAt) =>
+      Object.assign(
+        events.find((e) => e.id === id),
+        { processedAt },
+      ),
+    queueJob: async (values) => {
+      if (!jobs.some((j) => j.dedupeKey === values.dedupeKey))
+        jobs.push({ ...values, id: jobs.length + 1, attempts: 0 });
+    },
+    refundJobs: async (id) =>
+      jobs.filter(
+        (j) =>
+          j.type === 'refundConflict' &&
+          ['pending', 'failed'].includes(j.status) &&
+          (!id || j.payload.bookingId === id),
+      ),
+    saveJob: async (id, values) =>
+      Object.assign(
+        jobs.find((j) => j.id === id),
+        values,
+      ),
+    notify: async (values) => notifications.push(values),
+    expiredHolds: async (now) =>
+      rows
+        .filter((r) => r.status === 'pending_payment' && r.holdExpiresAt < now)
+        .map((r) => ({ id: r.id })),
     catalog: async () => structuredClone(data),
     schedule: async () => ({
       bookings: structuredClone(rows),
@@ -41,7 +113,7 @@ export async function memoryBookingRepository() {
       return media.length;
     },
     insertBooking: async (values) => {
-      rows.push(values);
+      rows.push({ ...values, id: rows.length + 1 });
       return rows.length;
     },
     transaction: async (run) => {
@@ -51,13 +123,23 @@ export async function memoryBookingRepository() {
         release = resolve;
       });
       await previous;
-      const lengths = [rows.length, clients.length, media.length];
+      const arrays = [
+        rows,
+        clients,
+        media,
+        attempts,
+        payments,
+        events,
+        jobs,
+        notifications,
+      ];
+      const snapshots = arrays.map((array) => structuredClone(array));
       try {
         return await run(repository);
       } catch (e) {
-        rows.length = lengths[0];
-        clients.length = lengths[1];
-        media.length = lengths[2];
+        arrays.forEach((array, i) =>
+          array.splice(0, array.length, ...snapshots[i]),
+        );
         throw e;
       } finally {
         release();
