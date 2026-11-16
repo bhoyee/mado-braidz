@@ -1,3 +1,5 @@
+import { bookingRouter } from './routes/public/booking.js';
+import { createBookingRepository } from './services/bookingRepository.js';
 import { join } from 'node:path';
 import { statSync } from 'node:fs';
 import { createDatabase } from './db/index.js';
@@ -22,6 +24,7 @@ import {
 export function createApp({
   config = parseEnv(),
   sessionStore,
+  bookingRepository,
   catalog,
   logger = createLogger(config),
 } = {}) {
@@ -33,6 +36,7 @@ export function createApp({
     (database = createDatabase(config.DATABASE_URL)).db,
   );
   app.locals.closeDatabase = () => database?.pool.end();
+  app.locals.turnstileSiteKey = config.TURNSTILE_SITE_KEY;
   app.disable('x-powered-by');
   app.use(pinoHttp({ logger }));
   app.use(
@@ -40,10 +44,15 @@ export function createApp({
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'"],
+          scriptSrc: ["'self'", 'https://challenges.cloudflare.com'],
           styleSrc: ["'self'"],
           imgSrc: ["'self'", 'data:'],
-          frameSrc: ["'self'", 'https://maps.google.com'],
+          frameSrc: [
+            "'self'",
+            'https://maps.google.com',
+            'https://challenges.cloudflare.com',
+          ],
+          connectSrc: ["'self'", 'https://challenges.cloudflare.com'],
           fontSrc: ["'self'"],
           mediaSrc: ["'self'"],
           objectSrc: ["'none'"],
@@ -129,6 +138,14 @@ export function createApp({
   });
   app.set('view engine', 'njk');
   app.use('/admin', designRouter(catalog, limits.preview));
+  app.use(
+    '/api',
+    bookingRouter(
+      bookingRepository ??
+        (database ? createBookingRepository(database.db) : null),
+      config,
+    ),
+  );
   app.use(publicRouter(catalog));
   app.use((_req, res) =>
     res.status(404).render('pages/message', {

@@ -5,24 +5,39 @@
   <div class="wrap">
     <p class="eyebrow">Our work</p>
     <h1>Fresh from <em>the chair.</em></h1>
-    <p class="intro">Real styles from the studio, from the first part to the final turn.</p>
+    <p class="intro">Photos and short films from the studio. Hover or tap any piece to see the style; press play on a film to watch it.</p>
   </div>
 </section>
+
 <section class="wrap section">
-  <div class="gallery-grid">
-    {% for style in suppliedStyles %}<figure><a href="/styles/{{ style.slug }}">{{ photo(style.photo,style.name) }}</a><figcaption>{{ style.name }}</figcaption></figure>{% endfor %}
-    {% for item in gallery %}<figure>{{ photo(item,item.alt) }}<figcaption>{{ item.alt }}</figcaption></figure>{% endfor %}
-  </div>
-</section>
-<section class="films-section" aria-labelledby="films-heading">
-  <div class="wrap">
-    <p class="eyebrow eyebrow-light">Studio films</p>
-    <h2 id="films-heading">Behind <em>the chair.</em></h2>
-    <div class="film-gallery">
-      <figure><div class="arch-frame">{{ studioVideo('studio-knotless','A client turns and smiles, showing her finished knotless braids') }}</div><figcaption><span>01</span><h3>That final turn</h3><p>Waist-length knotless, seen from every side.</p></figcaption></figure>
-      <figure><div class="arch-frame">{{ studioVideo('transformation','Spring twists from the first parted section to the finished look') }}</div><figcaption><span>02</span><h3>Before &amp; after</h3><p>Spring twists, start to finish.</p></figcaption></figure>
-      <figure><div class="arch-frame">{{ studioVideo('at-the-chair','Hands finishing a client’s braids') }}</div><figcaption><span>03</span><h3>Made by hand</h3><p>A moment behind the chair.</p></figcaption></figure>
-    </div>
+  {# One portfolio: films (taller tiles) mixed in with photos. Labels sit on
+     the picture and appear on hover; on touch screens they always show. #}
+  <ul class="work-grid">
+    {% for item in items %}
+    {% if item.type == 'film' %}
+    <li class="work-tile work-film">
+      {{ studioVideo(item.name, item.description) }}
+      <div class="work-caption" aria-hidden="true"><span class="work-kind">Film</span><strong>{{ item.title }}</strong><span class="work-sub">{{ item.label }}</span></div>
+    </li>
+    {% elif item.href %}
+    <li class="work-tile">
+      <a href="{{ item.href }}" class="work-link">
+        {{ photo(item.photo, item.label) }}
+        <span class="work-caption"><span class="work-kind">Photo</span><strong>{{ item.label }}</strong><span class="work-sub">View style <span aria-hidden="true">→</span></span></span>
+      </a>
+    </li>
+    {% else %}
+    <li class="work-tile">
+      {{ photo(item.photo, item.label) }}
+      <div class="work-caption" aria-hidden="true"><span class="work-kind">Photo</span><strong>{{ item.label }}</strong></div>
+    </li>
+    {% endif %}
+    {% endfor %}
+  </ul>
+
+  <div class="work-cta">
+    <p>Love a look?</p>
+    <a href="/styles" class="button">See styles &amp; prices</a>
   </div>
 </section>
 {% endblock %}

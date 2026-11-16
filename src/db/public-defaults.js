@@ -8,29 +8,35 @@ export const publicSettings = {
     google: '',
   },
   hours: {
-    summary: 'Open daily · 6:00 AM–6:00 PM',
-    daysLabel: 'Open daily',
-    timeLabel: '6:00 AM–6:00 PM',
+    summary: 'Mon–Sat · 6:00 AM–9:00 PM; Sun · 10:00 AM–6:00 PM',
+    daysLabel: 'Mon–Sat',
+    timeLabel: '6:00 AM–9:00 PM',
+    sundayLabel: 'Sun · 10:00 AM–6:00 PM',
     description:
-      'Monday–Friday, 6:00 AM–6:00 PM. Saturday–Sunday, 6:00 AM–6:00 PM. Eastern time.',
+      'Monday–Saturday, 6:00 AM–9:00 PM. Sunday, 10:00 AM–6:00 PM. Eastern time.',
     timezone: 'America/New_York',
-    weekly: Object.fromEntries(
-      [
-        'monday',
-        'tuesday',
-        'wednesday',
-        'thursday',
-        'friday',
-        'saturday',
-        'sunday',
-      ].map((day) => [day, { open: '06:00', close: '18:00', closed: false }]),
-    ),
+    weekly: {
+      ...Object.fromEntries(
+        [
+          'monday',
+          'tuesday',
+          'wednesday',
+          'thursday',
+          'friday',
+          'saturday',
+        ].map((day) => [day, { open: '06:00', close: '21:00', closed: false }]),
+      ),
+      sunday: { open: '10:00', close: '18:00', closed: false },
+    },
   },
   policy: {
     rescheduleHours: 48,
     freeReschedules: 1,
     depositRefundable: false,
-    hairIncluded: false,
+    hairIncluded: true,
+    includedHumanHairPercent: 50,
+    humanHairUpgradeSlug: 'human-hair-upgrade',
+    hairDescription: 'Hair with 50% human hair is included in the style price.',
   },
   seo: {
     pages: {
@@ -61,7 +67,7 @@ export const publicSettings = {
         {
           question: 'Do I need to bring my own hair?',
           answer:
-            'Yes. Please bring your braiding hair and call ahead to confirm the type and amount for your chosen style.',
+            'No. Hair with 50% human hair is included in the style price. Choose the 100% human hair upgrade for an additional $40.',
         },
         {
           question: 'How should I arrive?',

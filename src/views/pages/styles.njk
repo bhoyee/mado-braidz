@@ -23,7 +23,7 @@
   </nav>
   <p class="result-count" role="status" data-result-count>{{ matchCount }} {% if matchCount == 1 %}style{% else %}styles{% endif %} to explore</p>
   <aside class="collection-note">
-    <p><strong>{{ booking.depositCents | money }} deposit</strong> holds your chair and comes off your total.{% for addon in addons %} {{ addon.name }} +{{ addon.priceCents | money }}.{% endfor %} Bring your own braiding hair.</p>
+    <p><strong>{{ booking.depositCents | money }} deposit</strong> holds your chair and comes off your total.{% for addon in addons %} {{ addon.name }} +{{ addon.priceCents | money }}.{% endfor %} Hair with 50% human hair is included.</p>
   </aside>
 
   <div class="empty-editorial" data-search-empty {% if matchCount or not query %}hidden{% endif %}><h2>No styles match that search.</h2><p>Try another word, or call the studio and tell us the look you have in mind.</p><a href="tel:{{ business.phone }}" class="button outline">Call {{ phoneDisplay }}</a></div>

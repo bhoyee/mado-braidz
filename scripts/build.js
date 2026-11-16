@@ -35,3 +35,5 @@ for (const [source, target] of [
     `node_modules/@fontsource-variable/${source}`,
     `public/fonts/${target}`,
   );
+
+copyFileSync('src/client/booking.js', 'public/build/booking.js');
