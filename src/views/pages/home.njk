@@ -23,7 +23,7 @@
       <ol class="journey-steps">
         <li><h3>Choose your look</h3><p>Pick a style, a size and a length. You’ll see the price before anything else.</p></li>
         <li><h3>Hold your time</h3><p>A {{ booking.depositCents | money }} deposit reserves your chair and is taken off your total.</p></li>
-        <li><h3>Arrive ready</h3><p>Come with hair washed and detangled, and bring your braiding hair. Or add a head wash.</p></li>
+        <li><h3>Arrive ready</h3><p>Come with hair washed and detangled, or add a head wash. Hair with 50% human hair is included.</p></li>
         <li><h3>Leave with your look</h3><p>Relax in the chair. The balance is paid at your appointment.</p></li>
       </ol>
     </div>
@@ -58,7 +58,7 @@
       <ul class="menu-notes-top">
         <li><strong>{{ booking.depositCents | money }} deposit</strong> holds your chair, taken off your total</li>
         {% for addon in addons %}<li><strong>{{ addon.name }} +{{ addon.priceCents | money }}</strong></li>{% endfor %}
-        <li><strong>Bring your braiding hair</strong>, we’ll tell you what and how much</li>
+        <li><strong>Hair included</strong> with 50% human hair; upgrade to 100% human hair for {{ humanHairUpgrade.priceCents | money }} extra</li>
       </ul>
     </div>
 

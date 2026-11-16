@@ -19,12 +19,13 @@ export function fixtureCatalog(overrides = {}) {
     styles: catalogRows().map((s, i) => ({
       ...s,
       id: i + 1,
+      variants: s.variants.map((v, j) => ({ ...v, id: (i + 1) * 100 + j + 1 })),
       photos: images.filter(
         (image) => (image.styleSlug || image.slug) === s.slug,
       ),
     })),
     categories,
-    addons: seedData.addons,
+    addons: seedData.addons.map((a, i) => ({ ...a, id: i + 1 })),
     gallery: [],
     settings: { ...publicSettings, ...seedData.settings },
   };

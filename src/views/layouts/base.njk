@@ -26,7 +26,7 @@
       </a>
       <p class="topbar-item topbar-hours">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        <span>{{ hours.daysLabel or "Open daily" }} · {{ hours.timeLabel or "6:00 AM–6:00 PM" }} <abbr title="Eastern time">ET</abbr></span>
+        <span>{{ hours.daysLabel }} · {{ hours.timeLabel }}<br>{{ hours.sundayLabel }} <abbr title="Eastern time">ET</abbr></span>
       </p>
       <a class="topbar-item topbar-phone" href="tel:{{ business.phone }}">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m5 3 4 1 1 5-3 1c2 4 3 5 7 7l1-3 5 1 1 4c-1 5-8 2-12-2S1 4 5 3Z"/></svg>
@@ -86,7 +86,7 @@
     </div>
     <div>
       <h2 class="footer-heading">Hours</h2>
-      <p>{{ hours.daysLabel or "Open daily" }}<br>{{ hours.timeLabel or "6:00 AM–6:00 PM" }} Eastern</p>
+      <p>{{ hours.daysLabel }} · {{ hours.timeLabel }}<br>{{ hours.sundayLabel }}<br>Eastern time</p>
     </div>
     <nav aria-label="Footer navigation">
       <h2 class="footer-heading">Explore</h2>
@@ -104,10 +104,11 @@
 </footer>
 
 {% if not isDesign %}
-<div class="mobile-book">
+{% if currentPath != '/book' %}<div class="mobile-book">
   <a href="tel:{{ business.phone }}" class="mobile-book-call">Call</a>
   <a href="/book" class="button">Book your chair</a>
 </div>
+{% endif %}
 {% endif %}
 </body>
 </html>

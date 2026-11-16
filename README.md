@@ -50,7 +50,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-All 21 Section 9 tables are included. DATETIME(3) values use UTC, money uses integer cents. Sessions use the express-mysql-session schema with automatic table creation disabled. Section 10 seeds 13 styles, 30 price variants, six categories, Head wash, business/booking settings, and one owner. Seed runs in a transaction and preserves existing prices/settings/passwords on reruns, including nullable-length variants. Stop the app before running migrations. To change the existing owner email or password, edit ADMIN_EMAIL / ADMIN_PASSWORD in `.env` and run `npm run db:seed -- --update-owner`. This explicitly rotates the single owner account; ordinary seed reruns preserve its password.
+All 21 Section 9 tables are included. DATETIME(3) values use UTC, money uses integer cents. Sessions use the express-mysql-session schema with automatic table creation disabled. Section 10 seeds 13 styles, 30 price variants, six categories, Head wash and the 100% human hair upgrade, business/booking settings, and one owner. Seed runs in a transaction and preserves existing prices/settings/passwords on reruns, including nullable-length variants. Stop the app before running migrations. To change the existing owner email or password, edit ADMIN_EMAIL / ADMIN_PASSWORD in `.env` and run `npm run db:seed -- --update-owner`. This explicitly rotates the single owner account; ordinary seed reruns preserve its password.
 
 ## Checks
 
@@ -87,7 +87,7 @@ npm run dev
 
 Open **http://localhost:4780** and use Ctrl+F5 to refresh an existing preview. The landing page uses a silent studio video hero, a six-style photographic lookbook and the owner-supplied studio story. The salon header keeps address, daily opening hours and phone visible. The owner explicitly requested a new font/design direction: **Manrope** is now the main typeface and **Cormorant Garamond** the editorial accent, replacing the original Section 4 pairing. Both are self-hosted WOFF2 fonts with licenses in `public/fonts`.
 
-Public routes include `/`, `/styles` (server-rendered category filters), every `/styles/:slug`, `/our-work`, `/about`, `/contact`, policy/privacy/terms drafts and eight area page shells. Prices, durations, business details and public copy come from MySQL. Booking/result/manage paths remain informational holding pages. The disabled contact form never claims to send a message; POST attempts return 503 after CSRF validation. Booking logic and payments are later milestones.
+Public routes include `/`, `/styles` (server-rendered category filters), every `/styles/:slug`, `/our-work`, `/about`, `/contact`, policy/privacy/terms drafts and eight area page shells. Prices, durations, business details and public copy come from MySQL. `/book` is the four-step booking wizard; result/manage routes remain informational until payment integration. The disabled contact form never claims to send a message; POST attempts return 503 after CSRF validation. Availability and temporary holds are implemented in Milestone 3; online payments are Milestone 4.
 
 `/admin/design` uses a temporary browser Basic-auth challenge for the seeded owner account. Use the owner email/password from `.env`; after changing credentials, run `npm run db:seed -- --update-owner`. HTTPS is required in production. Failed credentials are limited; successful preview refreshes and empty browser challenges do not consume the failure quota. Full admin authentication remains Milestone 5.
 
@@ -144,13 +144,13 @@ npm run test:video
 
 Browser checks require local Chrome, MySQL and the app running on port 4780. They verify 390px/1440px layouts, WCAG A/AA rules, image decoding, keyboard controls, filters, map consent and owner preview access. Video checks exercise all clips and request-only playback. Reports/screenshots go in ignored `tmp/qa`. Unit/Supertest tests use catalog fixtures and no fixed port or running database.
 
-Current validation: 66 unit/Supertest tests pass; build/lint and browser/video checks pass; npm audit reports zero vulnerabilities. Run current standalone Lighthouse against Home and a style detail when media or layout changes. Its audit runner may require a newer Node version; the app remains Node 20.
+Milestone 2 validation: 66 unit/Supertest tests passed; build/lint and browser/video checks pass; npm audit reports zero vulnerabilities. Run current standalone Lighthouse against Home and a style detail when media or layout changes. Its audit runner may require a newer Node version; the app remains Node 20.
 
 Final salon-header/video-hero Lighthouse mobile scores: **98/100/100/100** for Home and **99/100/100/100** for Knotless Braids. Scores apply to the current media and layout; repeat them after future changes.
 
 ### Salon header, opening hours and style pricing
 
-The owner confirmed **every day, 6:00 AM–6:00 PM**, in `America/New_York`. These settings replace the original Tuesday–Saturday default; `hours.weekly` now contains seven open days. The header shows the street/city, daily hours, and click-to-call phone on mobile and desktop. Larger salon branding and navigation include **Styles & Prices** and **Our Work**.
+The owner confirmed **Monday–Saturday, 6:00 AM–9:00 PM; Sunday, 10:00 AM–6:00 PM**, in `America/New_York`. These replace the earlier hours. The header shows the street/city, daily hours, and click-to-call phone on mobile and desktop. Larger salon branding and navigation include **Styles & Prices** and **Our Work**.
 
 Prices are now part of each style. Open `/styles/knotless-braids`, choose Medium / Semi-medium / Small, then see that size's available length prices. The choice is a server-rendered GET URL such as `/styles/knotless-braids?size=small#lengths`, so it works without JavaScript and with back/refresh. Invalid sizes return 400. Only real catalog combinations are shown; no new prices or lengths were invented. Consultation styles keep their consultation path. Choosing a priced length leads to the existing informational booking page; availability/payment logic remains later work.
 
@@ -164,4 +164,44 @@ npm run content:sync
 npm run build
 ```
 
-`content:sync` updates the `hours` setting and `seo.pages.about` from `src/db/public-defaults.js`, preserving other public copy and all catalog prices. It is an explicit content update, not a startup hook; do not run it over later owner edits unless that overwrite is intended. New databases receive these defaults from the seed. No new environment variables are required.
+`content:sync` applies the latest owner amendment: hours, shared booking capacity 3, 30-minute starts, included 50% human hair, the $40 100% human hair upgrade, About copy and the hair FAQ. It preserves other booking/policy values, unrelated copy and style prices. The upgrade is intentionally set to $40 and enabled. It is an explicit content update, not a startup hook; do not run it over later owner edits unless that overwrite is intended. New databases receive these defaults from the seed. No new environment variables are required.
+
+## Hosting review deployment
+
+Current hosting checks, the proposed review deployment and remaining access/configuration requirements are recorded in [docs/HOSTING-PREVIEW.md](docs/HOSTING-PREVIEW.md). The local hosting credentials are never part of the deployable release.
+
+## Owner amendment: capacity and included hair
+
+The salon can serve three clients concurrently, with starts every 30 minutes. Capacity must be checked over the entire appointment plus the existing 30-minute buffer, including staggered starts; counting only identical start times is insufficient. Times become unavailable when adding another appointment would exceed three at any point. Active holds count; expired holds do not. This is a shared salon capacity, without individual staff selection. Milestone 3 now enforces these availability and locking rules.
+
+Hair with 50% human hair is included in the displayed style price. The optional 100% human hair upgrade adds 4000 cents ($40); Head wash remains 2500 cents ($25). No base style prices change. On an existing local database run `npm run db:seed` then `npm run content:sync`, and restart the app to load the new settings. No new environment variables or schema migrations are needed.
+
+## Milestone 3: availability and temporary holds
+
+Starts are every **30 minutes**, as explicitly confirmed by the owner. Up to three appointments may overlap, counting each full service duration and its 30-minute buffer. Hours are Mon–Sat 6am–9pm and Sun 10am–6pm Eastern. The default four-hour service therefore has its last start at 4:30pm Mon–Sat and 1:30pm Sunday, leaving room for the buffer. Notice remains 24 hours and the advance window 60 days; all are database settings.
+
+Run `npm run content:sync` once to apply the corrected interval to an existing local database, then `npm run build` and `npm run dev`. Visit **http://localhost:4780/book**. No new application environment variables or database migrations were needed. Existing owner passwords and style prices remain unchanged.
+
+The wizard accepts style/size/length, eligible extras, date/time, contact details, optional notes, an optional private inspiration image, required policy acceptance, and optional unticked marketing consent. URL and browser session storage retain choices; contact details stay out of the URL. The summary is calculated on the server, sticky beside the form on desktop and expandable at the bottom on mobile. Consultation styles offer deposit only and keep their final price unknown. The $40 human hair upgrade and $25 head wash are optional; base hair is already included.
+
+Availability is exposed through `GET /api/availability?styleVariantId=&addonIds=&month=`. addonIds is a comma-separated list of IDs; styleId can identify consultation styles. `GET /api/availability/day` accepts the same selection plus `date=YYYY-MM-DD`. `GET /api/bookings/quote` returns authoritative prices. All selection endpoints reject unknown price fields. `POST /api/bookings/hold` requires the CSRF header and accepts JSON or multipart with one JSON `payload` field and optional `inspiration` image. Uploads are limited to 8 MB JPEG/PNG/WebP, checked by bytes, re-encoded and stored under UPLOAD_DIR outside the webroot. Files from failed holds are removed.
+
+Holds are created only through bookingService inside a REPEATABLE READ transaction using calendar_locks and current locking reads. Concurrent duplicate-key lock deadlocks retry the entire rolled-back transaction. Capacity uses peak overlap, including staggered starts and live holds; expired holds free capacity immediately without a worker. Admin time blocks close the entire salon for their interval. Future admin changes must follow the same date-lock protocol. The current public opening model does not permit overnight appointments.
+
+A successful hold is **pending_payment**, unpaid and expires after 30 minutes. It is not a confirmed appointment and does not send email or create a Stripe session. The UI explains this. When configured, the existing TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY enable the widget and server verification; local development with empty keys uses CSRF, honeypot, validation and rate limits. Production configuration already requires Turnstile secrets. Keep UPLOAD_DIR private and included in backups.
+
+Checks:
+
+```powershell
+npm run build
+npm run lint
+npm test
+npm run test:db
+npm run test:booking:browser
+```
+
+`npm test` runs unit/Supertest tests without a database; the database integration file is intentionally skipped in this command. `npm run test:db` explicitly enables that suite and creates a random `mado_booking_test_*` database, migrates it, exercises 20 simultaneous holds, and removes only that disposable database afterward. It uses DATABASE_URL from ignored .env, or optional TEST_DATABASE_URL if provided. That database user needs CREATE/DROP DATABASE privileges for testing only; do not grant those privileges to the deployed application user. `test:booking:browser` uses local Chrome and an isolated app on an ephemeral test port with synthetic data, so it does not occupy port 4780 or write real appointments.
+
+Follow-ups: Stripe checkout, webhook confirmation, late-payment conflict handling, expiry state cleanup, email delivery, full admin workflows and production deployment remain in later milestones or the separate hosting task. No confirmed booking can be created through the current public flow.
+
+Milestone 3 validation: **83 unit/Supertest tests**, **4 real database integration tests**, and **9 mobile/desktop accessibility cases** pass. Details: [docs/MILESTONE-3.md](docs/MILESTONE-3.md).

@@ -20,7 +20,9 @@
     "test:video": "node scripts/qa/video.js",
     "images:prepare": "node scripts/prepare-style-images.js",
     "content:sync": "node scripts/sync-public-content.js",
-    "images:guides": "node scripts/prepare-guides.js"
+    "images:guides": "node scripts/prepare-guides.js",
+    "test:db": "node scripts/qa/booking-db.js",
+    "test:booking:browser": "node scripts/qa/booking-browser.js"
   },
   "dependencies": {
     "@alpinejs/csp": "^3.17.5",
@@ -37,7 +39,9 @@
     "express-rate-limit": "^8.7.4",
     "express-session": "^1.19.0",
     "helmet": "^8.3.0",
+    "luxon": "^3.7.2",
     "marked": "^18.2.0",
+    "multer": "^2.5.0",
     "mysql2": "^3.24.6",
     "nunjucks": "^3.2.4",
     "pino": "^10.4.0",

@@ -31,7 +31,7 @@ Rules:
 
 ## 1. Product overview
 
-This is a premium, brand-led website and booking platform for a one-stylist African hair braiding salon in Lanham, MD. Clients browse styles, pick a time, add extras, and pay a $30 deposit or the full price through Stripe. A slot only locks once payment succeeds. The owner runs everything from an admin portal and gets alerts by email and in-app.
+This is a premium, brand-led website and booking platform for an African hair braiding salon with capacity for three concurrent clients in Lanham, MD. Clients browse styles, pick a time, add extras, and pay a $30 deposit or the full price through Stripe. A temporary hold consumes capacity during checkout; payment confirmation makes the booking permanent. The owner runs everything from an admin portal and gets alerts by email and in-app.
 
 ### Business facts
 
@@ -46,13 +46,15 @@ This is a premium, brand-led website and booking platform for a one-stylist Afri
 | Default appointment length | 4 hours, editable per style |
 | Booking deposit | $30, applied toward the total |
 | Head wash add-on | $25 |
-| Stylists | 1 (the model supports more later) |
+| Concurrent capacity | 3 clients throughout the appointment and buffer; individual staff selection is not part of this amendment |
+| Hair | 50% human hair included; optional 100% human hair upgrade +$40 |
+| Hours | Monday–Saturday 6am–9pm; Sunday 10am–6pm (America/New_York) |
 
 ### Goals for v1
 
 1. Visitors find the salon on Google for searches like "knotless braids Lanham MD" and see every style with clear prices.
 2. Visitors book and pay in under 2 minutes on a phone, with no account required.
-3. No double bookings, ever. A paid slot is blocked for its full duration.
+3. Never exceed three concurrent clients. Each paid booking consumes one capacity unit for its full duration and buffer.
 4. The owner manages bookings, styles, prices, availability and settings herself, with no developer.
 5. Automated emails cut no-shows (reminders) and bring clients back (win-back at 1, 2 and 3 months).
 
@@ -60,7 +62,7 @@ This is a premium, brand-led website and booking platform for a one-stylist Afri
 
 - Client accounts with passwords (clients use magic links from their emails instead)
 - SMS (design the notification layer so Twilio can plug in later)
-- Multiple stylists and staff payroll
+- Individual staff selection, staff calendars and payroll (shared capacity of three is included)
 - Product shop and gift cards
 
 ## 2. Open decisions to confirm with the owner
@@ -72,10 +74,10 @@ Each of these has a working default, so Codex can build now. They're all setting
 | 1 | Brand name. The logo says "Mado Braids", the flyer says "Mado Hair Braiding", the domain says "Mado African Braidz". Which one goes public? | "Mado African Braidz" everywhere. One name matters for Google (name, address and phone must match exactly). |
 | 2 | Is the $30 deposit taken off the total, or charged on top as a booking fee? | Taken off the total |
 | 3 | Is the deposit refundable? What's the cancel/reschedule window? | Non-refundable. One free reschedule if made 48h+ before. Late cancel or no-show forfeits the deposit. |
-| 4 | Business hours and start times | Tue–Sat. Start times 8:00, 12:30 (4h + 30 min buffer). Sun–Mon closed. |
+| 4 | Business hours and start times | Owner confirmed Mon–Sat 6am–9pm; Sun 10am–6pm. Starts every 30 minutes; capacity 3. |
 | 5 | Buffer between clients | 30 minutes |
 | 6 | How far ahead can people book? Minimum notice? | Up to 60 days ahead, at least 24h notice |
-| 7 | Is hair included, or does the client bring hair? | Client brings hair; "hair included" can be added as an add-on with a price |
+| 7 | Is hair included, or does the client bring hair? | Hair with 50% human hair is included; 100% human hair upgrade adds $40 |
 | 8 | How is the balance paid? | Client chooses: online card link (Stripe) or in person (cash, Zelle, card). Admin records in-person payments. |
 | 9 | Prices for "Other styles" (cornrows, passion twist, etc.) | Shown as "Price on consultation" with a "from" price the admin can set |
 | 10 | Sales tax on services | Off (MD generally doesn't tax personal services; owner's accountant should confirm) |
@@ -223,7 +225,7 @@ The public site has 10 page types, all server-rendered. The booking wizard runs 
 ### Booking wizard
 
 1. **Style.** Pick a style, then size (Medium, Semi-Medium, Small) and length (Shoulder, Mid Back, Waist, Top Butt, Under Butt). Only valid combinations show, each with its price.
-2. **Add-ons.** Toggle cards: Head wash +$25 (seeded). Admin can add more (hair included, beads, take-down).
+2. **Add-ons.** Toggle cards: Head wash +$25 and 100% human hair upgrade +$40 (seeded). Hair with 50% human hair is already included; never charge that base hair again. Admin can add more (beads, take-down).
 3. **Date and time.** Month calendar showing only days with free starts. Pick a start time. Each pill shows start and end ("8:00 AM – 12:00 PM").
 4. **Your details and payment.** Name, phone, email, notes, optional inspiration photo, policy checkbox (required), marketing emails checkbox (optional, unticked). Choose **Pay $30 deposit now** or **Pay in full now**. The summary shows: style price, add-ons, total, paid today, due at appointment.
 
@@ -231,13 +233,13 @@ The button "Continue to secure payment" creates the hold and redirects to Stripe
 
 ### Edge cases the UI must handle
 
-- Slot taken while the client was filling in the form: show "That time was just booked" and the nearest free times.
+- Slot reaches capacity while the client was filling in the form: show "That time is now fully booked" and the nearest free times.
 - Client returns from Stripe with "Cancel": return to step 4 with everything filled in. Release the hold right away.
 - Payment succeeded but the webhook is slow: the success page polls `/api/bookings/:ref/status` every 2 s for up to 60 s, then shows "We've got your payment; confirmation is on its way by email."
 
 ## 6. Booking engine, slot locking and Stripe payments
 
-The slot is held for 30 minutes while the client pays. It becomes a confirmed, blocked booking only when Stripe's webhook says payment succeeded. A database lock per calendar day makes double booking impossible, even if two people click at the same second.
+The slot is held for 30 minutes while the client pays. It becomes a confirmed, blocked booking only when Stripe's webhook says payment succeeded. A database lock per calendar day enforces the shared capacity of three, even when requests arrive simultaneously. Each valid pending hold consumes one unit; expired holds do not.
 
 ### Booking states
 
@@ -257,18 +259,18 @@ Allowed transitions live in one map in `bookingService.js`. Any other transition
 
 ### Availability
 
-- Settings hold weekly hours per weekday (open, close, closed flag), slot step (30 min), buffer (30 min), min notice (24 h), max advance (60 days).
-- A start time is offered when `[start, start + duration + buffer)` fits inside opening hours, doesn't overlap any blocking booking or admin time block, and passes notice and advance rules.
+- Settings hold weekly hours per weekday (open, close, closed flag), slot step (30 min), capacity (3 concurrent clients), buffer (30 min), min notice (24 h), max advance (60 days).
+- A start time is offered when `[start, start + duration + buffer)` fits inside opening hours, never exceeds capacity three during any part of the candidate interval, avoids admin time blocks, and passes notice and advance rules.
 - Duration comes from the style (default 240 min) plus any add-on durations (head wash: +0 by default, editable).
 - Compute in America/New\_York with Luxon, store UTC. Test daylight-saving days (8 Mar 2026 and 1 Nov 2026 style cases).
-- `GET /api/availability?styleVariantId=&addons=&month=2026-12` returns days with free starts. `GET /api/availability/day?date=` returns start times.
+- `GET /api/availability?styleVariantId=&addonIds=&month=2026-12` returns days with free starts. `GET /api/availability/day?date=` returns start times.
 
-### Creating a hold (the double-booking guard)
+### Creating a hold (the capacity guard)
 
 Inside one MySQL transaction (`REPEATABLE READ`):
 
 1. `INSERT IGNORE INTO calendar_locks (date) VALUES (?)` for every local date the appointment touches, then `SELECT ... FROM calendar_locks WHERE date IN (...) FOR UPDATE`. This serializes all bookings for that day.
-2. Re-run the overlap check against bookings with `status IN ('confirmed','completed')` or (`status = 'pending_payment'` and `hold_expires_at > NOW()`), plus time blocks.
+2. Re-run the capacity check against bookings with `status IN ('confirmed','completed')` or (`status = 'pending_payment'` and `hold_expires_at > NOW()`), plus time blocks. Use a sweep of start/end events over the candidate interval: the peak existing occupancy must remain below capacity, not merely the total number of intersecting bookings. Process endings before starts at equal instants (half-open intervals). Admin time blocks close the salon for their whole interval.
 3. If clear: insert the booking as `pending_payment` with `hold_expires_at = now + 30 min` and a server-computed price snapshot. Commit.
 4. If not clear: roll back and return `409 SLOT_TAKEN` with the next 3 free starts.
 
@@ -453,45 +455,284 @@ One item to confirm: the flyer lists Senegalese Twist as "Medium $180, Waist Len
 ```json
 {
   "settings": {
-    "booking": { "depositCents": 3000, "holdMinutes": 30, "stepMinutes": 30, "bufferMinutes": 30,
-                 "minNoticeHours": 24, "maxAdvanceDays": 60, "defaultDurationMin": 240 },
-    "business": { "name": "Mado African Braidz", "street": "7375 Executive Place", "city": "Lanham",
-                  "region": "MD", "postalCode": "20706", "country": "US", "phone": "+14437434979",
-                  "timezone": "America/New_York", "url": "https://madoafricanbraidz.com" }
+    "booking": {
+      "depositCents": 3000,
+      "holdMinutes": 30,
+      "stepMinutes": 30,
+      "bufferMinutes": 30,
+      "minNoticeHours": 24,
+      "maxAdvanceDays": 60,
+      "defaultDurationMin": 240,
+      "capacity": 3
+    },
+    "business": {
+      "name": "Mado African Braidz",
+      "street": "7375 Executive Place",
+      "city": "Lanham",
+      "region": "MD",
+      "postalCode": "20706",
+      "country": "US",
+      "phone": "+14437434979",
+      "timezone": "America/New_York",
+      "url": "https://madoafricanbraidz.com"
+    }
   },
   "addons": [
-    { "name": "Head wash", "slug": "head-wash", "priceCents": 2500, "durationMin": 0, "appliesToAll": true }
+    {
+      "name": "Head wash",
+      "slug": "head-wash",
+      "priceCents": 2500,
+      "durationMin": 0,
+      "appliesToAll": true
+    },
+    {
+      "name": "100% human hair upgrade",
+      "slug": "human-hair-upgrade",
+      "priceCents": 4000,
+      "durationMin": 0,
+      "appliesToAll": true
+    }
   ],
   "styles": [
-    { "name": "Knotless Braids", "slug": "knotless-braids", "category": "knotless", "featured": true,
+    {
+      "name": "Knotless Braids",
+      "slug": "knotless-braids",
+      "category": "knotless",
+      "featured": true,
       "variants": [
-        ["medium","mid_back",18000], ["medium","waist",20000],
-        ["semi_medium","shoulder",22000], ["semi_medium","mid_back",24000], ["semi_medium","waist",26000],
-        ["semi_medium","top_butt",30000], ["semi_medium","under_butt",32000],
-        ["small","shoulder",24000], ["small","mid_back",26000], ["small","waist",30000],
-        ["small","top_butt",32000], ["small","under_butt",34000] ] },
-    { "name": "Boho Knotless Braids", "slug": "boho-knotless-braids", "category": "boho", "featured": true,
+        [
+          "medium",
+          "mid_back",
+          18000
+        ],
+        [
+          "medium",
+          "waist",
+          20000
+        ],
+        [
+          "semi_medium",
+          "shoulder",
+          22000
+        ],
+        [
+          "semi_medium",
+          "mid_back",
+          24000
+        ],
+        [
+          "semi_medium",
+          "waist",
+          26000
+        ],
+        [
+          "semi_medium",
+          "top_butt",
+          30000
+        ],
+        [
+          "semi_medium",
+          "under_butt",
+          32000
+        ],
+        [
+          "small",
+          "shoulder",
+          24000
+        ],
+        [
+          "small",
+          "mid_back",
+          26000
+        ],
+        [
+          "small",
+          "waist",
+          30000
+        ],
+        [
+          "small",
+          "top_butt",
+          32000
+        ],
+        [
+          "small",
+          "under_butt",
+          34000
+        ]
+      ]
+    },
+    {
+      "name": "Boho Knotless Braids",
+      "slug": "boho-knotless-braids",
+      "category": "boho",
+      "featured": true,
       "variants": [
-        ["medium","mid_back",24000], ["medium","waist",26000], ["medium","top_butt",29000], ["medium","under_butt",32000],
-        ["semi_medium","mid_back",26000], ["semi_medium","waist",28000], ["semi_medium","top_butt",30000],
-        ["semi_medium","under_butt",34000] ] },
-    { "name": "Boho Bob", "slug": "boho-bob", "category": "boho",
-      "variants": [ ["medium",null,20000], ["semi_medium",null,26000], ["small",null,28000] ] },
-    { "name": "Senegalese Twist", "slug": "senegalese-twist", "category": "twists",
-      "variants": [ ["medium","mid_back",18000], ["medium","waist",22000], ["medium","top_butt",24000] ] },
-    { "name": "Island Twist", "slug": "island-twist", "category": "twists", "featured": true,
-      "variants": [ ["medium","mid_back",28000], ["medium","waist",30000], ["medium","butt",32000],
-                    ["medium","under_butt",34000] ] },
-    { "name": "Fulani Braids", "slug": "fulani-braids", "category": "fulani", "featured": true,
-      "fromPriceCents": 24000, "priceOnConsultation": true,
-      "note": "From $240 depending on style and length" },
-    { "name": "Cornrows", "slug": "cornrows", "category": "other", "priceOnConsultation": true },
-    { "name": "Passion Twist", "slug": "passion-twist", "category": "twists", "priceOnConsultation": true },
-    { "name": "Marley Twist", "slug": "marley-twist", "category": "twists", "priceOnConsultation": true },
-    { "name": "Invisible Locs", "slug": "invisible-locs", "category": "locs", "priceOnConsultation": true },
-    { "name": "Soft Locs", "slug": "soft-locs", "category": "locs", "priceOnConsultation": true },
-    { "name": "Butterfly Locs", "slug": "butterfly-locs", "category": "locs", "priceOnConsultation": true },
-    { "name": "Crochet Braids", "slug": "crochet-braids", "category": "other", "priceOnConsultation": true }
+        [
+          "medium",
+          "mid_back",
+          24000
+        ],
+        [
+          "medium",
+          "waist",
+          26000
+        ],
+        [
+          "medium",
+          "top_butt",
+          29000
+        ],
+        [
+          "medium",
+          "under_butt",
+          32000
+        ],
+        [
+          "semi_medium",
+          "mid_back",
+          26000
+        ],
+        [
+          "semi_medium",
+          "waist",
+          28000
+        ],
+        [
+          "semi_medium",
+          "top_butt",
+          30000
+        ],
+        [
+          "semi_medium",
+          "under_butt",
+          34000
+        ]
+      ]
+    },
+    {
+      "name": "Boho Bob",
+      "slug": "boho-bob",
+      "category": "boho",
+      "variants": [
+        [
+          "medium",
+          null,
+          20000
+        ],
+        [
+          "semi_medium",
+          null,
+          26000
+        ],
+        [
+          "small",
+          null,
+          28000
+        ]
+      ]
+    },
+    {
+      "name": "Senegalese Twist",
+      "slug": "senegalese-twist",
+      "category": "twists",
+      "variants": [
+        [
+          "medium",
+          "mid_back",
+          18000
+        ],
+        [
+          "medium",
+          "waist",
+          22000
+        ],
+        [
+          "medium",
+          "top_butt",
+          24000
+        ]
+      ]
+    },
+    {
+      "name": "Island Twist",
+      "slug": "island-twist",
+      "category": "twists",
+      "featured": true,
+      "variants": [
+        [
+          "medium",
+          "mid_back",
+          28000
+        ],
+        [
+          "medium",
+          "waist",
+          30000
+        ],
+        [
+          "medium",
+          "butt",
+          32000
+        ],
+        [
+          "medium",
+          "under_butt",
+          34000
+        ]
+      ]
+    },
+    {
+      "name": "Fulani Braids",
+      "slug": "fulani-braids",
+      "category": "fulani",
+      "featured": true,
+      "fromPriceCents": 24000,
+      "priceOnConsultation": true,
+      "note": "From $240 depending on style and length"
+    },
+    {
+      "name": "Cornrows",
+      "slug": "cornrows",
+      "category": "other",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Passion Twist",
+      "slug": "passion-twist",
+      "category": "twists",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Marley Twist",
+      "slug": "marley-twist",
+      "category": "twists",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Invisible Locs",
+      "slug": "invisible-locs",
+      "category": "locs",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Soft Locs",
+      "slug": "soft-locs",
+      "category": "locs",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Butterfly Locs",
+      "slug": "butterfly-locs",
+      "category": "locs",
+      "priceOnConsultation": true
+    },
+    {
+      "name": "Crochet Braids",
+      "slug": "crochet-braids",
+      "category": "other",
+      "priceOnConsultation": true
+    }
   ]
 }
 ```
@@ -571,9 +812,9 @@ The site handles money and personal data, so security and the booking tests are 
 
 ### Tests that must exist and pass
 
-1. Two holds for the same slot fired at the same time: exactly one succeeds (run 20 parallel requests).
+1. Holds for the same slot fired at the same time: exactly three succeed with capacity three (run 20 parallel requests); capacity one still allows exactly one.
 2. Overlap logic: back-to-back bookings with buffer, bookings across a daylight-saving change, time blocks, closed days.
-3. Expired hold frees the slot. Late payment on a free slot confirms; late payment on a taken slot refunds and sets `payment_conflict`.
+3. Expired hold frees the slot. Late payment on a free slot confirms; late payment on a slot at capacity refunds and sets `payment_conflict`.
 4. Webhook: bad signature returns 400; a duplicate event is ignored; deposit, full and balance each set the right payment status.
 5. Pricing: server ignores tampered prices; deposit is capped at the subtotal; add-ons are summed correctly.
 6. Jobs: reminders are scheduled at the right local times; cancelling a booking cancels its jobs; rebooking cancels win-backs; unsubscribed clients get no marketing email.
@@ -624,7 +865,7 @@ The build runs in 9 milestones, each a separate Codex task and pull request. Pas
 
 1. **Foundation.** Prompt: "Read docs/SPEC.md. Do Milestone 1: scaffold the project per Section 3 (folder layout, Express app + server.js, zod env config, Nunjucks, Tailwind v4 build, Drizzle + MySQL connection, the full schema and migrations from Section 9, seed script with Section 10 data, pino logging, helmet/CSRF/rate-limit middleware, Vitest setup, README and .env.example)." Done when: `npm run dev` serves a page; migrate and seed run on a fresh MySQL; `npm test` passes; lint is clean.
 2. **Design system and public pages.** Prompt: "Do Milestone 2: build the design tokens, fonts and components from Section 4, the /admin/design preview page, and all public pages in Section 5 (excluding the booking wizard logic), rendered from the database. Mobile first at 390 px." Done when: every page renders from seeded data; Lighthouse mobile is 95+ on Home and a style page; no banned design patterns; keyboard navigation works.
-3. **Availability and holds.** Prompt: "Do Milestone 3: availabilityService, pricingService and the hold creation with calendar\_locks per Section 6, plus the availability APIs and wizard steps 1–4 up to (not including) Stripe. Include tests 1, 2 and 5 from Section 12." Done when: 20 parallel holds on one slot produce exactly one booking; DST and buffer tests pass; tampered prices are rejected.
+3. **Availability and holds.** Prompt: "Do Milestone 3: availabilityService, pricingService and the hold creation with calendar\_locks per Section 6, plus the availability APIs and wizard steps 1–4 up to (not including) Stripe. Include tests 1, 2 and 5 from Section 12, with shared capacity three and the 100% human hair upgrade." Done when: 20 parallel holds on one slot produce exactly three holds at capacity three; capacity-one regression also passes; DST and buffer tests pass; tampered prices are rejected.
 4. **Stripe payments.** Prompt: "Do Milestone 4: Stripe Checkout for deposit and full payment, the webhook handler with idempotency, success-page polling, cancel/resume, expireHolds job, late-payment conflict refunds, and the balance Checkout flow, all per Section 6. Include tests 3 and 4." Done when: a test-card booking confirms via `stripe listen`; an abandoned checkout frees the slot after 30 minutes; replayed webhooks change nothing.
 5. **Admin core.** Prompt: "Do Milestone 5: admin auth (argon2id, optional TOTP, lockout, reset), roles, audit log, dashboard, calendar (FullCalendar), bookings list and detail with all actions, and admin-created bookings, per Section 7. Include test 7." Done when: the owner can create, reschedule (drag), cancel, complete, record payment, send balance link and refund; staff are blocked from settings and refunds.
 6. **Admin catalog and settings.** Prompt: "Do Milestone 6: styles and variants CRUD with photo upload and sharp resizing, add-ons, availability and time blocks, gallery, clients, settings, and the 301 redirects table, per Section 7." Done when: a new style created in admin appears on the site, in booking and in the sitemap within 60 s; price changes don't alter existing bookings.

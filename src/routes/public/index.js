@@ -156,6 +156,77 @@ export const matchesSearch = (text, query) =>
     .split(' ')
     .filter(Boolean)
     .every((word) => text.includes(word));
+// Our Work: short labels for extra gallery photos (their alt text is a full
+// description for screen readers, too long to show on the picture).
+const GALLERY_LABELS = {
+  'sew-in': 'Sew-in',
+  'spring-twist': 'Spring twists',
+  'tribal-crochet': 'Tribal crochet',
+};
+export const galleryLabel = (item) => {
+  const key = String(item.path || '')
+    .split('/')
+    .pop()
+    .replace(/-\d+\.(?:webp|avif|jpe?g|png)$/i, '')
+    .replace(/-(?:detail|finish)$/, '');
+  return (
+    GALLERY_LABELS[key] ||
+    key.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase()) ||
+    'Our work'
+  );
+};
+// Studio films for Our Work, each with a short title and the style shown.
+const WORK_FILMS = [
+  {
+    name: 'studio-knotless',
+    title: 'That final turn',
+    label: 'Knotless braids',
+    description:
+      'A client smiles and swings her finished knotless braids in front of the Mado Braids sign',
+  },
+  {
+    name: 'transformation',
+    title: 'Before & after',
+    label: 'Spring twists',
+    description:
+      'Spring twists from the first parted section to the finished look',
+  },
+  {
+    name: 'at-the-chair',
+    title: 'Made by hand',
+    label: 'At the chair',
+    description: 'Braiding a client in a purple cape',
+  },
+  {
+    name: 'braid-detail',
+    title: 'Up close',
+    label: 'Boho curls',
+    description: 'A close look at braided sections and curly lengths',
+  },
+];
+// Photos and films mixed into one portfolio: a film, two photos, a film...
+export function workItems(suppliedStyles, gallery) {
+  const photos = [
+    ...suppliedStyles.map((style) => ({
+      type: 'photo',
+      photo: style.photo,
+      label: style.name,
+      href: `/styles/${style.slug}`,
+    })),
+    ...gallery.map((item) => ({
+      type: 'photo',
+      photo: item,
+      label: galleryLabel(item),
+    })),
+  ];
+  const films = WORK_FILMS.map((film) => ({ type: 'film', ...film }));
+  const items = [];
+  while (photos.length || films.length) {
+    if (films.length) items.push(films.shift());
+    items.push(...photos.splice(0, films.length ? 2 : photos.length));
+  }
+  return items;
+}
 export function decorateCatalog(data) {
   const styles = data.styles.map((style) => {
     const allPhotos = (style.photos || []).map(safePhoto).filter(Boolean);
@@ -247,6 +318,9 @@ export function decorateCatalog(data) {
     ),
     business: b,
     social: socialLinks(b.social ?? publicSettings.social),
+    humanHairUpgrade: data.addons.find(
+      (addon) => addon.slug === 'human-hair-upgrade',
+    ),
     booking: data.settings.booking,
     pages,
     hours: data.settings.hours,
@@ -355,7 +429,12 @@ export function publicRouter(catalog) {
   });
   router.get('/prices', (_req, res) => res.redirect(301, '/styles'));
   router.get('/gallery', (_req, res) => res.redirect(301, '/our-work'));
-  router.get('/our-work', render('gallery', 'Our Work'));
+  router.get('/our-work', (req, res) =>
+    res.render('pages/gallery', {
+      title: `Our Work | ${res.locals.business.name}`,
+      items: workItems(res.locals.suppliedStyles, res.locals.gallery),
+    }),
+  );
   router.get('/about', render('about', 'Meet Mado'));
   router.get('/contact', (req, res) =>
     res.render('pages/contact', {
@@ -370,15 +449,12 @@ export function publicRouter(catalog) {
       contactUnavailable: true,
     }),
   );
-  router.get(
-    '/book',
-    render('message', 'Book your chair', {
-      heading: 'Your chair is waiting.',
-      message:
-        'Online booking is coming soon. Call Mado to choose your style and arrange your appointment. No payment is taken on this website yet.',
-      call: true,
-    }),
-  );
+  router.get('/book', (req, res) => {
+    res.set('Cache-Control', 'no-store').render('pages/book', {
+      title: `Book your chair | ${res.locals.business.name}`,
+      csrfToken: generateToken(req),
+    });
+  });
   router.get(
     '/book/success',
     render('message', 'Your appointment', {

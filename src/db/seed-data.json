@@ -7,7 +7,8 @@
       "bufferMinutes": 30,
       "minNoticeHours": 24,
       "maxAdvanceDays": 60,
-      "defaultDurationMin": 240
+      "defaultDurationMin": 240,
+      "capacity": 3
     },
     "business": {
       "name": "Mado African Braidz",
@@ -26,6 +27,13 @@
       "name": "Head wash",
       "slug": "head-wash",
       "priceCents": 2500,
+      "durationMin": 0,
+      "appliesToAll": true
+    },
+    {
+      "name": "100% human hair upgrade",
+      "slug": "human-hair-upgrade",
+      "priceCents": 4000,
       "durationMin": 0,
       "appliesToAll": true
     }

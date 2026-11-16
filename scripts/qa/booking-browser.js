@@ -1,0 +1,176 @@
+import { DateTime } from 'luxon';
+import { chromium } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import { createApp } from '../../src/app.js';
+import { parseEnv } from '../../src/config/env.js';
+import { fixtureCatalog } from '../../tests/fixtures/catalog.js';
+import { memoryBookingRepository } from '../../tests/fixtures/booking.js';
+import { mkdtemp, rm, mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import assert from 'node:assert/strict';
+
+const uploadDir = await mkdtemp(join(tmpdir(), 'mado-browser-test-'));
+const repo = await memoryBookingRepository();
+const app = createApp({
+  config: parseEnv({
+    NODE_ENV: 'test',
+    SESSION_SECRET: 'test-browser-secret-at-least-32-characters',
+    DATABASE_URL: 'mysql://unused:unused@localhost/mado',
+    UPLOAD_DIR: uploadDir,
+  }),
+  catalog: fixtureCatalog(),
+  bookingRepository: repo,
+});
+const server = app.listen(0, '127.0.0.1');
+await new Promise((resolve) => server.once('listening', resolve));
+const base = `http://127.0.0.1:${server.address().port}`;
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const results = [];
+await mkdir('tmp/qa', { recursive: true });
+try {
+  for (const width of [390, 1440]) {
+    const context = await browser.newContext({
+      viewport: { width, height: 1000 },
+    });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(
+      base + '/book?style=knotless-braids&size=medium&variant=101',
+    );
+    await page.waitForFunction(
+      () => document.getElementById('summary-total').textContent === '$180',
+    );
+    assert.equal(await page.locator('#booking-variant').inputValue(), '101');
+    async function check(step) {
+      assert.equal(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth > innerWidth,
+        ),
+        false,
+        'horizontal overflow',
+      );
+      const report = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+        .analyze();
+      assert.deepEqual(
+        report.violations.map((v) => ({
+          id: v.id,
+          nodes: v.nodes.map((n) => n.target),
+        })),
+        [],
+        `Accessibility step ${step}`,
+      );
+      results.push({ width, step, accessibility: 'pass' });
+    }
+    await check(1);
+    await page
+      .getByRole('button', { name: 'Choose extras', exact: true })
+      .click();
+    await page.getByRole('checkbox', { name: /100% human hair/ }).check();
+    await page.waitForFunction(
+      () => document.getElementById('summary-total').textContent === '$220',
+    );
+    await check(2);
+    await page
+      .getByRole('button', { name: 'Find a time', exact: true })
+      .click();
+    await page.locator('#booking-calendar button:enabled').first().click();
+    await page.locator('#booking-slots button:enabled').first().click();
+    await check(3);
+    await page
+      .getByRole('button', { name: 'Your details', exact: true })
+      .click();
+    await page
+      .getByLabel('Full name', { exact: true })
+      .fill('Browser Test Client');
+    await page
+      .getByLabel('Email', { exact: true })
+      .fill('browser@example.test');
+    await page.getByLabel('Phone', { exact: true }).fill('4437434979');
+    await check(4);
+    await page.goBack();
+    await page.locator('[data-booking-step="3"]:visible').waitFor();
+    await page.goForward();
+    await page.locator('[data-booking-step="4"]:visible').waitFor();
+    await page.reload();
+    await page.waitForFunction(
+      () => !document.querySelector('[data-booking-step="4"]').hidden,
+    );
+    assert.equal(
+      await page.getByLabel('Full name', { exact: true }).inputValue(),
+      'Browser Test Client',
+    );
+    assert.match(await page.locator('#summary-time').innerText(), /Eastern/);
+    if (width === 390) {
+      await page
+        .getByRole('button', { name: /View your visit summary/ })
+        .click();
+      await check('summary');
+      await page
+        .getByRole('button', { name: /View your visit summary/ })
+        .click();
+    }
+    await page.getByRole('checkbox', { name: /I accept the/ }).check();
+    assert.equal(await page.locator('#booking-marketing').isChecked(), false);
+    await page.screenshot({
+      path: `tmp/qa/booking-details-${width}.png`,
+      fullPage: true,
+    });
+    await page
+      .getByRole('button', { name: 'Hold this time for 30 minutes' })
+      .click();
+    await page.locator('#booking-result').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#booking-reference').innerText(), /MADO-/);
+    assert.match(
+      await page.locator('#booking-result-message').innerText(),
+      /not confirmed/,
+    );
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
+  // Existing three overlapping appointments grey out the entire affected range.
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 1000 },
+  });
+  const page = await context.newPage();
+  const row = repo.rows[0];
+  repo.rows.splice(
+    0,
+    repo.rows.length,
+    row,
+    { ...row, ref: 'QA-SECOND' },
+    { ...row, ref: 'QA-THIRD' },
+  );
+  const heldDate = DateTime.fromJSDate(row.startAt)
+    .setZone('America/New_York')
+    .toISODate();
+  await page.goto(base + '/book?style=knotless-braids&variant=101&step=3');
+  const heldDay = page.getByRole('button', {
+    name: new RegExp('^' + heldDate),
+  });
+  await heldDay.waitFor();
+  if (await heldDay.isEnabled()) {
+    await heldDay.click();
+    await page.waitForFunction(
+      () => document.querySelectorAll('#booking-slots button').length > 0,
+    );
+    assert.ok(
+      (await page.locator('#booking-slots button:disabled').count()) > 0,
+    );
+  } else assert.equal(await heldDay.isDisabled(), true);
+  await context.close();
+  console.log(
+    JSON.stringify({
+      cases: results,
+      capacityGreyOut: 'pass',
+      refresh: 'pass',
+      temporaryHold: 'pass',
+    }),
+  );
+} finally {
+  await browser.close();
+  await new Promise((resolve) => server.close(resolve));
+  await rm(uploadDir, { recursive: true, force: true });
+}
