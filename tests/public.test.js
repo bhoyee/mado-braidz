@@ -176,8 +176,8 @@ describe('Milestone 2 public pages', () => {
   });
   it('shows the confirmed hours, address, phone and Our Work navigation', async () => {
     const response = await request(makeApp()).get('/').expect(200);
-    expect(response.text).toContain('6:00 AM–6:00 PM');
-    expect(response.text).toContain('Open daily');
+    expect(response.text).toContain('6:00 AM–9:00 PM');
+    expect(response.text).toContain('Mon\u2013Sat');
     expect(response.text).toContain('7375 Executive Place');
     expect(response.text).toContain('(443) 743-4979');
     expect(response.text).toContain('Styles &amp; Prices');
@@ -338,4 +338,56 @@ describe('owner-only design preview', () => {
       .auth('staff@example.com', 'owner-test-password')
       .expect(401);
   });
+});
+
+it('publishes both opening schedules and included hair across the public pages', async () => {
+  for (const path of [
+    '/',
+    '/styles',
+    '/styles/knotless-braids',
+    '/policies',
+    '/terms',
+  ]) {
+    const response = await request(makeApp()).get(path).expect(200);
+    expect(response.text).toContain('6:00 AM\u20139:00 PM');
+    expect(response.text).toContain('10:00 AM\u20136:00 PM');
+    expect(response.text).toContain('50% human hair');
+    expect(response.text).not.toMatch(/bring your (own )?braiding hair/i);
+  }
+  const style = await request(makeApp())
+    .get('/styles/knotless-braids')
+    .expect(200);
+  expect(style.text).toContain('100% human hair');
+  expect(style.text).toContain('$40');
+});
+
+it('loads the approved shared capacity, start interval and hair upgrade without changing base prices', async () => {
+  const data = await fixtureCatalog().load();
+  expect(data.settings.booking).toMatchObject({
+    capacity: 3,
+    stepMinutes: 30,
+    bufferMinutes: 30,
+  });
+  expect(data.settings.hours.weekly.monday).toEqual({
+    open: '06:00',
+    close: '21:00',
+    closed: false,
+  });
+  expect(data.settings.hours.weekly.saturday).toEqual({
+    open: '06:00',
+    close: '21:00',
+    closed: false,
+  });
+  expect(data.settings.hours.weekly.sunday).toEqual({
+    open: '10:00',
+    close: '18:00',
+    closed: false,
+  });
+  expect(data.settings.policy.hairIncluded).toBe(true);
+  expect(
+    data.addons.find((addon) => addon.slug === 'human-hair-upgrade'),
+  ).toMatchObject({ priceCents: 4000, durationMin: 0, appliesToAll: true });
+  expect(
+    data.addons.find((addon) => addon.slug === 'head-wash').priceCents,
+  ).toBe(2500);
 });
