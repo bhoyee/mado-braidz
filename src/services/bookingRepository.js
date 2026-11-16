@@ -76,6 +76,143 @@ function context(db, locking = false) {
         );
       return row.id;
     },
+    async bookingById(id) {
+      let query = db.select().from(s.bookings).where(eq(s.bookings.id, id));
+      if (locking) query = query.for('update');
+      return (await query)[0];
+    },
+    async bookingByRef(ref) {
+      return (
+        await db.select().from(s.bookings).where(eq(s.bookings.ref, ref))
+      )[0];
+    },
+    async bookingByToken(hash) {
+      return (
+        await db
+          .select()
+          .from(s.bookings)
+          .where(eq(s.bookings.manageTokenHash, hash))
+      )[0];
+    },
+    async bookingByRequest(key) {
+      return (
+        await db
+          .select()
+          .from(s.bookings)
+          .where(eq(s.bookings.checkoutRequestKey, key))
+      )[0];
+    },
+    async saveBooking(id, values) {
+      await db.update(s.bookings).set(values).where(eq(s.bookings.id, id));
+    },
+    async client(id) {
+      return (await db.select().from(s.clients).where(eq(s.clients.id, id)))[0];
+    },
+    async attempt(id) {
+      return (
+        await db
+          .select()
+          .from(s.checkoutAttempts)
+          .where(eq(s.checkoutAttempts.id, id))
+      )[0];
+    },
+    async attemptBySession(id) {
+      return (
+        await db
+          .select()
+          .from(s.checkoutAttempts)
+          .where(eq(s.checkoutAttempts.stripeSessionId, id))
+      )[0];
+    },
+    async attempts(id) {
+      return db
+        .select()
+        .from(s.checkoutAttempts)
+        .where(eq(s.checkoutAttempts.bookingId, id));
+    },
+    async insertAttempt(values) {
+      await db.insert(s.checkoutAttempts).values(values);
+    },
+    async saveAttempt(id, values) {
+      await db
+        .update(s.checkoutAttempts)
+        .set(values)
+        .where(eq(s.checkoutAttempts.id, id));
+    },
+    async payments(id) {
+      return db.select().from(s.payments).where(eq(s.payments.bookingId, id));
+    },
+    async paymentByIntent(id) {
+      return (
+        await db
+          .select()
+          .from(s.payments)
+          .where(
+            and(
+              eq(s.payments.stripePaymentIntentId, id),
+              sql`${s.payments.type} <> 'refund'`,
+            ),
+          )
+      )[0];
+    },
+    async insertPayment(values) {
+      await db.insert(s.payments).values(values);
+    },
+    async event(id, type, now) {
+      await db.execute(
+        sql`INSERT IGNORE INTO stripe_events (id,type,received_at) VALUES (${id},${type},${now})`,
+      );
+      return (
+        await db
+          .select()
+          .from(s.stripeEvents)
+          .where(eq(s.stripeEvents.id, id))
+          .for('update')
+      )[0];
+    },
+    async finishEvent(id, now) {
+      await db
+        .update(s.stripeEvents)
+        .set({ processedAt: now })
+        .where(eq(s.stripeEvents.id, id));
+    },
+    async queueJob(values) {
+      await db
+        .insert(s.jobs)
+        .values(values)
+        .onDuplicateKeyUpdate({ set: { dedupeKey: values.dedupeKey } });
+    },
+    async saveJob(id, values) {
+      await db.update(s.jobs).set(values).where(eq(s.jobs.id, id));
+    },
+    async refundJobs(id) {
+      return db
+        .select()
+        .from(s.jobs)
+        .where(
+          and(
+            eq(s.jobs.type, 'refundConflict'),
+            inArray(s.jobs.status, ['pending', 'failed']),
+            ...(id
+              ? [sql`JSON_EXTRACT(${s.jobs.payload}, '$.bookingId') = ${id}`]
+              : []),
+          ),
+        );
+    },
+    async notify(values) {
+      await db.insert(s.notifications).values(values);
+    },
+    async expiredHolds(now) {
+      return db
+        .select({ id: s.bookings.id })
+        .from(s.bookings)
+        .where(
+          and(
+            eq(s.bookings.status, 'pending_payment'),
+            lt(s.bookings.holdExpiresAt, now),
+          ),
+        );
+    },
   };
 }
 export function createBookingRepository(db) {

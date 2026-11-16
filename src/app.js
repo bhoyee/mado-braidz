@@ -1,3 +1,9 @@
+import { paymentPages } from './routes/public/paymentPages.js';
+import {
+  createStripeProvider,
+  createPaymentService,
+} from './services/paymentService.js';
+import { stripeWebhook } from './routes/webhooks/stripe.js';
 import { bookingRouter } from './routes/public/booking.js';
 import { createBookingRepository } from './services/bookingRepository.js';
 import { join } from 'node:path';
@@ -25,6 +31,7 @@ export function createApp({
   config = parseEnv(),
   sessionStore,
   bookingRepository,
+  stripeProvider,
   catalog,
   logger = createLogger(config),
 } = {}) {
@@ -35,10 +42,33 @@ export function createApp({
   catalog ??= createCatalogService(
     (database = createDatabase(config.DATABASE_URL)).db,
   );
+  bookingRepository ??= database ? createBookingRepository(database.db) : null;
+  const provider =
+    stripeProvider === undefined
+      ? createStripeProvider(config)
+      : stripeProvider;
+  const payments = bookingRepository
+    ? createPaymentService(bookingRepository, provider, config)
+    : null;
+  app.locals.paymentsEnabled = Boolean(provider);
   app.locals.closeDatabase = () => database?.pool.end();
   app.locals.turnstileSiteKey = config.TURNSTILE_SITE_KEY;
   app.disable('x-powered-by');
-  app.use(pinoHttp({ logger }));
+  app.use(
+    pinoHttp({
+      logger,
+      serializers: {
+        req(req) {
+          const safe = { ...req };
+          if (safe.url)
+            safe.url = safe.url
+              .replace(/(\/booking\/)[a-f0-9]{64}/g, '$1[redacted]')
+              .replace(/(session_id=)[^&]+/g, '$1[redacted]');
+          return safe;
+        },
+      },
+    }),
+  );
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -77,7 +107,7 @@ export function createApp({
         { maxAge: '7d' },
       ),
     );
-  // Mount the signed Stripe raw-body route here before JSON parsing in Milestone 4.
+  app.use('/webhooks/stripe', stripeWebhook(provider, payments, config));
   app.use(express.json({ limit: '32kb' }));
   app.use(express.urlencoded({ extended: false, limit: '32kb' }));
   if (!sessionStore && config.NODE_ENV !== 'test') {
@@ -109,6 +139,15 @@ export function createApp({
   );
   const limits = createRateLimits();
   app.use('/api/bookings/hold', limits.hold);
+  app.use(
+    [
+      '/api/bookings/:ref/checkout',
+      '/api/bookings/:ref/balance',
+      '/api/bookings/:ref/cancel',
+    ],
+    limits.checkout,
+  );
+  app.use('/api/bookings/payment-status', limits.availability);
   app.use('/admin/login', limits.login);
   app.post('/contact', limits.contact);
   app.use('/api/availability', limits.availability);
@@ -138,15 +177,8 @@ export function createApp({
   });
   app.set('view engine', 'njk');
   app.use('/admin', designRouter(catalog, limits.preview));
-  app.use(
-    '/api',
-    bookingRouter(
-      bookingRepository ??
-        (database ? createBookingRepository(database.db) : null),
-      config,
-    ),
-  );
-  app.use(publicRouter(catalog));
+  app.use('/api', bookingRouter(bookingRepository, config, payments));
+  app.use(publicRouter(catalog, paymentPages(bookingRepository)));
   app.use((_req, res) =>
     res.status(404).render('pages/message', {
       title: 'Page not found',

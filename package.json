@@ -22,7 +22,10 @@
     "content:sync": "node scripts/sync-public-content.js",
     "images:guides": "node scripts/prepare-guides.js",
     "test:db": "node scripts/qa/booking-db.js",
-    "test:booking:browser": "node scripts/qa/booking-browser.js"
+    "test:booking:browser": "node scripts/qa/booking-browser.js",
+    "test:stripe:e2e": "node scripts/qa/stripe-e2e.js",
+    "jobs": "node scripts/run-jobs.js",
+    "test:payments:browser": "node scripts/qa/payments-browser.js"
   },
   "dependencies": {
     "@alpinejs/csp": "^3.17.5",
@@ -50,6 +53,7 @@
     "rotating-file-stream": "^4.0.0",
     "sanitize-html": "^2.18.2",
     "sharp": "^0.35.5",
+    "stripe": "^23.1.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

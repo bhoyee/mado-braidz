@@ -198,6 +198,7 @@ export const bookings = mysqlTable(
     manageTokenHash: str('manage_token_hash', 64).notNull(),
     policyAcceptedAt: dt('policy_accepted_at'),
     stripeCheckoutSessionId: str('stripe_checkout_session_id'),
+    checkoutRequestKey: str('checkout_request_key', 64).unique(),
     createdByAdminId: ref('created_by_admin_id').references(() => admins.id),
     completedAt: dt('completed_at'),
     cancelledAt: dt('cancelled_at'),
@@ -264,6 +265,28 @@ export const stripeEvents = mysqlTable('stripe_events', {
   type: str('type').notNull(),
   receivedAt: dt('received_at').notNull(),
   processedAt: dt('processed_at'),
+});
+export const checkoutAttempts = mysqlTable('checkout_attempts', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  bookingId: ref('booking_id')
+    .notNull()
+    .references(() => bookings.id),
+  paymentType: mysqlEnum('payment_type', [
+    'deposit',
+    'full',
+    'balance',
+  ]).notNull(),
+  amountCents: int('amount_cents').notNull(),
+  status: mysqlEnum('status', [
+    'creating',
+    'open',
+    'paid',
+    'expired',
+  ]).notNull(),
+  stripeSessionId: str('stripe_session_id').unique(),
+  stripePaymentIntentId: str('stripe_payment_intent_id').unique(),
+  expiresAt: dt('expires_at').notNull(),
+  createdAt: created(),
 });
 export const jobs = mysqlTable(
   'jobs',

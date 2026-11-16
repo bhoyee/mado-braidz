@@ -217,6 +217,9 @@ if (root) {
   } catch {
     /* storage is optional */
   }
+  const paymentsEnabled = form.dataset.paymentsEnabled === 'true';
+  let requestKey = saved.requestKey || crypto.randomUUID();
+  let checkoutRef = saved.checkoutRef || '';
   const error = (message) => {
     $('booking-error').textContent = message;
     $('booking-error').hidden = !message;
@@ -297,6 +300,8 @@ if (root) {
   function persist() {
     const data = {
       ...selection(),
+      requestKey,
+      checkoutRef,
       size: size.value,
       startAt,
       date,
@@ -377,7 +382,11 @@ if (root) {
       variant.selectedIndex = 1;
     pickers.forEach((picker) => picker.refresh());
   }
-  async function refreshQuote(resetTime = true) {
+  async function refreshQuote(resetTime = true, renewRequest = true) {
+    if (renewRequest) {
+      requestKey = crypto.randomUUID();
+      checkoutRef = '';
+    }
     const current = ++serial;
     quote = null;
     if (resetTime) {
@@ -533,6 +542,10 @@ if (root) {
           button.disabled = !slot.available;
           button.setAttribute('aria-pressed', String(slot.startAt === startAt));
           button.addEventListener('click', () => {
+            if (startAt !== slot.startAt) {
+              checkoutRef = '';
+              requestKey = crypto.randomUUID();
+            }
             startAt = slot.startAt;
             $('summary-time').textContent =
               date + ' · ' + slot.label + ' Eastern';
@@ -664,6 +677,7 @@ if (root) {
     if (/^1\d{10}$/.test(phone)) phone = '+' + phone;
     const payload = {
       ...selection(),
+      requestKey,
       startAt,
       name: form.elements.name.value,
       email: form.elements.email.value,
@@ -681,11 +695,28 @@ if (root) {
     button.disabled = true;
     error('');
     try {
-      const result = await api('/api/bookings/hold', {
-        method: 'POST',
-        headers: { 'x-csrf-token': form.dataset.csrf },
-        body,
-      });
+      const result = checkoutRef
+        ? { ref: checkoutRef }
+        : await api('/api/bookings/hold', {
+            method: 'POST',
+            headers: { 'x-csrf-token': form.dataset.csrf },
+            body,
+          });
+      if (paymentsEnabled) {
+        checkoutRef = result.ref;
+        persist();
+        const checkout = await api(`/api/bookings/${result.ref}/checkout`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-csrf-token': form.dataset.csrf,
+          },
+          body: '{}',
+        });
+        submitted = true;
+        location.assign(checkout.url);
+        return;
+      }
       submitted = true;
       for (const section of root.querySelectorAll('[data-booking-step]'))
         section.hidden = true;
@@ -706,7 +737,9 @@ if (root) {
       $('booking-result').scrollIntoView({ block: 'center' });
     } catch (e) {
       window.turnstile?.reset();
-      if (e.data?.error === 'SLOT_TAKEN') {
+      if (['SLOT_TAKEN', 'HOLD_EXPIRED'].includes(e.data?.error)) {
+        checkoutRef = '';
+        requestKey = crypto.randomUUID();
         startAt = '';
         await showStep(3);
         error(e.message + ' Select another available start.');
@@ -766,7 +799,42 @@ if (root) {
   startAt = params.get('startAt') || saved.startAt || '';
   date = params.get('date') || saved.date || '';
   if (/^\d{4}-\d{2}/.test(date)) month = date.slice(0, 7);
-  refreshQuote(false).then(() =>
-    showStep(quote ? Number(params.get('step') || saved.step || 1) : 1, false),
-  );
+  async function initialize() {
+    const resume = params.get('resume');
+    if (resume && paymentsEnabled) {
+      try {
+        const state = await api(
+          `/api/bookings/${encodeURIComponent(resume)}/cancel`,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-csrf-token': form.dataset.csrf,
+            },
+            body: '{}',
+          },
+        );
+        if (state.paid) {
+          location.replace(
+            '/book/success?session_id=' + encodeURIComponent(state.sessionId),
+          );
+          return;
+        }
+        requestKey = crypto.randomUUID();
+        checkoutRef = '';
+        const url = new URL(location.href);
+        url.searchParams.delete('resume');
+        history.replaceState(null, '', url);
+      } catch (e) {
+        error(e.message);
+        return;
+      }
+    }
+    await refreshQuote(false, false);
+    await showStep(
+      quote ? Number(resume ? 4 : params.get('step') || saved.step || 1) : 1,
+      false,
+    );
+  }
+  initialize();
 }
