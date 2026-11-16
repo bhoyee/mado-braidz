@@ -284,9 +284,6 @@
   font-weight: 800;
   line-height: 1.5;
 }
-.booking-policy-banner .wrap {
-  max-width: 1440px;
-}
 .booking-intro:has(.booking-policy-banner) {
   padding-bottom: 0;
 }
