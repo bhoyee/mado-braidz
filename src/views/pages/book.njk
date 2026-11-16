@@ -1,7 +1,7 @@
 {% extends "layouts/base.njk" %}
 {% block content %}
-<section class="page-head"><div class="wrap"><p class="eyebrow">Make time for your next look</p><h1>Your style.<br><em>Your chair.</em></h1><p class="intro">Choose your look, extras and a time. Hair with 50% human hair is included.</p><p class="notice">Online payments are not available yet. This flow can create a temporary hold, but does not confirm an appointment or take payment. Call <a href="tel:{{ business.phone }}">{{ phoneDisplay }}</a> to arrange your visit.</p></div></section>
-<div class="wrap section booking-layout" data-booking-wizard>
+<section class="booking-intro"><div class="wrap"><h1>Book <em>your chair.</em></h1><p>Choose your style and time. Hair with 50% human hair is included.</p><p class="booking-payment-note">Temporary holds only — no payment or appointment confirmation yet. <a href="tel:{{ business.phone }}">Call {{ phoneDisplay }} to book.</a></p></div></section>
+<div class="wrap booking-layout" data-booking-wizard>
   <noscript><p class="notice">Please enable JavaScript to check live availability, or <a href="tel:{{ business.phone }}">call the studio</a> to book.</p></noscript>
   <form id="booking-form" class="booking-form" data-csrf="{{ csrfToken }}">
     <ol class="booking-progress" aria-label="Booking steps"><li aria-current="step">1 · Style</li><li>2 · Extras</li><li>3 · Time</li><li>4 · Details</li></ol>

@@ -222,3 +222,55 @@
     display: flex;
   }
 }
+
+/* Booking is a task page: keep the first controls in the initial viewport. */
+.booking-intro {
+  padding-block: 24px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.booking-intro h1 {
+  font-size: clamp(30px, 3vw, 42px);
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+.booking-intro p {
+  max-width: 850px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.booking-intro .booking-payment-note {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.booking-payment-note a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.booking-layout {
+  padding-top: 24px;
+  padding-bottom: 96px;
+}
+.booking-form .booking-progress {
+  margin-bottom: 20px;
+}
+.booking-form section h2 {
+  font-size: 30px;
+  margin-bottom: 16px;
+}
+@media (max-width: 800px) {
+  .booking-intro {
+    padding-block: 16px 14px;
+  }
+  .booking-layout {
+    padding-top: 18px;
+    padding-bottom: 120px;
+  }
+  .booking-form .booking-progress {
+    margin-bottom: 16px;
+  }
+  .booking-form section h2 {
+    font-size: 26px;
+    margin-bottom: 12px;
+  }
+}
