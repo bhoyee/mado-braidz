@@ -1,4 +1,174 @@
 const root = document.querySelector('[data-booking-wizard]');
+// Keep the SSR select as the source of truth; enhance its menu so scrolling,
+// keyboard controls and pointer colours are consistent on touch and desktop.
+function enhanceBookingSelect(select) {
+  const label = document.querySelector(`label[for="${select.id}"]`);
+  label.id ||= `${select.id}-label`;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'booking-select-trigger';
+  button.setAttribute('role', 'combobox');
+  button.setAttribute('aria-haspopup', 'listbox');
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('aria-labelledby', label.id);
+  button.id = `${select.id}-trigger`;
+  const valueText = document.createElement('span');
+  valueText.id = `${select.id}-value`;
+  button.append(valueText);
+  button.setAttribute('aria-describedby', valueText.id);
+  if (select.required) button.setAttribute('aria-required', 'true');
+  const menu = document.createElement('div');
+  menu.id = `${select.id}-menu`;
+  menu.className = 'booking-select-menu';
+  menu.setAttribute('role', 'listbox');
+  menu.setAttribute('aria-labelledby', label.id);
+  menu.hidden = true;
+  button.setAttribute('aria-controls', menu.id);
+  select.after(button);
+  document.body.append(menu);
+  select.classList.add('booking-native-select');
+  select.setAttribute('aria-hidden', 'true');
+  select.tabIndex = -1;
+  let active = 0,
+    options = [],
+    search = '',
+    searchedAt = 0;
+  const isOpen = () => !menu.hidden;
+  function close() {
+    menu.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+    button.removeAttribute('aria-activedescendant');
+  }
+  function focusOption(index, scroll = true) {
+    if (!options.length) return;
+    active = Math.max(0, Math.min(options.length - 1, index));
+    [...menu.children].forEach((item, i) =>
+      item.classList.toggle('is-active', i === active),
+    );
+    button.setAttribute('aria-activedescendant', menu.children[active].id);
+    if (scroll) menu.children[active].scrollIntoView({ block: 'nearest' });
+  }
+  function choose(index) {
+    select.value = options[index].value;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    refresh();
+    close();
+    button.focus({ preventScroll: true });
+  }
+  function refresh() {
+    options = [...select.options].filter(
+      (option) => option.value && !option.disabled,
+    );
+    valueText.textContent =
+      select.selectedOptions[0]?.textContent ||
+      select.options[0]?.textContent ||
+      'Choose an option';
+    button.disabled = select.disabled || !options.length;
+    menu.replaceChildren();
+    options.forEach((option, i) => {
+      const item = document.createElement('div');
+      item.id = `${select.id}-option-${i}`;
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', String(option.value === select.value));
+      item.textContent = option.textContent;
+      item.addEventListener('click', () => choose(i));
+      item.addEventListener('pointermove', (event) => {
+        if (event.pointerType === 'mouse') focusOption(i, false);
+      });
+      menu.append(item);
+    });
+    if (isOpen())
+      focusOption(
+        Math.max(
+          0,
+          options.findIndex((option) => option.value === select.value),
+        ),
+      );
+  }
+  function open() {
+    document
+      .querySelectorAll('.booking-select-trigger[aria-expanded="true"]')
+      .forEach((other) => {
+        if (other !== button) other.dispatchEvent(new Event('pickerclose'));
+      });
+    const rect = button.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const top = viewport?.offsetTop || 0;
+    const bottom = top + (viewport?.height || innerHeight);
+    const below = bottom - rect.bottom - 90;
+    const above = rect.top - top - 12;
+    const up = below < 160 && above > below;
+    const height = Math.min(280, Math.max(96, up ? above : below));
+    menu.style.left = `${rect.left}px`;
+    menu.style.width = `${rect.width}px`;
+    menu.style.maxHeight = `${height}px`;
+    menu.hidden = false;
+    menu.style.top = `${up ? Math.max(top + 8, rect.top - menu.offsetHeight - 6) : rect.bottom + 6}px`;
+    button.setAttribute('aria-expanded', 'true');
+    focusOption(
+      Math.max(
+        0,
+        options.findIndex((option) => option.value === select.value),
+      ),
+    );
+  }
+  button.addEventListener('click', () => (isOpen() ? close() : open()));
+  button.addEventListener('pickerclose', close);
+  label.addEventListener('click', (event) => {
+    event.preventDefault();
+    button.focus();
+  });
+  button.addEventListener('keydown', (event) => {
+    if (
+      ['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', ' ', 'Escape'].includes(
+        event.key,
+      )
+    ) {
+      event.preventDefault();
+      if (event.key === 'Escape') {
+        close();
+        return;
+      }
+      if (!isOpen()) {
+        open();
+        return;
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        choose(active);
+        return;
+      }
+      focusOption(
+        event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? options.length - 1
+            : active + (event.key === 'ArrowUp' ? -1 : 1),
+      );
+    } else if (event.key === 'Tab') close();
+    else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
+      search = Date.now() - searchedAt > 700 ? event.key : search + event.key;
+      searchedAt = Date.now();
+      if (!isOpen()) open();
+      const index = options.findIndex((option) =>
+        option.textContent.toLowerCase().startsWith(search.toLowerCase()),
+      );
+      if (index >= 0) focusOption(index);
+    }
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!button.contains(event.target) && !menu.contains(event.target)) close();
+  });
+  window.addEventListener('resize', close);
+  window.addEventListener(
+    'scroll',
+    (event) => {
+      if (!menu.contains(event.target)) close();
+    },
+    true,
+  );
+  refresh();
+  return { refresh, close };
+}
 if (root) {
   const form = root.querySelector('form');
   document
@@ -17,6 +187,7 @@ if (root) {
   const allVariants = [...variant.options]
     .filter((o) => o.dataset.style)
     .map((o) => o.cloneNode(true));
+  const pickers = [style, size, variant].map(enhanceBookingSelect);
   const params = new URLSearchParams(location.search);
   const dollars = (n) =>
     n === null
@@ -140,6 +311,7 @@ if (root) {
       : '';
     if (variant.options.length === 2 && !variant.value)
       variant.selectedIndex = 1;
+    pickers.forEach((picker) => picker.refresh());
   }
   async function refreshQuote(resetTime = true) {
     const current = ++serial;
@@ -286,6 +458,7 @@ if (root) {
     }
   }
   async function showStep(next, focus = true) {
+    pickers.forEach((picker) => picker.close());
     const previousUrl = location.href;
     step = Math.max(1, Math.min(4, next));
     error('');

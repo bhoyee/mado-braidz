@@ -1,6 +1,6 @@
 {% extends "layouts/base.njk" %}
 {% block content %}
-<section class="booking-intro"><div class="wrap"><h1>Book <em>your chair.</em></h1><p>Choose your style and time. Hair with 50% human hair is included.</p><p class="booking-payment-note">Temporary holds only — no payment or appointment confirmation yet. <a href="tel:{{ business.phone }}">Call {{ phoneDisplay }} to book.</a></p></div></section>
+<section class="booking-intro"><div class="wrap"><h1>Book <em>your chair.</em></h1><p>Choose your style and time. <mark class="booking-hair-badge">50% human hair is included.</mark></p><p class="booking-policy-banner"><strong>Policy:</strong> A strict, non-refundable deposit of <strong>{{ booking.depositCents | money }} USD</strong> is required upfront to secure and reserve your chair. The deposit is applied to your total.</p></div></section>
 <div class="wrap booking-layout" data-booking-wizard>
   <noscript><p class="notice">Please enable JavaScript to check live availability, or <a href="tel:{{ business.phone }}">call the studio</a> to book.</p></noscript>
   <form id="booking-form" class="booking-form" data-csrf="{{ csrfToken }}">

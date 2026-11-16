@@ -32,6 +32,7 @@ try {
   for (const width of [390, 1440]) {
     const context = await browser.newContext({
       viewport: { width, height: 1000 },
+      hasTouch: width === 390,
     });
     const page = await context.newPage();
     const errors = [];
@@ -65,6 +66,74 @@ try {
       results.push({ width, step, accessibility: 'pass' });
     }
     await check(1);
+    const stylePicker = page.getByRole('combobox', {
+      name: 'Style',
+      exact: true,
+    });
+    await stylePicker.click();
+    await check('style menu');
+    assert.equal(
+      await page
+        .locator('#booking-style-menu')
+        .evaluate((el) => el.scrollHeight > el.clientHeight),
+      true,
+    );
+    if (width === 390) {
+      const session = await context.newCDPSession(page);
+      const box = await page.locator('#booking-style-menu').boundingBox();
+      const x = box.x + box.width / 2,
+        y = box.y + box.height - 20;
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [{ x, y }],
+      });
+      for (let i = 1; i <= 8; i++)
+        await session.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x, y: y - i * 20 }],
+        });
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchEnd',
+        touchPoints: [],
+      });
+      await session.detach();
+    } else {
+      await page.locator('#booking-style-menu').hover();
+      await page.mouse.wheel(0, 400);
+    }
+    await page.waitForFunction(
+      () => document.getElementById('booking-style-menu').scrollTop > 0,
+    );
+    assert.equal(await stylePicker.getAttribute('aria-expanded'), 'true');
+    await stylePicker.press('Home');
+    await stylePicker.press('Enter');
+    assert.equal(await page.locator('#booking-style').inputValue(), '1');
+    const sizePicker = page.getByRole('combobox', {
+      name: 'Braid size',
+      exact: true,
+    });
+    await sizePicker.click();
+    await check('size menu');
+    await page.getByRole('option', { name: 'Medium', exact: true }).click();
+    const lengthPicker = page.getByRole('combobox', {
+      name: 'Length',
+      exact: true,
+    });
+    await lengthPicker.click();
+    await check('length menu');
+    await page.getByRole('option', { name: /Mid back/ }).hover();
+    assert.equal(
+      await page
+        .getByRole('option', { name: /Mid back/ })
+        .evaluate((el) => getComputedStyle(el).backgroundColor),
+      'rgb(95, 45, 158)',
+    );
+    await lengthPicker.press('Home');
+    await lengthPicker.press('Enter');
+    await page.waitForFunction(
+      () => document.getElementById('summary-total').textContent === '$180',
+    );
+
     await page
       .getByRole('button', { name: 'Choose extras', exact: true })
       .click();
