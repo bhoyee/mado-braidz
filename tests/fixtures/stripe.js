@@ -28,6 +28,7 @@ export function fakeStripe() {
         amount_total: params.line_items[0].price_data.unit_amount,
         currency: 'usd',
         expires_at: params.expires_at,
+        cancel_url: params.cancel_url,
         metadata: params.metadata,
         payment_intent: 'pi_test_' + (sessions.size + 1),
       };

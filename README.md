@@ -264,7 +264,7 @@ The implementation and local mock-provider tests are ready; **real Stripe CLI/te
 
 ## Pay page and manual transfer review
 
-`/pay` is linked from the footer. A booking confirmation code opens the payment due for that booking; phone/email lookups also require that code before showing appointment details. This prevents public phone/email searches exposing client visits. The private visit link remains available. Cancelled/expired bookings and known-price bookings without an eligible balance do not offer payment.
+`/pay` is linked from the footer. One search field accepts an exact phone number, email address or booking confirmation code. Phone/email lookups can return multiple pending payments without an additional code. Results grant payment-only access tied to the current browser session for one hour, without exposing private management tokens, client contact details, notes or proofs. This does not authorize cancellation. The original private visit link remains available. Cancelled/expired bookings and known-price bookings without an eligible balance do not offer payment.
 
 Set `MANUAL_PAYMENT_NAME` (default Magdaline Arrey), `ZELLE_RECIPIENT` (the verified Zelle email/phone), and `CASHAPP_CASHTAG` (the verified $cashtag) in ignored `.env` locally and cPanel environment settings on the server. A transfer method is displayed only when its destination is configured. Do not invent transfer destinations. Restart the app after changing config. `MANUAL_REVIEW_HOURS` defaults to 24 (1–48); initial proof submission extends the existing capacity hold up to this limit, never beyond the appointment start. Unreviewed holds then expire normally. Balance submissions do not change an already confirmed appointment.
 

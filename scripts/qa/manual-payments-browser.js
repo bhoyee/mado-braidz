@@ -117,7 +117,6 @@ try {
     await page
       .getByLabel('Phone, email or booking confirmation code', { exact: true })
       .fill('4437434979');
-    await page.getByLabel(/Booking code/).fill(row.ref);
     await page
       .getByRole('button', { name: 'Find my payment', exact: true })
       .click();

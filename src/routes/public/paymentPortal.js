@@ -15,6 +15,11 @@ import {
 import { BookingError } from '../../services/bookingErrors.js';
 import { generateToken } from '../../middleware/csrf.js';
 import { designAuth } from '../../middleware/designAuth.js';
+import {
+  grantPaymentAccess,
+  paymentToken,
+  paymentPageUrl,
+} from '../../services/paymentAccess.js';
 
 export function manualMethods(config) {
   return [
@@ -75,68 +80,47 @@ export function paymentPortal(repository, config, payments, catalog) {
       const input = z
         .object({
           query: z.string().trim().min(1).max(255),
-          bookingCode: z.string().trim().max(32).optional(),
           _csrf: z.string().optional(),
         })
         .strict()
         .parse(req.body);
       const query = input.query.trim();
-      const code = (
-        /^MADO-/i.test(query) ? query : input.bookingCode || ''
-      ).toUpperCase();
-      if (!code)
-        return renderPay(req, res, {
-          lookupMessage:
-            'Enter your booking confirmation code to securely view payments linked to this phone or email.',
-          query,
+      let kind, value;
+      if (/^MADO-[A-F0-9]{16}$/i.test(query)) {
+        kind = 'ref';
+        value = query.toUpperCase();
+      } else if (z.email().safeParse(query).success) {
+        kind = 'email';
+        value = query.toLowerCase();
+      } else {
+        const phone = parsePhoneNumberFromString(query, {
+          defaultCountry: 'US',
+          extract: false,
         });
-      const booking = /^MADO-[A-F0-9]{16}$/.test(code)
-        ? await repository.bookingByRef(code)
-        : null;
-      let match = !!booking;
-      if (booking && !/^MADO-/i.test(query)) {
-        const client = await repository.client(booking.clientId);
-        const phone = parsePhoneNumberFromString(query, 'US');
-        match =
-          query.toLowerCase() === client.email.toLowerCase() ||
-          (phone?.isValid() &&
-            phone.country === 'US' &&
-            phone.number === client.phoneE164);
+        if (phone?.country === 'US' && phone.isValid()) {
+          kind = 'phone';
+          value = phone.number;
+        }
       }
-      if (!match)
-        return renderPay(req, res, {
-          lookupMessage: 'No pending payments found.',
-          query,
-        });
-      const price =
-        typeof booking.priceSnapshot === 'string'
-          ? JSON.parse(booking.priceSnapshot)
-          : booking.priceSnapshot;
-      const initial =
-        booking.status === 'pending_payment' &&
-        booking.holdExpiresAt > new Date();
-      const balance =
-        ['confirmed', 'completed'].includes(booking.status) &&
-        booking.paymentStatus === 'deposit_paid' &&
-        booking.balanceCents > 0 &&
-        !price.consultation;
-      if (!initial && !balance)
-        return renderPay(req, res, {
-          lookupMessage: 'No pending payments found.',
-          query,
-        });
-      const token = accessToken(booking.ref, config.SESSION_SECRET);
-      if (tokenHash(token) !== booking.manageTokenHash)
-        return renderPay(req, res, {
-          lookupMessage:
-            'Please use your original booking link or call the studio.',
-          query,
-        });
-      req.session.bookingAccess ||= {};
-      req.session.bookingAccess[booking.ref] = token;
-      return renderPay(req, res, {
-        query,
-        found: {
+      const matches = kind ? await repository.paymentMatches(kind, value) : [];
+      const found = [];
+      for (const booking of matches) {
+        const price =
+          typeof booking.priceSnapshot === 'string'
+            ? JSON.parse(booking.priceSnapshot)
+            : booking.priceSnapshot;
+        const initial =
+          booking.status === 'pending_payment' &&
+          booking.holdExpiresAt > new Date();
+        const balance =
+          ['confirmed', 'completed'].includes(booking.status) &&
+          booking.paymentStatus === 'deposit_paid' &&
+          booking.balanceCents > 0 &&
+          !price.consultation;
+        if (!initial && !balance) continue;
+        const token = accessToken(booking.ref, config.SESSION_SECRET);
+        if (tokenHash(token) !== booking.manageTokenHash) continue;
+        found.push({
           ref: booking.ref,
           styleName: price.styleName,
           time: booking.startAt.toLocaleString('en-US', {
@@ -145,8 +129,13 @@ export function paymentPortal(repository, config, payments, catalog) {
             timeStyle: 'short',
           }),
           amountCents: initial ? price.dueTodayCents : booking.balanceCents,
-          url: '/booking/' + token,
-        },
+          url: grantPaymentAccess(req, booking.ref, token),
+        });
+      }
+      return renderPay(req, res, {
+        query,
+        found,
+        lookupMessage: found.length ? '' : 'No pending payments found.',
       });
     } catch (error) {
       next(error);
@@ -163,10 +152,7 @@ export function paymentPortal(repository, config, payments, catalog) {
           .string()
           .regex(/^MADO-[A-F0-9]{16}$/)
           .parse(req.params.ref);
-        const booking = await payments.authorize(
-          ref,
-          req.session.bookingAccess?.[ref],
-        );
+        const booking = await payments.authorize(ref, paymentToken(req, ref));
         const method = z.enum(['zelle', 'cashapp']).parse(req.body.method);
         if (!manualMethods(config).some((m) => m.id === method))
           throw new BookingError(
@@ -219,7 +205,7 @@ export function paymentPortal(repository, config, payments, catalog) {
         );
         path = null;
         res.json({
-          url: '/booking/' + req.session.bookingAccess[ref],
+          url: paymentPageUrl(req, ref),
           message: 'Payment proof submitted. Awaiting owner review.',
         });
       } catch (error) {

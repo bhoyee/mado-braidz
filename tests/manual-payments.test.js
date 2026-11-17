@@ -148,7 +148,80 @@ describe('manual payment review', () => {
   });
 });
 describe('public pay lookup and private proof routes', () => {
-  it('protects lookup, validates proof bytes/ownership, and requires owner credentials to review', async () => {
+  it('finds multiple exact contact matches and grants only session-bound payment access', async () => {
+    const { repo, hold, service } = await setup();
+    const second = await service.createHold(validHold);
+    const third = await service.createHold({
+      ...validHold,
+      email: 'other@example.test',
+      phone: '+12025550123',
+    });
+    const provider = fakeStripe();
+    const app = createApp({
+      config: parseEnv(paymentConfig),
+      catalog: fixtureCatalog(),
+      bookingRepository: repo,
+      stripeProvider: provider,
+    });
+    const agent = request.agent(app);
+    const page = await agent.get('/pay').expect(200);
+    expect(page.text).not.toContain('name="bookingCode"');
+    const csrf = page.text.match(/name="_csrf" value="([^"]+)"/)[1];
+    const found = await agent
+      .post('/pay/search')
+      .type('form')
+      .send({ _csrf: csrf, query: validHold.phone })
+      .expect(200);
+    expect(found.text).toContain(hold.ref);
+    expect(found.text).toContain(second.ref);
+    expect(found.text).not.toContain(third.ref);
+    expect(found.text).not.toContain(hold.manageToken);
+    const paymentUrl = found.text.match(
+      /href="(\/pay\/appointment\/[a-f0-9]+)"/,
+    )[1];
+    await request(app).get(paymentUrl).expect(404);
+    await agent.get(paymentUrl).expect(200);
+    const checkout = await agent
+      .post(`/api/bookings/${hold.ref}/checkout`)
+      .set('x-csrf-token', csrf)
+      .send({})
+      .expect(200);
+    expect(provider.calls.create[0].params.cancel_url).toContain(
+      '/pay/appointment/',
+    );
+    expect(provider.calls.create[0].params.customer_email).toBeUndefined();
+    expect(provider.calls.create[0].params.cancel_url).not.toContain(
+      hold.manageToken,
+    );
+    await agent
+      .get('/api/bookings/payment-status')
+      .query({ session_id: checkout.body.sessionId })
+      .expect(200)
+      .expect((r) => {
+        expect(r.body.manageUrl).toMatch(/^\/pay\/appointment\//);
+        expect(JSON.stringify(r.body)).not.toContain(hold.manageToken);
+      });
+    await agent
+      .get(`/api/bookings/${hold.ref}/status`)
+      .expect(200)
+      .expect((r) => expect(r.body.manageUrl).toMatch(/^\/pay\/appointment\//));
+    provider.sessions.get(checkout.body.sessionId).cancel_url =
+      paymentConfig.APP_URL + '/booking/' + hold.manageToken;
+    await agent
+      .post(`/api/bookings/${hold.ref}/checkout`)
+      .set('x-csrf-token', csrf)
+      .send({})
+      .expect(409)
+      .expect((r) =>
+        expect(JSON.stringify(r.body)).not.toContain(hold.manageToken),
+      );
+    await agent
+      .post(`/api/bookings/${hold.ref}/cancel`)
+      .set('x-csrf-token', csrf)
+      .send({})
+      .expect(404);
+  });
+  it('supports one-field lookup with session-bound payment access and private proof review', async () => {
     const { repo, hold } = await setup();
     const uploadDir = await mkdtemp(join(tmpdir(), 'mado-proof-test-'));
     const password = 'owner-test-only-at-least-12';
@@ -175,31 +248,36 @@ describe('public pay lookup and private proof routes', () => {
       const agent = request.agent(app);
       const page = await agent.get('/pay').expect(200);
       const csrf = page.text.match(/name="_csrf" value="([^"]+)"/)[1];
+      let paymentUrl;
+      for (const query of [
+        validHold.email.toUpperCase(),
+        '(443) 743-4979',
+        hold.ref.toLowerCase(),
+      ]) {
+        const result = await agent
+          .post('/pay/search')
+          .type('form')
+          .send({ _csrf: csrf, query })
+          .expect(200);
+        expect(result.text).toContain('Pay now');
+        expect(result.text).not.toContain(hold.manageToken);
+        paymentUrl = result.text.match(
+          /href="(\/pay\/appointment\/[a-f0-9]+)"/,
+        )[1];
+      }
+      await request(app).get(paymentUrl).expect(404);
+      await agent.get(paymentUrl).expect(200);
       await agent
         .post('/pay/search')
         .type('form')
-        .send({ _csrf: csrf, query: validHold.email })
-        .expect(200)
-        .expect((r) => {
-          expect(r.text).not.toContain(hold.ref);
-          expect(r.text).toContain('confirmation code');
-        });
-      await agent
-        .post('/pay/search')
-        .type('form')
-        .send({
-          _csrf: csrf,
-          query: 'unknown@example.test',
-          bookingCode: hold.ref,
-        })
+        .send({ _csrf: csrf, query: 'unknown@example.test' })
         .expect(200)
         .expect((r) => expect(r.text).toContain('No pending payments found.'));
       await agent
-        .post('/pay/search')
-        .type('form')
-        .send({ _csrf: csrf, query: validHold.email, bookingCode: hold.ref })
-        .expect(200)
-        .expect((r) => expect(r.text).toContain('Pay now'));
+        .post('/api/bookings/' + hold.ref + '/cancel')
+        .set('x-csrf-token', csrf)
+        .send({})
+        .expect(404);
       await request(app).post(`/api/bookings/${hold.ref}/proof`).expect(403);
       await agent
         .post(`/api/bookings/${hold.ref}/proof`)

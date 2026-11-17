@@ -98,7 +98,7 @@ export function createPaymentService(repository, provider, config, clock) {
       throw new BookingError('NOT_FOUND', 'Booking not found.', 404);
     return booking;
   }
-  async function checkout(ref, token, balance = false) {
+  async function checkout(ref, token, balance = false, returnPath = null) {
     if (!provider)
       throw new BookingError(
         'PAYMENT_UNAVAILABLE',
@@ -125,9 +125,19 @@ export function createPaymentService(repository, provider, config, clock) {
       client,
     } = await bookings.reserveCheckout(booking.id, type);
     let session;
-    if (attempt.stripeSessionId)
+    if (attempt.stripeSessionId) {
       session = await provider.retrieveSession(attempt.stripeSessionId);
-    else {
+      if (
+        returnPath &&
+        (session.customer_email ||
+          /\/booking\/[a-f0-9]{64}/.test(session.cancel_url || ''))
+      )
+        throw new BookingError(
+          'CHECKOUT_OPEN',
+          'A card checkout is already open. Use your original booking link or call the studio.',
+          409,
+        );
+    } else {
       const price = locked.priceSnapshot;
       const look = [
         price.styleName,
@@ -158,7 +168,7 @@ export function createPaymentService(repository, provider, config, clock) {
             mode: 'payment',
             adaptive_pricing: { enabled: false },
             automatic_tax: { enabled: false },
-            customer_email: client.email,
+            ...(returnPath ? {} : { customer_email: client.email }),
             client_reference_id: String(booking.id),
             metadata,
             payment_intent_data: { metadata },
@@ -177,9 +187,10 @@ export function createPaymentService(repository, provider, config, clock) {
               origin + '/book/success?session_id={CHECKOUT_SESSION_ID}',
             cancel_url:
               origin +
-              (balance
-                ? `/booking/${token}?cancel=1`
-                : `/book?resume=${encodeURIComponent(ref)}`),
+              (returnPath ||
+                (balance
+                  ? `/booking/${token}?cancel=1`
+                  : `/book?resume=${encodeURIComponent(ref)}`)),
           },
           // Numeric IDs may repeat across local and disposable test databases.
           // Keep Stripe retries scoped to the globally unique booking reference.

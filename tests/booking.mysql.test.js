@@ -139,6 +139,16 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         method: 'zelle',
         path: 'private-proof.webp',
       });
+      expect(
+        await repository.paymentMatches('email', validHold.email),
+      ).toHaveLength(1);
+      expect(
+        await repository.paymentMatches('phone', validHold.phone),
+      ).toHaveLength(1);
+      expect(await repository.paymentMatches('ref', hold.ref)).toHaveLength(1);
+      expect(
+        await repository.paymentMatches('email', 'unknown@example.test'),
+      ).toHaveLength(0);
       expect((await repository.bookingById(hold.id)).paidCents).toBe(0);
       await Promise.all(
         Array.from({ length: 5 }, () =>

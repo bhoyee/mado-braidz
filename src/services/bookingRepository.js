@@ -6,6 +6,32 @@ import { BookingError } from './bookingErrors.js';
 
 function context(db, locking = false) {
   return {
+    async paymentMatches(kind, value) {
+      const field =
+        kind === 'email'
+          ? s.clients.email
+          : kind === 'phone'
+            ? s.clients.phoneE164
+            : s.bookings.ref;
+      return (
+        await db
+          .select({ booking: s.bookings })
+          .from(s.bookings)
+          .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
+          .where(
+            and(
+              eq(field, value),
+              inArray(s.bookings.status, [
+                'pending_payment',
+                'confirmed',
+                'completed',
+              ]),
+            ),
+          )
+          .orderBy(s.bookings.startAt)
+          .limit(50)
+      ).map((row) => row.booking);
+    },
     async catalog() {
       const catalog = await createCatalogService(db).load();
       const links = await db.select().from(s.addonStyles);

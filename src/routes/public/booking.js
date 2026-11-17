@@ -12,6 +12,7 @@ import { createAvailabilityService } from '../../services/availabilityService.js
 import { createBookingService } from '../../services/bookingService.js';
 import { BookingError } from '../../services/bookingErrors.js';
 import { createHash } from 'node:crypto';
+import { paymentToken, paymentPageUrl } from '../../services/paymentAccess.js';
 
 const id = z.coerce.number().int().positive().safe();
 const addonIds = z
@@ -260,7 +261,10 @@ export function bookingRouter(repository, config, payments) {
       run(async (req, res) => {
         const ref = refSchema.parse(req.params.ref);
         empty.parse(req.body || {});
-        const token = req.session.bookingAccess?.[ref];
+        const token =
+          action === 'cancel'
+            ? req.session.bookingAccess?.[ref]
+            : paymentToken(req, ref);
         if (!payments)
           throw new BookingError(
             'PAYMENT_UNAVAILABLE',
@@ -270,7 +274,14 @@ export function bookingRouter(repository, config, payments) {
         const result =
           action === 'cancel'
             ? await payments.cancel(ref, token)
-            : await payments.checkout(ref, token, action === 'balance');
+            : await payments.checkout(
+                ref,
+                token,
+                action === 'balance',
+                req.session.bookingAccess?.[ref]
+                  ? null
+                  : paymentPageUrl(req, ref),
+              );
         res.set('Cache-Control', 'no-store').json(result);
       }),
     );
@@ -285,36 +296,28 @@ export function bookingRouter(repository, config, payments) {
       const row = attempt && (await repository.bookingById(attempt.bookingId));
       if (!row || !payments)
         throw new BookingError('NOT_FOUND', 'Payment not found.', 404);
-      res
-        .set('Cache-Control', 'no-store')
-        .json(
-          await payments.status(
-            sessionId,
-            req.session.bookingAccess?.[row.ref],
-          ),
-        );
+      res.set('Cache-Control', 'no-store').json({
+        ...(await payments.status(sessionId, paymentToken(req, row.ref))),
+        manageUrl: paymentPageUrl(req, row.ref),
+      });
     }),
   );
   router.get(
     '/bookings/:ref/status',
     run(async (req, res) => {
       const ref = refSchema.parse(req.params.ref);
-      const row = await payments.authorize(
-        ref,
-        req.session.bookingAccess?.[ref],
-      );
+      const row = await payments.authorize(ref, paymentToken(req, ref));
       const attempts = await repository.attempts(row.id);
       const attempt = attempts.filter((a) => a.stripeSessionId).at(-1);
-      res
-        .set('Cache-Control', 'no-store')
-        .json(
-          attempt
-            ? await payments.status(
-                attempt.stripeSessionId,
-                req.session.bookingAccess[ref],
-              )
-            : { ref, status: row.status, paymentStatus: row.paymentStatus },
-        );
+      res.set('Cache-Control', 'no-store').json({
+        ...(attempt
+          ? await payments.status(
+              attempt.stripeSessionId,
+              paymentToken(req, ref),
+            )
+          : { ref, status: row.status, paymentStatus: row.paymentStatus }),
+        manageUrl: paymentPageUrl(req, ref),
+      });
     }),
   );
   router.use((err, req, res, next) => {

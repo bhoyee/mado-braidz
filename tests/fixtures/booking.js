@@ -38,6 +38,15 @@ export async function memoryBookingRepository() {
     eventRows: events,
     jobRows: jobs,
     notificationRows: notifications,
+    paymentMatches: async (kind, value) =>
+      rows.filter((row) => {
+        const client = clients[row.clientId - 1];
+        return kind === 'ref'
+          ? row.ref === value
+          : kind === 'email'
+            ? client.email.toLowerCase() === value
+            : client.phoneE164 === value;
+      }),
     proofRows: proofs,
     auditRows: audits,
     proofs: async (id) => proofs.filter((p) => !id || p.bookingId === id),
