@@ -103,6 +103,7 @@ export function paymentPortal(repository, config, payments, catalog) {
         }
       }
       const matches = kind ? await repository.paymentMatches(kind, value) : [];
+      req.session.paySearch = kind ? { kind, value } : null;
       const found = [];
       for (const booking of matches) {
         const price =
@@ -129,18 +130,192 @@ export function paymentPortal(repository, config, payments, catalog) {
             timeStyle: 'short',
           }),
           amountCents: initial ? price.dueTodayCents : booking.balanceCents,
+          kind: initial ? 'initial' : 'balance',
+          pendingReview: (await repository.proofs(booking.id)).some(
+            (proof) => proof.status === 'pending',
+          ),
           url: grantPaymentAccess(req, booking.ref, token),
         });
       }
+      req.session.paySelection = {
+        items: found
+          .filter((payment) => !payment.pendingReview)
+          .map((payment) => ({
+            ref: payment.ref,
+            amountCents: payment.amountCents,
+            kind: payment.kind,
+          })),
+        refs: found
+          .filter((payment) => !payment.pendingReview)
+          .map((payment) => payment.ref),
+        batchId: 'batch-' + randomBytes(16).toString('hex'),
+      };
       return renderPay(req, res, {
         query,
         found,
+        totalDueCents: found.reduce(
+          (total, payment) => total + payment.amountCents,
+          0,
+        ),
+        payableCount: found.filter((payment) => !payment.pendingReview).length,
+        payableTotalCents: found
+          .filter((payment) => !payment.pendingReview)
+          .reduce((sum, payment) => sum + payment.amountCents, 0),
         lookupMessage: found.length ? '' : 'No pending payments found.',
       });
     } catch (error) {
       next(error);
     }
   });
+  async function batchAccess(req, id) {
+    const batch = await repository.batch(id);
+    if (!batch || !(req.session.paymentBatchAccess?.[id] > Date.now()))
+      throw new BookingError(
+        'NOT_FOUND',
+        'Payment link expired. Search again.',
+        404,
+      );
+    const items =
+      typeof batch.items === 'string' ? JSON.parse(batch.items) : batch.items;
+    for (const item of items)
+      await payments.authorize(item.ref, paymentToken(req, item.ref));
+    return { ...batch, items };
+  }
+  router.post('/api/pay/all', limited(10), async (req, res, next) => {
+    try {
+      z.object({})
+        .strict()
+        .parse(req.body || {});
+      const selected = req.session.paySelection;
+      if (!selected || !selected.items || selected.refs.length < 2)
+        throw new BookingError(
+          'INVALID_SELECTION',
+          'Search for at least two pending payments.',
+          409,
+        );
+      const tokens = Object.fromEntries(
+        selected.refs.map((ref) => [ref, paymentToken(req, ref)]),
+      );
+      req.session.paymentBatchAccess ||= {};
+      req.session.paymentBatchAccess[selected.batchId] = Date.now() + 3600000;
+      res.json(
+        await payments.checkoutBatch(
+          selected.refs,
+          tokens,
+          selected.batchId,
+          selected.items,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  });
+  router.get('/pay/success', (req, res) => {
+    const sessionId =
+      typeof req.query.session_id === 'string' &&
+      /^cs_[A-Za-z0-9_]+$/.test(req.query.session_id)
+        ? req.query.session_id
+        : '';
+    res
+      .set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' })
+      .render('pages/batch-payment-result', {
+        title: 'Your payments | Mado African Braidz',
+        sessionId,
+        csrfToken: generateToken(req),
+        hideMobileBooking: true,
+      });
+  });
+  router.get('/pay/batch/:id', async (req, res, next) => {
+    try {
+      const batch = await batchAccess(req, req.params.id);
+      res
+        .set({
+          'Cache-Control': 'no-store',
+          'X-Robots-Tag': 'noindex, nofollow',
+        })
+        .render('pages/batch-payment-result', {
+          title: 'Your payments | Mado African Braidz',
+          sessionId: batch.stripeSessionId,
+          batchId: batch.id,
+          cancelRequested: req.query.cancel === '1',
+          csrfToken: generateToken(req),
+          hideMobileBooking: true,
+        });
+    } catch (error) {
+      next(error);
+    }
+  });
+  router.get(
+    '/api/pay/batch-status',
+    limited(120, 60000),
+    async (req, res, next) => {
+      try {
+        const sessionId = z
+          .string()
+          .regex(/^cs_[A-Za-z0-9_]+$/)
+          .parse(req.query.session_id);
+        const initial = await repository.batchBySession(sessionId);
+        if (!initial)
+          throw new BookingError('NOT_FOUND', 'Payment not found.', 404);
+        const batch = await batchAccess(req, initial.id);
+        const entries = await Promise.all(
+          batch.items.map(async (item) => {
+            const row = await repository.bookingById(item.bookingId);
+            const price =
+              typeof row.priceSnapshot === 'string'
+                ? JSON.parse(row.priceSnapshot)
+                : row.priceSnapshot;
+            return {
+              ref: item.ref,
+              styleName: price.styleName,
+              startAt: row.startAt.toISOString(),
+              status: row.status,
+              paymentStatus: row.paymentStatus,
+              amountCents: item.amountCents,
+              refundedCents: item.refundedCents || 0,
+              refundPending: Math.max(
+                0,
+                (item.refundDueCents || 0) - (item.refundedCents || 0),
+              ),
+              balanceCents: price.consultation ? null : row.balanceCents,
+              url: paymentPageUrl(req, item.ref),
+            };
+          }),
+        );
+        res.set('Cache-Control', 'no-store').json({
+          status: batch.status,
+          totalCents: batch.totalCents,
+          refundedCents: entries.reduce(
+            (sum, item) => sum + item.refundedCents,
+            0,
+          ),
+          entries,
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+  router.post(
+    '/api/pay/all/:id/cancel',
+    limited(10),
+    async (req, res, next) => {
+      try {
+        z.object({})
+          .strict()
+          .parse(req.body || {});
+        const batch = await batchAccess(req, req.params.id);
+        const result = await payments.cancelBatch(batch.id);
+        res.json({
+          url: result.paid
+            ? '/pay/success?session_id=' + result.sessionId
+            : '/pay',
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
   router.post(
     '/api/bookings/:ref/proof',
     limited(10),

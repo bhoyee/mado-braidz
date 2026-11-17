@@ -227,7 +227,7 @@ For manual local webhook testing, run Stripe CLI in another terminal:
 
 ```powershell
 stripe login
-stripe listen --forward-to http://localhost:4780/webhooks/stripe --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired,charge.refunded
+stripe listen --forward-to http://localhost:4780/webhooks/stripe --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired,charge.refunded,refund.updated,refund.failed
 ```
 
 Copy the listener's signing secret into STRIPE_WEBHOOK_SECRET in ignored `.env`, then restart the app. The listener secret differs from a Dashboard endpoint's secret. Do not commit or paste keys into logs. Hosted Checkout uses the payment methods enabled in the Stripe Dashboard, USD prices and no automatic tax/adaptive conversion. No Stripe.js card form is embedded.
@@ -273,3 +273,13 @@ Run `npm run db:migrate` before starting the updated app; the additive `payment_
 The owner can open `/admin/payment-reviews` using the seeded owner's email/password through the existing owner-only Basic authentication (HTTPS required in production). This is a narrow review screen; the full admin portal remains a later milestone. Verify the transfer in the actual Zelle/Cash App account, inspect the private screenshot, then approve or reject. Owner decisions are CSRF protected, date locked, audited and idempotent. Approval records the expected server-calculated amount, reconciles the balance and confirms only if capacity is still available. If the appointment is no longer available or money differs, arrange a manual refund/reconciliation with the client; do not approve the proof. Rejection of an initial proof releases the chair. Staff cannot review proofs. Confirmation email jobs are queued; actual email delivery remains Milestone 7.
 
 Manual-payment browser verification: `npm run test:manual:browser` uses generated test images, fake Stripe and an isolated in-memory repository. It does not send transfers or modify the development database. Run `npm run test:db` for real disposable-database row locking and concurrent approval verification.
+
+## Multiple appointments and Pay all
+
+A phone/email search lists **every eligible linked booking**, with an individual Pay now action and the total due now. A booking reference lists only that booking. Results have no fixed booking-count cutoff. Payments already awaiting manual review stay visible but are excluded from card checkout to prevent paying twice.
+
+When at least two payments are ready, **Pay all** opens one Stripe Checkout for the server-computed sum. `payment_batches` stores immutable per-booking allocations; its attempts prevent a simultaneous individual or manual payment for those same bookings. Reservation and webhook allocation take all affected calendar-day locks in sorted order. Only a verified paid webhook credits the entries. Group cancellation/expiry releases unpaid initial holds while preserving appointments that were already confirmed. Conflict refunds apply only to the affected allocation; other appointments remain paid.
+
+Run `npm run db:migrate` for `0004_misty_ozymandias.sql` before starting/deploying this version (24 tables). Cron also expires combined checkouts. No new environment variables are required. In Stripe webhooks, retain the existing events and add `refund.updated` and `refund.failed` for asynchronous combined-refund reconciliation. Do not issue allocation-specific refunds using the old single-booking refund code: shared PaymentIntents must use the combined-refund path. Untagged refunds issued directly in Stripe Dashboard are allocated in booking order and create an owner reconciliation notification; verify these against the intended bookings.
+
+Validation commands: `npm run test:batch:browser` checks phone/email versus reference lookup, individual/combined controls, deposits, balances, cancellation and accessibility in mobile/desktop Chrome using fake Stripe. `npm run test:stripe:batch` uses real **test-only** Stripe keys, creates a disposable local database, verifies a combined Checkout total, expires only its own unpaid session, and drops only its own database. It never submits a card or takes payment. Real hosted-card confirmation remains the separate `npm run test:stripe:e2e` acceptance check.

@@ -20,9 +20,9 @@ export function paymentPageUrl(req, ref) {
 export function grantPaymentAccess(req, ref, token) {
   if (req.session.paymentAccess?.[ref]?.expiresAt > Date.now())
     return paymentPageUrl(req, ref);
-  const active = Object.entries(req.session.paymentAccess || {})
-    .filter(([, grant]) => grant.expiresAt > Date.now())
-    .slice(-49);
+  const active = Object.entries(req.session.paymentAccess || {}).filter(
+    ([, grant]) => grant.expiresAt > Date.now(),
+  );
   req.session.paymentAccess = Object.fromEntries(active);
   req.session.paymentAccess[ref] = {
     key: randomBytes(24).toString('hex'),

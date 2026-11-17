@@ -176,6 +176,22 @@ describe('public pay lookup and private proof routes', () => {
     expect(found.text).toContain(second.ref);
     expect(found.text).not.toContain(third.ref);
     expect(found.text).not.toContain(hold.manageToken);
+    const emailMatches = await agent
+      .post('/pay/search')
+      .type('form')
+      .send({ _csrf: csrf, query: validHold.email })
+      .expect(200);
+    expect(emailMatches.text).toContain(hold.ref);
+    expect(emailMatches.text).toContain(second.ref);
+    expect(emailMatches.text).not.toContain(third.ref);
+    const codeMatch = await agent
+      .post('/pay/search')
+      .type('form')
+      .send({ _csrf: csrf, query: hold.ref })
+      .expect(200);
+    expect(codeMatch.text).toContain(hold.ref);
+    expect(codeMatch.text).not.toContain(second.ref);
+    expect(codeMatch.text).not.toContain(third.ref);
     const paymentUrl = found.text.match(
       /href="(\/pay\/appointment\/[a-f0-9]+)"/,
     )[1];
