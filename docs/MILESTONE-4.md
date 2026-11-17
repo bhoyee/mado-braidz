@@ -38,3 +38,9 @@ On cPanel, run `node scripts/run-jobs.js` from cron every five minutes using the
 Add the matching test keys to ignored `.env`, then complete the real Stripe CLI/card verification. Review the final sandbox Checkout payment methods and merchant branding in Stripe Dashboard. Keep this PR a draft until that external acceptance passes. Live keys, owner test bookings, full launch checks and deployment remain later work. Email delivery, admin payment/refund controls, staff permissions and appointment changes remain Milestones 5–7. Hosting still awaits working SSH access.
 
 References: [Stripe Checkout sessions](https://docs.stripe.com/api/checkout/sessions/create), [webhook handling](https://docs.stripe.com/webhooks), [refunds](https://docs.stripe.com/api/refunds/create).
+
+### Manual transfer extension verification
+
+The owner added the public Pay page and Zelle/Cash App proof workflow to Milestone 4. Local `.env` now contains the confirmed transfer destinations; `.env.example` lists every new variable without committing live configuration. Migration `0003_premium_revanche.sql` adds `payment_proofs` (23 tables total). The local database migration passed. The owner-review bridge is `/admin/payment-reviews`; full admin authentication remains Milestone 5.
+
+Validation: 113 unit/API tests pass; 7 real database tests pass, including five concurrent approvals recording exactly one manual payment and audit entry. `npm run test:manual:browser` passes at 390px and 1440px, covering Zelle booking proof, pending/unpaid state, owner approval, Cash App balance proof and approval, paid-in-full lookup, and accessibility. Existing Stripe browser checks also pass. No real transfers are sent by tests. Build/lint pass. Email sending remains out of scope.

@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { tokenHash } from '../../services/bookingService.js';
 import { generateToken } from '../../middleware/csrf.js';
-export function paymentPages(repository) {
+import { paymentPortal, manualMethods } from './paymentPortal.js';
+export function paymentPages(repository, config, payments, catalog) {
   const router = Router();
+  if (repository)
+    router.use(paymentPortal(repository, config, payments, catalog));
   router.get('/book/success', (req, res, next) => {
     if (!repository) return next();
     const sessionId =
@@ -29,6 +32,8 @@ export function paymentPages(repository) {
         typeof row.priceSnapshot === 'string'
           ? JSON.parse(row.priceSnapshot)
           : row.priceSnapshot;
+      const proofs = await repository.proofs(row.id);
+      const pendingProof = proofs.find((p) => p.status === 'pending');
       res
         .set({
           'Cache-Control': 'no-store',
@@ -40,6 +45,18 @@ export function paymentPages(repository) {
           hideMobileBooking: true,
           appointment: row,
           price,
+          pendingProof,
+          manualMethods: manualMethods(config),
+          paymentName: config.MANUAL_PAYMENT_NAME,
+          canSubmitProof:
+            !pendingProof &&
+            ((row.status === 'pending_payment' &&
+              row.holdExpiresAt > new Date()) ||
+              (['confirmed', 'completed'].includes(row.status) &&
+                row.paymentStatus === 'deposit_paid' &&
+                row.balanceCents > 0 &&
+                !price.consultation)),
+          initialPayment: row.status === 'pending_payment',
           appointmentTime: row.startAt.toLocaleString('en-US', {
             timeZone: 'America/New_York',
             dateStyle: 'long',
@@ -47,6 +64,7 @@ export function paymentPages(repository) {
           }),
           csrfToken: generateToken(req),
           canPayBalance:
+            !pendingProof &&
             ['confirmed', 'completed'].includes(row.status) &&
             row.paymentStatus === 'deposit_paid' &&
             row.balanceCents > 0 &&

@@ -1,7 +1,9 @@
-﻿{% extends "layouts/base.njk" %}
+{% extends "layouts/base.njk" %}
 {% block content %}
+{% from "partials/manual-payment.njk" import proofForm %}
 <section class="wrap appointment-result visit-page">
-  <header class="appointment-result-heading visit-heading"><div><p class="eyebrow">Your appointment</p><h1>Your <em>visit.</em></h1><p>All the details for your time in our chair.</p></div><span class="visit-status" data-status="{{ appointment.status }}">{{ appointment.status | replace('_', ' ') }}</span></header>
+  <header class="appointment-result-heading visit-heading"><div><p class="eyebrow">Your appointment</p><h1>Your <em>visit.</em></h1><p>All the details for your time in our chair.</p></div><span class="visit-status" data-status="{{ appointment.status }}">{% if pendingProof %}Payment awaiting review{% else %}{{ appointment.status | replace('_', ' ') }}{% endif %}</span></header>
+  {% if pendingProof %}<p class="manual-review-notice" role="status">Payment proof received. The owner will verify your {{ pendingProof.method | title }} transfer. {% if initialPayment %}Your appointment is not confirmed yet.{% endif %} Please do not pay again.</p>{% endif %}
   <div class="appointment-receipt">
     <div class="appointment-visit">
       <div class="appointment-reference"><span>Booking reference</span><strong>{{ appointment.ref }}</strong></div>
@@ -18,7 +20,11 @@
     </aside>
     <div class="appointment-location"><span class="appointment-detail-label">Meet us at the studio</span><p>{{ business.street }}<br>{{ business.city }}, {{ business.region }} {{ business.postalCode }}</p><a class="text-link" href="{{ directions }}" target="_blank" rel="noopener">Get directions</a></div>
   </div>
+{% if initialPayment and not pendingProof and paymentsEnabled %}<form class="visit-card-payment" data-initial-checkout data-ref="{{ appointment.ref }}" data-csrf="{{ csrfToken }}"><button class="button" type="submit">Pay {{ price.dueTodayCents | money }} securely by card</button><p class="field-error" role="alert" hidden></p></form>{% endif %}
+{% if canSubmitProof and manualMethods.length %}<div>{{ proofForm(appointment.ref, csrfToken, manualMethods, paymentName, price.dueTodayCents if initialPayment else appointment.balanceCents) }}</div>{% endif %}
   <div class="visit-support"><div><h2>A change of plans?</h2><p>Call the studio for appointment changes. Please give at least 48 hours’ notice for rescheduling.</p><a class="text-link" href="/policies">Appointment policies</a></div><a class="button outline" href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></div>
 </section>
+
+
 <script defer src="/build/payment.js"></script>
 {% endblock %}

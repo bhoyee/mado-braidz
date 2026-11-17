@@ -1,0 +1,9 @@
+{% macro proofForm(ref, csrfToken, methods, paymentName, amountCents) %}
+<form class="manual-proof-form" data-proof-form data-ref="{{ ref }}" data-csrf="{{ csrfToken }}" enctype="multipart/form-data">
+  <h2>Pay with Zelle or Cash App</h2><p>Send your payment using the details below, then upload your receipt. The owner must verify the money was received before approval.</p>
+  <p>Amount to send: <strong>{{ amountCents | money }}</strong> · Reference: <strong>{{ ref }}</strong></p>
+  <fieldset><legend>Payment method</legend>{% for method in methods %}<label class="booking-check"><input type="radio" name="method" value="{{ method.id }}" required {% if loop.first %}checked{% endif %}><span><strong>{{ method.name }}</strong><br>{{ method.recipient }}<br>Recipient: {{ paymentName }}</span></label>{% endfor %}</fieldset>
+  <label for="manual-proof">Payment screenshot</label><input id="manual-proof" type="file" name="proof" accept="image/jpeg,image/png,image/webp" required><p class="small">JPEG, PNG or WebP, up to 8 MB. Include your booking reference in the transfer note.</p>
+  <button class="button" type="submit">Submit payment for review</button><p class="field-error" role="alert" hidden></p>
+</form>
+{% endmacro %}

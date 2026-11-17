@@ -429,6 +429,8 @@ if (root) {
         ? 'Final price at consultation'
         : dollars(data.subtotalCents);
       $('summary-today').textContent = dollars(data.dueTodayCents);
+      if ($('booking-manual-amount'))
+        $('booking-manual-amount').textContent = dollars(data.dueTodayCents);
       const payingFull =
         selection().paymentChoice === 'full' && !data.consultation;
       $('summary-payment-label').textContent = payingFull
@@ -678,6 +680,21 @@ if (root) {
     });
   for (const input of form.querySelectorAll('input,textarea'))
     input.addEventListener('input', persist);
+  const selectedMethod = () =>
+    form.querySelector('[name="paymentMethod"]:checked')?.value || 'card';
+  for (const input of form.querySelectorAll('[name="paymentMethod"]'))
+    input.addEventListener('change', () => {
+      const manual = selectedMethod() !== 'card';
+      $('booking-manual-payment').hidden = !manual;
+      form
+        .querySelectorAll('[data-manual-recipient]')
+        .forEach(
+          (el) => (el.hidden = el.dataset.manualRecipient !== selectedMethod()),
+        );
+      $('booking-submit').textContent = manual
+        ? 'Submit payment for review'
+        : 'Continue to secure payment';
+    });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (submitted) return;
@@ -692,6 +709,10 @@ if (root) {
       return;
     }
     if (!quote || !startAt) return error('Select a time');
+    const method = selectedMethod();
+    const proof = $('booking-payment-proof')?.files[0];
+    if (method !== 'card' && (!proof || proof.size > 8 * 1024 * 1024))
+      return error('Upload a payment screenshot up to 8 MB.');
     const file = $('booking-inspiration').files[0];
     if (file && file.size > 8 * 1024 * 1024)
       return error('Choose an image smaller than 8 MB.');
@@ -725,9 +746,22 @@ if (root) {
             headers: { 'x-csrf-token': form.dataset.csrf },
             body,
           });
-      if (paymentsEnabled) {
+      if (paymentsEnabled || method !== 'card') {
         checkoutRef = result.ref;
         persist();
+        if (method !== 'card') {
+          const proofBody = new FormData();
+          proofBody.append('method', method);
+          proofBody.append('proof', proof);
+          const submission = await api(`/api/bookings/${result.ref}/proof`, {
+            method: 'POST',
+            headers: { 'x-csrf-token': form.dataset.csrf },
+            body: proofBody,
+          });
+          submitted = true;
+          location.assign(submission.url);
+          return;
+        }
         const checkout = await api(`/api/bookings/${result.ref}/checkout`, {
           method: 'POST',
           headers: {

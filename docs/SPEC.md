@@ -884,3 +884,13 @@ The build runs in 9 milestones, each a separate Codex task and pull request. Pas
 - [ ] Search Console verified, sitemap submitted
 - [ ] Backups confirmed running
 - [ ] First real booking taken and refunded as a final live test
+
+## Owner amendment — public Pay page and manual transfers (November 17, 2026)
+
+This explicitly extends Milestone 4 with `/pay` in the footer, booking/visit payment-method selection, private Zelle/Cash App proof upload, and owner review before an initial appointment is confirmed. Card payments retain Stripe Checkout and signed-webhook confirmation. Transfer recipient name and destinations come only from env (`MANUAL_PAYMENT_NAME`, `ZELLE_RECIPIENT`, `CASHAPP_CASHTAG`), so a restart after changing env updates every payment screen. Never infer payment receipt from a screenshot.
+
+Phone/email searches must also present a matching booking confirmation code; a reference can be searched directly. Do not expose bookings or balances through unauthenticated phone/email enumeration. A match exposes only that booking and its private payment actions. No eligible payment returns “No pending payments found.”
+
+Manual proofs are private re-encoded JPEG/PNG/WebP inputs, max 8 MB; metadata and review status live in `payment_proofs`. Submitting an initial proof keeps `pending_payment` and unpaid totals, extending its capacity hold for `MANUAL_REVIEW_HOURS` (working default 24, range 1–48), capped at appointment start. The owner must review promptly; expiry releases capacity. An owner approval rechecks full-interval capacity and time blocks under the date lock before recording money and confirming. A late conflict requires owner reconciliation/manual refund, never overbooking. An initial rejection cancels and frees the chair. Balance review leaves the confirmed chair intact. Duplicate submissions/decisions cannot duplicate payment, and card Checkout is blocked during proof review.
+
+A narrow `/admin/payment-reviews` screen uses the existing seeded-owner Basic authentication with HTTPS in production, rate limiting, CSRF and audit entries. This is a payment-review bridge until Milestone 5 replaces it with the full session-authenticated admin portal. Staff cannot approve, reject or read proofs. Actual client/admin email delivery remains Milestone 7; payment confirmation jobs are recorded for that delivery layer.

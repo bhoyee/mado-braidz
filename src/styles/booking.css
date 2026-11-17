@@ -766,3 +766,129 @@
     white-space: normal;
   }
 }
+
+.pay-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.pay-search,
+.manual-proof-form,
+.payment-review {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 28px;
+  background: var(--color-cream);
+}
+.pay-search input,
+.manual-proof-form input,
+.payment-review textarea {
+  max-width: 100%;
+}
+.pay-search .small,
+.manual-proof-form .small {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.pay-search .button,
+.manual-proof-form .button {
+  margin-top: 18px;
+}
+.pay-alternatives {
+  padding: 28px;
+  background: var(--color-night);
+  color: var(--color-cream);
+  border-radius: 12px;
+}
+.pay-alternatives .eyebrow,
+.pay-alternatives a {
+  color: var(--color-lilac);
+}
+.pay-alternatives h2,
+.manual-proof-form h2,
+.pay-found h2 {
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+.pay-alternatives p {
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.pay-alternatives dl {
+  padding-block: 16px;
+  border-top: 1px solid var(--color-plum);
+}
+.pay-alternatives dt {
+  font-size: 13px;
+}
+.pay-alternatives dd {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.pay-found {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.pay-found dd {
+  font: 700 36px var(--font-serif);
+  color: var(--color-violet-deep);
+}
+.pay-found dl {
+  margin-top: 16px;
+}
+.pay-found p,
+.manual-proof-form p,
+.payment-review p {
+  font-size: 15px;
+}
+.pay-lookup-message,
+.manual-review-notice {
+  margin-block: 20px;
+  padding: 16px 20px;
+  border-left: 3px solid var(--color-violet);
+  background: var(--color-mist);
+  color: var(--color-night);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.manual-proof-form {
+  margin-block: 24px;
+  max-width: 760px;
+}
+.manual-proof-form .booking-check {
+  min-height: 44px;
+  padding: 10px 0;
+  font-size: 15px;
+}
+.manual-proof-form .booking-check input {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.manual-proof-form .button {
+  white-space: normal;
+}
+.payment-review {
+  margin-bottom: 24px;
+}
+@media (max-width: 700px) {
+  .pay-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .pay-search,
+  .pay-alternatives,
+  .manual-proof-form,
+  .payment-review {
+    padding: 20px;
+  }
+  .visit-status {
+    white-space: normal;
+  }
+}

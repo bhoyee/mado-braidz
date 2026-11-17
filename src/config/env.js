@@ -15,6 +15,10 @@ export const envSchema = z
     STRIPE_SECRET_KEY: optional,
     STRIPE_PUBLISHABLE_KEY: optional,
     STRIPE_WEBHOOK_SECRET: optional,
+    MANUAL_PAYMENT_NAME: z.string().default('Magdaline Arrey'),
+    ZELLE_RECIPIENT: optional,
+    CASHAPP_CASHTAG: optional,
+    MANUAL_REVIEW_HOURS: z.coerce.number().int().min(1).max(48).default(24),
     EMAIL_PROVIDER: z.enum(['resend', 'postmark', 'log']).default('log'),
     RESEND_API_KEY: optional,
     EMAIL_FROM: z

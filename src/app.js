@@ -1,4 +1,5 @@
 import { paymentPages } from './routes/public/paymentPages.js';
+import { manualMethods } from './routes/public/paymentPortal.js';
 import {
   createStripeProvider,
   createPaymentService,
@@ -51,6 +52,8 @@ export function createApp({
     ? createPaymentService(bookingRepository, provider, config)
     : null;
   app.locals.paymentsEnabled = Boolean(provider);
+  app.locals.manualMethods = manualMethods(config);
+  app.locals.paymentName = config.MANUAL_PAYMENT_NAME;
   app.locals.closeDatabase = () => database?.pool.end();
   app.locals.turnstileSiteKey = config.TURNSTILE_SITE_KEY;
   app.disable('x-powered-by');
@@ -178,7 +181,12 @@ export function createApp({
   app.set('view engine', 'njk');
   app.use('/admin', designRouter(catalog, limits.preview));
   app.use('/api', bookingRouter(bookingRepository, config, payments));
-  app.use(publicRouter(catalog, paymentPages(bookingRepository)));
+  app.use(
+    publicRouter(
+      catalog,
+      paymentPages(bookingRepository, config, payments, catalog),
+    ),
+  );
   app.use((_req, res) =>
     res.status(404).render('pages/message', {
       title: 'Page not found',

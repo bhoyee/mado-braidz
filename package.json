@@ -25,7 +25,8 @@
     "test:booking:browser": "node scripts/qa/booking-browser.js",
     "test:stripe:e2e": "node scripts/qa/stripe-e2e.js",
     "jobs": "node scripts/run-jobs.js",
-    "test:payments:browser": "node scripts/qa/payments-browser.js"
+    "test:payments:browser": "node scripts/qa/payments-browser.js",
+    "test:manual:browser": "node scripts/qa/manual-payments-browser.js"
   },
   "dependencies": {
     "@alpinejs/csp": "^3.17.5",

@@ -130,3 +130,35 @@ if (balance)
       button.disabled = false;
     }
   });
+for (const form of document.querySelectorAll(
+  '[data-proof-form], [data-initial-checkout]',
+)) {
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = form.querySelector('button'),
+      error = form.querySelector('[role="alert"]');
+    button.disabled = true;
+    error.hidden = true;
+    try {
+      const proof = form.hasAttribute('data-proof-form');
+      const response = await fetch(
+        `/api/bookings/${form.dataset.ref}/${proof ? 'proof' : 'checkout'}`,
+        {
+          method: 'POST',
+          headers: {
+            'x-csrf-token': form.dataset.csrf,
+            ...(!proof ? { 'content-type': 'application/json' } : {}),
+          },
+          body: proof ? new FormData(form) : '{}',
+        },
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Please try again.');
+      location.assign(data.url);
+    } catch (e) {
+      error.textContent = e.message;
+      error.hidden = false;
+      button.disabled = false;
+    }
+  });
+}
