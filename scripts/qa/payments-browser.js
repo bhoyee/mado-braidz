@@ -121,7 +121,7 @@ try {
       .waitFor();
     assert.match(
       await page.locator('#payment-totals').innerText(),
-      /30\.00.*150\.00/,
+      /30\.00.*150\.00/s,
     );
     const report = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
@@ -147,7 +147,7 @@ try {
       .waitFor();
     assert.match(
       await page.locator('#payment-totals').innerText(),
-      /180\.00.*0\.00/,
+      /180\.00.*0\.00/s,
     );
     assert.deepEqual(errors, []);
     await context.close();

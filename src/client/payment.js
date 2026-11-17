@@ -20,6 +20,7 @@ if (result) {
         );
       const data = await response.json();
       if (data.status === 'confirmed' || data.status === 'completed') {
+        result.dataset.state = 'confirmed';
         heading.textContent = 'Your chair is booked.';
         message.textContent =
           'Payment received. We look forward to seeing you.';
@@ -31,15 +32,14 @@ if (result) {
             dateStyle: 'long',
             timeStyle: 'short',
           }) + ' Eastern';
-        document.getElementById('payment-reference').textContent =
-          'Reference: ' + data.ref;
-        document.getElementById('payment-totals').textContent =
-          'Paid: ' +
-          money(data.paidCents) +
-          ' · Balance: ' +
-          (data.balanceCents === null
+        document.getElementById('payment-reference').textContent = data.ref;
+        document.getElementById('payment-paid').textContent = money(
+          data.paidCents,
+        );
+        document.getElementById('payment-balance').textContent =
+          data.balanceCents === null
             ? 'Agreed at consultation'
-            : money(data.balanceCents));
+            : money(data.balanceCents);
         document.getElementById('payment-manage').href = data.manageUrl;
         const stamp = (v) =>
           new Date(v)

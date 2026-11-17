@@ -104,7 +104,7 @@
 </footer>
 
 {% if not isDesign %}
-{% if currentPath != '/book' %}<div class="mobile-book">
+{% if currentPath != '/book' and currentPath != '/book/success' %}<div class="mobile-book">
   <a href="tel:{{ business.phone }}" class="mobile-book-call">Call</a>
   <a href="/book" class="button">Book your chair</a>
 </div>

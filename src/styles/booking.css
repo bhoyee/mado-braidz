@@ -450,3 +450,202 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* A compact appointment receipt, with the key visit and payment details first. */
+.appointment-result {
+  padding-block: 32px 56px;
+}
+.appointment-result-heading {
+  margin-bottom: 24px;
+}
+.appointment-result-heading .eyebrow {
+  margin-bottom: 8px;
+}
+.appointment-result h1 {
+  font-size: clamp(32px, 4vw, 52px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  margin-bottom: 10px;
+}
+.appointment-result-heading > p:last-child {
+  font-size: 15px;
+  color: var(--muted);
+}
+.appointment-receipt {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr);
+  border: 1px solid var(--color-lilac);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-cream);
+}
+.appointment-receipt[hidden] {
+  display: none;
+}
+.appointment-visit {
+  padding: 28px 32px;
+}
+.appointment-reference {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.appointment-reference > span,
+.appointment-detail-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.appointment-reference strong {
+  padding: 5px 9px;
+  background: #f5d878;
+  color: var(--color-night);
+  font-size: 14px;
+  letter-spacing: 0.025em;
+  overflow-wrap: anywhere;
+}
+.appointment-visit .eyebrow {
+  margin-bottom: 6px;
+}
+.appointment-visit h2 {
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.15;
+  margin-bottom: 22px;
+}
+.appointment-date p {
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 5px;
+}
+.appointment-timezone {
+  font-size: 12px;
+  color: var(--muted);
+}
+.appointment-location {
+  padding: 0 32px 28px;
+  grid-column: 1;
+  grid-row: 2;
+}
+.appointment-location p {
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 6px 0;
+}
+.appointment-location .text-link {
+  font-size: 14px;
+}
+.appointment-payment {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  background: var(--color-night);
+  color: var(--color-cream);
+  padding: 28px 32px;
+}
+.appointment-payment .eyebrow {
+  color: var(--color-lilac);
+  margin-bottom: 20px;
+}
+.appointment-payment dt {
+  font-size: 14px;
+  font-weight: 600;
+}
+.appointment-payment dd {
+  margin: 5px 0 0;
+  font-family: var(--font-serif);
+  font-size: clamp(30px, 3vw, 42px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.appointment-paid dd {
+  color: var(--color-gold);
+}
+.appointment-balance {
+  border-top: 1px solid var(--color-plum);
+  margin-top: 18px;
+  padding-top: 18px;
+}
+.appointment-payment-caption {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-lilac);
+  margin-top: 18px;
+  max-width: 32ch;
+}
+.appointment-actions {
+  margin-top: 22px;
+  display: grid;
+  gap: 10px;
+}
+.appointment-actions .button {
+  background: var(--color-cream);
+  color: var(--color-night);
+  margin: 0;
+  text-align: center;
+}
+.appointment-actions .button:hover {
+  background: var(--color-lilac);
+}
+.appointment-calendar {
+  color: var(--color-cream);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.appointment-help {
+  font-size: 14px;
+  margin-top: 20px;
+}
+.appointment-help a {
+  font-weight: 700;
+  color: var(--color-violet-deep);
+}
+@media (max-width: 700px) {
+  .appointment-result {
+    padding-block: 22px 36px;
+  }
+  .appointment-result-heading {
+    margin-bottom: 18px;
+  }
+  .appointment-receipt {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .appointment-visit,
+  .appointment-payment {
+    padding: 22px;
+  }
+  .appointment-payment {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .appointment-location {
+    grid-row: 3;
+    padding: 20px 22px;
+  }
+  .appointment-reference {
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+  }
+  .appointment-visit h2 {
+    margin-bottom: 16px;
+  }
+  .appointment-payment dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .appointment-balance {
+    border-top: 0;
+    border-left: 1px solid var(--color-lilac);
+    margin-top: 0;
+    padding: 0 0 0 16px;
+  }
+}
