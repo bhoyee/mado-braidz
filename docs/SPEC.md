@@ -887,6 +887,10 @@ The build runs in 9 milestones, each a separate Codex task and pull request. Pas
 
 ## Owner amendment — Milestone 5 owner access (November 17, 2026)
 
+Deployment instruction (November 17): deploy the current build on the main domain, using production mode and the current Stripe test keys for verification. The owner explicitly deferred Cloudflare Turnstile until later. Use `TURNSTILE_ENABLED=false` for that initial server configuration; the default stays true and genuine keys are required to enable it. Do not fabricate keys or switch the hosted app into development mode. Email delivery remains Milestone 7.
+
+Follow-up instruction (November 17): the owner supplied the Turnstile key pair in the ignored local `.env`; enable verification on the server for booking and prepare the contact endpoint with the same protection. The contact form must stay disabled until email setup; do not create an enquiry inbox or persist messages yet. Check successful verification, hostname and the expected form action. The owner also explicitly authorized downloading a database backup to this PC's ignored `tmp/hosting/live` folder.
+
 Build the admin core for one owner only. Staff accounts, invitations and staff management UI are deferred until requested; existing non-owner records must be denied access. The owner can edit a booking, especially its date and start time, with the same full-interval capacity of three, opening-hours, 30-minute start-step and buffer checks. Date-only changes retain the agreed price snapshot. An explicit style/extra change recomputes the affected appointment's total on the server; consultation-priced visits can receive an agreed final total. Owner-created short-notice appointments may bypass public notice/advance restrictions, but never opening hours, time blocks or capacity. Email requests from admin actions are queued for Milestone 7; password reset has its own Resend delivery path and a private ignored local-development file fallback.
 
 ## Owner amendment — public Pay page and manual transfers (November 17, 2026)

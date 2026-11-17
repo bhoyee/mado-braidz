@@ -54,6 +54,38 @@ describe('foundation', () => {
   it('requires production secrets and HTTPS', () => {
     expect(() => parseEnv({ ...input, NODE_ENV: 'production' })).toThrow();
   });
+  it('permits an explicit Turnstile deferral without disabling production security', () => {
+    const production = {
+      ...input,
+      NODE_ENV: 'production',
+      APP_URL: 'https://madoafricanbraidz.com',
+      STRIPE_SECRET_KEY: 'sk_test_example',
+      STRIPE_PUBLISHABLE_KEY: 'pk_test_example',
+      STRIPE_WEBHOOK_SECRET: 'whsec_example',
+      CRON_SECRET: 'cron-secret-for-test-only',
+    };
+    expect(() => parseEnv(production)).toThrow();
+    expect(
+      parseEnv({ ...production, TURNSTILE_ENABLED: 'false' }).TURNSTILE_ENABLED,
+    ).toBe(false);
+    expect(() =>
+      parseEnv({
+        ...production,
+        TURNSTILE_ENABLED: 'false',
+        APP_URL: 'http://example.test',
+      }),
+    ).toThrow();
+    expect(() =>
+      parseEnv({ ...production, TURNSTILE_ENABLED: 'false', CRON_SECRET: '' }),
+    ).toThrow();
+    expect(
+      parseEnv({
+        ...production,
+        TURNSTILE_SITE_KEY: 'site',
+        TURNSTILE_SECRET_KEY: 'secret',
+      }).TURNSTILE_ENABLED,
+    ).toBe(true);
+  });
   it('loads every flyer price and consultation style', () => {
     const rows = catalogRows();
     expect(rows).toHaveLength(13);

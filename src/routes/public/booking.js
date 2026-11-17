@@ -11,6 +11,7 @@ import { priceBooking } from '../../services/pricingService.js';
 import { createAvailabilityService } from '../../services/availabilityService.js';
 import { createBookingService } from '../../services/bookingService.js';
 import { BookingError } from '../../services/bookingErrors.js';
+import { verifyTurnstile } from '../../services/turnstileService.js';
 import { createHash } from 'node:crypto';
 import { paymentToken, paymentPageUrl } from '../../services/paymentAccess.js';
 
@@ -159,35 +160,7 @@ export function bookingRouter(repository, config, payments) {
           input.checkoutRequestKey = createHash('sha256')
             .update(req.sessionID + ':' + input.requestKey)
             .digest('hex');
-        if (config.TURNSTILE_SECRET_KEY) {
-          let verification;
-          try {
-            const response = await fetch(
-              'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-              {
-                method: 'POST',
-                body: new URLSearchParams({
-                  secret: config.TURNSTILE_SECRET_KEY,
-                  response: input.turnstileToken,
-                  remoteip: req.ip,
-                }),
-                signal: AbortSignal.timeout(10000),
-              },
-            );
-            verification = await response.json();
-          } catch {
-            throw new BookingError(
-              'VERIFICATION_UNAVAILABLE',
-              'Verification is temporarily unavailable. Please try again.',
-              503,
-            );
-          }
-          if (!verification.success)
-            throw new BookingError(
-              'VERIFICATION_FAILED',
-              'Please complete the security check and try again.',
-            );
-        }
+        await verifyTurnstile(config, input.turnstileToken, req.ip, 'booking');
         let media = null;
         if (req.file) {
           // Check bytes; never trust file extension or browser MIME type.

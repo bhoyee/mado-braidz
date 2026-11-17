@@ -4,6 +4,10 @@ Milestones 1–5: Express 4, Nunjucks SSR, Tailwind CSS v4, Alpine.js, MySQL thr
 
 ## Requirements and Windows setup
 
+For the cPanel server setup, see [docs/DEPLOY.md](docs/DEPLOY.md). Local development remains on port **4780**.
+
+Pushes to `main` now run GitHub Actions checks and automatically deploy production, including a database backup, Drizzle migrations, an app restart and served-revision checks. Pull requests run checks without deploying. See [the CI/CD setup and recovery instructions](docs/DEPLOY.md#github-actions-production-deployment) for the required encrypted environment secrets and rollback behavior. Production runtime credentials stay on the server; local `.env` is never deployed.
+
 Use Node.js 20 LTS, npm, Git, and MySQL 8 (or MariaDB 10.6+). In PowerShell:
 
 ```powershell
@@ -168,7 +172,7 @@ npm run build
 
 ## Hosting review deployment
 
-Current hosting checks, the proposed review deployment and remaining access/configuration requirements are recorded in [docs/HOSTING-PREVIEW.md](docs/HOSTING-PREVIEW.md). The local hosting credentials are never part of the deployable release.
+The current deployment and verification record is [docs/DEPLOY.md](docs/DEPLOY.md). Earlier access troubleshooting is retained in [docs/HOSTING-PREVIEW.md](docs/HOSTING-PREVIEW.md) as historical context. The local hosting credentials are never part of the deployable release.
 
 ## Owner amendment: capacity and included hair
 
@@ -260,7 +264,7 @@ npm run test:stripe:e2e
 
 The last command is a **real sandbox-only** hosted-card test using Stripe CLI and local Chrome. It refuses live keys, creates a disposable local database, opens the hosted test checkout, uses the published Stripe test card, waits for the actual forwarded webhook, then removes only its own temporary database and closes its browser/listener. Keys are passed through environment variables, not command arguments. It does not change the development database or occupy port 4780. Browser verification challenges may require a manual sandbox checkout. Run this only after adding valid test keys. It creates test-mode Stripe records; no real money is processed.
 
-The implementation and local mock-provider tests are ready; **real Stripe CLI/test-card acceptance is pending until test keys are supplied**. Full details are in [docs/MILESTONE-4.md](docs/MILESTONE-4.md). Remote deployment remains a separate task awaiting SSH access.
+On 17 November 2026, the hosted main-domain app completed a real Stripe sandbox-card checkout and confirmed through Stripe's actual webhook. The test payment was refunded and the test appointment cancelled. The separate local CLI harness is not recorded as passing. Full details are in [docs/DEPLOY.md](docs/DEPLOY.md) and [docs/MILESTONE-4.md](docs/MILESTONE-4.md). Real-money activation still requires the owner's launch checks.
 
 ## Pay page and manual transfer review
 
@@ -295,3 +299,5 @@ Login has persistent lockout after five failures for 15 minutes, optional authen
 Client emails requested from owner actions are queued for Milestone 7. Until delivery is enabled, copy the private visit/payment link from the booking details. Stripe refunds are durable jobs retried by the existing cron command; manual refunds only record money the owner has already returned herself. Settings, catalog CRUD and time-block editing remain Milestone 6.
 
 Verify with `npm run lint`, `npm test`, `npm run test:db` and `npm run test:admin:browser`. The owner browser test uses fake Stripe, in-memory data and an ephemeral port; MySQL integration tests use a disposable database. See [docs/MILESTONE-5.md](docs/MILESTONE-5.md) for the full scope and owner setup notes.
+
+`TURNSTILE_ENABLED` defaults to `true`. After the initial deferred setup, the owner supplied genuine keys and enabled it on the server. Set `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`, keep the flag true and restart Passenger after key changes. Tokens are verified server-side against the configured `APP_URL` hostname and the expected form action; missing, invalid, expired/replayed or wrongly scoped tokens are rejected. Cloudflare outages fail closed. Booking uses action `booking`; the contact preview uses `contact`. Contact delivery remains disabled until email setup, as the owner requested—no contact messages are stored or sent. Both forms retain CSRF, rate limits and honeypots. Add localhost to the widget's allowed hostnames if you want to use these domain keys during local development; do not use dummy keys on the server. The Passenger startup file is `app.cjs`, which loads the ES-module server; command-line development still uses `src/server.js`.

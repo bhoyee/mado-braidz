@@ -44,6 +44,18 @@ try {
     const index = faq.findIndex((item) => item.question === hairFaq.question);
     if (index === -1) faq.push(hairFaq);
     else faq[index] = hairFaq;
+    // Update only the old rollout placeholder; preserve an owner's rewritten FAQ.
+    const depositFaq = publicSettings.seo.pages.faq.find(
+      (item) => item.question === 'How does the deposit work?',
+    );
+    const depositIndex = faq.findIndex(
+      (item) => item.question === depositFaq.question,
+    );
+    if (depositIndex === -1) faq.push(depositFaq);
+    else if (
+      faq[depositIndex].answer.includes('Online checkout is coming soon')
+    )
+      faq[depositIndex] = depositFaq;
     await save('seo', {
       ...seo,
       pages: { ...seo.pages, about: publicSettings.seo.pages.about, faq },

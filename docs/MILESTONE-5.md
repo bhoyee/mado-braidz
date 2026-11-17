@@ -47,4 +47,4 @@ Validated: build and lint; 144 application tests; all 10 disposable-MySQL integr
 - Staff accounts and staff-management UI are deferred by owner instruction.
 - Catalog CRUD, availability settings and time-block editing are Milestone 6.
 - Delivery of client confirmations, reschedule messages, payment receipts and balance-link emails remains Milestone 7. Requests are queued; copy the private visit link when a client needs it now.
-- Real hosted Stripe test-card acceptance and remote hosting deployment remain outstanding launch checks from earlier milestones.
+- Hosted Stripe test-card confirmation and remote deployment passed on 17 November 2026; see [DEPLOY.md](DEPLOY.md). Owner launch testing and live Stripe activation remain outstanding.

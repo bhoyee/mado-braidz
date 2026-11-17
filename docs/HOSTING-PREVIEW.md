@@ -1,5 +1,7 @@
 # Hosting preview
 
+**Historical record.** SSH access and main-domain deployment were completed on 17 November 2026. See [DEPLOY.md](DEPLOY.md) for current setup and verification; the blocked-access notes below describe the earlier state.
+
 The owner has chosen deployment to the main domain, madoafricanbraidz.com. These earlier hosting checks remain recorded for troubleshooting; do not create a preview subdomain. Milestone 3 now includes availability and unpaid temporary holds; Stripe payment and confirmation remain unfinished.
 
 ## Access check — 16 November 2026

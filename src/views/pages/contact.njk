@@ -16,7 +16,10 @@
   </div>
   <form action="/contact" method="post" aria-describedby="contact-status" class="form-card">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    {% if contactError %}<p class="field-error" role="alert">{{ contactError }}</p>{% endif %}
     <p id="contact-status" class="notice" {% if contactUnavailable %}role="alert"{% endif %}>Online messages are not being sent yet. Please call the studio; nothing entered here is saved.</p>
+    {% if turnstileSiteKey %}<div class="cf-turnstile" data-sitekey="{{ turnstileSiteKey }}" data-action="contact" data-size="flexible"></div>{% endif %}
+    <div class="booking-honeypot" aria-hidden="true"><label for="contact-website">Website</label><input id="contact-website" name="website" tabindex="-1" autocomplete="off"></div>
     <fieldset disabled>
       <legend class="sr-only">Enquiry form preview</legend>
       <label for="contact-name">Name</label><input id="contact-name" name="name" autocomplete="name" placeholder="Your name">
@@ -26,4 +29,5 @@
     </fieldset>
   </form>
 </section>
+{% if turnstileSiteKey %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}
 {% endblock %}

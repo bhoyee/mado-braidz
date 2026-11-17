@@ -8,13 +8,14 @@ import { stripeWebhook } from './routes/webhooks/stripe.js';
 import { bookingRouter } from './routes/public/booking.js';
 import { createBookingRepository } from './services/bookingRepository.js';
 import { join } from 'node:path';
-import { statSync } from 'node:fs';
+import { statSync, existsSync, readFileSync } from 'node:fs';
 import { createDatabase } from './db/index.js';
 import { createCatalogService } from './services/catalogService.js';
 import { publicRouter, money } from './routes/public/index.js';
 import { designRouter } from './routes/admin/design.js';
 import { adminRouter } from './routes/admin/index.js';
 import { createAdminRepository } from './services/adminRepository.js';
+import { contactRouter } from './routes/public/contact.js';
 import { DateTime } from 'luxon';
 import { randomBytes } from 'node:crypto';
 import express from 'express';
@@ -62,7 +63,9 @@ export function createApp({
   app.locals.manualMethods = manualMethods(config);
   app.locals.paymentName = config.MANUAL_PAYMENT_NAME;
   app.locals.closeDatabase = () => database?.pool.end();
-  app.locals.turnstileSiteKey = config.TURNSTILE_SITE_KEY;
+  app.locals.turnstileSiteKey = config.TURNSTILE_ENABLED
+    ? config.TURNSTILE_SITE_KEY
+    : '';
   app.disable('x-powered-by');
   app.use(
     pinoHttp({
@@ -111,7 +114,13 @@ export function createApp({
     }),
   );
   app.use(compression());
-  app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+  const releaseFile = new URL('../release.json', import.meta.url);
+  const revision = existsSync(releaseFile)
+    ? JSON.parse(readFileSync(releaseFile, 'utf8')).revision
+    : undefined;
+  app.get('/health', (_req, res) =>
+    res.set('Cache-Control', 'no-store').json({ status: 'ok', revision }),
+  );
   app.use(
     '/build',
     express.static(fileURLToPath(new URL('../public/build', import.meta.url))),
@@ -216,6 +225,7 @@ export function createApp({
     publicRouter(
       catalog,
       paymentPages(bookingRepository, config, payments, catalog),
+      contactRouter(config),
     ),
   );
   app.use((_req, res) =>
