@@ -1,4 +1,5 @@
 @import './booking.css';
+@import './admin.css';
 @import 'tailwindcss';
 @source '../views';
 

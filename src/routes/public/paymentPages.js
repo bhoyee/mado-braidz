@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { tokenHash } from '../../services/bookingService.js';
 import { generateToken } from '../../middleware/csrf.js';
 import { paymentPortal, manualMethods } from './paymentPortal.js';
+import { payableBalance } from '../../services/paymentEligibility.js';
 export function paymentPages(repository, config, payments, catalog) {
   const router = Router();
   if (repository)
@@ -46,7 +47,7 @@ export function paymentPages(repository, config, payments, catalog) {
           ((row.status === 'pending_payment' &&
             row.holdExpiresAt > new Date()) ||
             (['confirmed', 'completed'].includes(row.status) &&
-              row.paymentStatus === 'deposit_paid' &&
+              payableBalance(row) &&
               row.balanceCents > 0 &&
               !price.consultation)),
         initialPayment: row.status === 'pending_payment',
@@ -59,7 +60,7 @@ export function paymentPages(repository, config, payments, catalog) {
         canPayBalance:
           !pendingProof &&
           ['confirmed', 'completed'].includes(row.status) &&
-          row.paymentStatus === 'deposit_paid' &&
+          payableBalance(row) &&
           row.balanceCents > 0 &&
           !price.consultation,
       });

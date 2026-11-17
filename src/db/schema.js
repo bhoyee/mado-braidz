@@ -30,6 +30,12 @@ export const admins = mysqlTable('admins', {
   passwordHash: str('password_hash').notNull(),
   role: mysqlEnum('role', ['owner', 'staff']).notNull(),
   totpSecret: str('totp_secret'),
+  totpLastStep: bigint('totp_last_step', { mode: 'number' }),
+  authVersion: int('auth_version').notNull().default(0),
+  failedAttempts: int('failed_attempts').notNull().default(0),
+  lockedUntil: dt('locked_until'),
+  resetTokenHash: str('reset_token_hash', 64),
+  resetExpiresAt: dt('reset_expires_at'),
   lastLoginAt: dt('last_login_at'),
   createdAt: created(),
 });
@@ -241,6 +247,7 @@ export const timeBlocks = mysqlTable('time_blocks', {
 });
 export const payments = mysqlTable('payments', {
   id: id(),
+  adminRequestKey: str('admin_request_key', 64).unique(),
   bookingId: ref('booking_id')
     .notNull()
     .references(() => bookings.id),

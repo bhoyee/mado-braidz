@@ -13,6 +13,10 @@ import { createDatabase } from './db/index.js';
 import { createCatalogService } from './services/catalogService.js';
 import { publicRouter, money } from './routes/public/index.js';
 import { designRouter } from './routes/admin/design.js';
+import { adminRouter } from './routes/admin/index.js';
+import { createAdminRepository } from './services/adminRepository.js';
+import { DateTime } from 'luxon';
+import { randomBytes } from 'node:crypto';
 import express from 'express';
 import nunjucks from 'nunjucks';
 import helmet from 'helmet';
@@ -32,6 +36,7 @@ export function createApp({
   config = parseEnv(),
   sessionStore,
   bookingRepository,
+  adminRepository,
   stripeProvider,
   catalog,
   logger = createLogger(config),
@@ -44,6 +49,8 @@ export function createApp({
     (database = createDatabase(config.DATABASE_URL)).db,
   );
   bookingRepository ??= database ? createBookingRepository(database.db) : null;
+  adminRepository ??= database ? createAdminRepository(database.db) : null;
+  app.locals.ownerPortal = Boolean(adminRepository);
   const provider =
     stripeProvider === undefined
       ? createStripeProvider(config)
@@ -72,13 +79,17 @@ export function createApp({
       },
     }),
   );
+  app.use((_req, res, next) => {
+    res.locals.cspNonce = randomBytes(18).toString('base64');
+    next();
+  });
   app.use(
     helmet({
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", 'https://challenges.cloudflare.com'],
-          styleSrc: ["'self'"],
+          styleSrc: ["'self'", (_req, res) => `'nonce-${res.locals.cspNonce}'`],
           imgSrc: ["'self'", 'data:'],
           frameSrc: [
             "'self'",
@@ -86,7 +97,10 @@ export function createApp({
             'https://challenges.cloudflare.com',
           ],
           connectSrc: ["'self'", 'https://challenges.cloudflare.com'],
-          fontSrc: ["'self'"],
+          fontSrc: [
+            "'self'",
+            (req) => (req.path.startsWith('/admin') ? 'data:' : "'self'"),
+          ],
           mediaSrc: ["'self'"],
           objectSrc: ["'none'"],
           frameAncestors: ["'none'"],
@@ -151,7 +165,6 @@ export function createApp({
     limits.checkout,
   );
   app.use('/api/bookings/payment-status', limits.availability);
-  app.use('/admin/login', limits.login);
   app.post('/contact', limits.contact);
   app.use('/api/availability', limits.availability);
   app.use(csrfSynchronisedProtection);
@@ -164,6 +177,13 @@ export function createApp({
     },
   );
   views.addFilter('money', money);
+  views.addFilter('et', (value, format = 'ccc, LLL d · h:mm a') =>
+    value
+      ? DateTime.fromJSDate(new Date(value), {
+          zone: 'America/New_York',
+        }).toFormat(format)
+      : '—',
+  );
   // Versioned media URLs: the file's modified time is appended, so browsers
   // fetch a regenerated clip or poster instead of replaying a cached copy.
   const mediaDir = fileURLToPath(new URL('../public/media', import.meta.url));
@@ -179,6 +199,17 @@ export function createApp({
     }
   });
   app.set('view engine', 'njk');
+  if (adminRepository && bookingRepository)
+    app.use(
+      '/admin',
+      adminRouter(
+        adminRepository,
+        bookingRepository,
+        config,
+        payments,
+        catalog,
+      ),
+    );
   app.use('/admin', designRouter(catalog, limits.preview));
   app.use('/api', bookingRouter(bookingRepository, config, payments));
   app.use(

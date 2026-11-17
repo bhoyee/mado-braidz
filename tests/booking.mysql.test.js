@@ -9,6 +9,7 @@ import 'dotenv/config';
 import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest';
 import mysql from 'mysql2/promise';
 import { randomBytes } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { migrate } from 'drizzle-orm/mysql2/migrator';
 import { createDatabase } from '../src/db/index.js';
 import { createBookingRepository } from '../src/services/bookingRepository.js';
@@ -347,6 +348,92 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
             .where(eq(s.jobs.type, 'refundConflict'))
         )[0].status,
       ).toBe('done');
+    }, 30000);
+    it('serializes owner reschedules across old and new calendar dates without exceeding three clients', async () => {
+      const service = createBookingService(
+        repository,
+        () => now,
+        paymentConfig.SESSION_SECRET,
+      );
+      const owner = { id: 1, role: 'owner' };
+      const holds = [];
+      for (let n = 0; n < 5; n++)
+        holds.push(
+          await service.createHold(
+            {
+              ...validHold,
+              startAt: now
+                .plus({ days: n + 2 })
+                .set({ hour: 15 })
+                .toUTC()
+                .toISO(),
+              checkoutRequestKey: randomUUID(),
+            },
+            null,
+            { admin: owner, mode: 'override' },
+          ),
+        );
+      const startAt = '2026-12-15T14:00:00Z';
+      const results = await Promise.allSettled(
+        holds.map((hold) =>
+          service.adminEdit(
+            hold.id,
+            {
+              ...validHold,
+              startAt,
+              adminNotes: '',
+              requestKey: randomUUID(),
+              action: 'edit',
+            },
+            owner,
+          ),
+        ),
+      );
+      expect(
+        results.filter((result) => result.status === 'fulfilled'),
+      ).toHaveLength(3);
+      expect(
+        results
+          .filter((result) => result.status === 'rejected')
+          .every((result) => result.reason.code === 'SLOT_TAKEN'),
+      ).toBe(true);
+      const rows = await db.select().from(s.bookings);
+      expect(
+        rows.filter((row) => +row.startAt === +new Date(startAt)),
+      ).toHaveLength(3);
+      expect(rows.every((row) => row.status === 'confirmed')).toBe(true);
+      expect(
+        (await db.select().from(s.auditLog)).filter(
+          (row) => row.action === 'edit',
+        ),
+      ).toHaveLength(3);
+    }, 30000);
+    it('records simultaneous owner cash receipts exactly once using durable request keys', async () => {
+      const service = createBookingService(
+        repository,
+        () => now,
+        paymentConfig.SESSION_SECRET,
+      );
+      const hold = await service.createHold(validHold);
+      const input = {
+        action: 'payment',
+        amountCents: 3000,
+        method: 'cash',
+        requestKey: randomUUID(),
+        note: 'Received',
+      };
+      await Promise.all(
+        Array.from({ length: 8 }, () =>
+          service.adminAction(hold.id, input, { id: 1, role: 'owner' }),
+        ),
+      );
+      const [booking] = await db.select().from(s.bookings);
+      expect(booking).toMatchObject({
+        status: 'confirmed',
+        paidCents: 3000,
+        balanceCents: 15000,
+      });
+      expect(await db.select().from(s.payments)).toHaveLength(1);
     }, 30000);
     it('blocks staggered overlaps, snapshots addon money, and admits an expired hold replacement', async () => {
       const service = createBookingService(repository, () => now);

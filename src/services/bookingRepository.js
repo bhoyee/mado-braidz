@@ -6,6 +6,36 @@ import { BookingError } from './bookingErrors.js';
 
 function context(db, locking = false) {
   return {
+    async updateClient(id, values) {
+      await db.update(s.clients).set(values).where(eq(s.clients.id, id));
+    },
+    async replaceAddons(id, addons) {
+      await db.delete(s.bookingAddons).where(eq(s.bookingAddons.bookingId, id));
+      if (addons.length)
+        await db.insert(s.bookingAddons).values(
+          addons.map((a) => ({
+            bookingId: id,
+            addonId: a.id,
+            nameSnapshot: a.name,
+            priceCents: a.priceCents,
+            durationMin: a.durationMin,
+          })),
+        );
+    },
+    async bookingJobs(id) {
+      return db
+        .select()
+        .from(s.jobs)
+        .where(sql`JSON_EXTRACT(${s.jobs.payload}, '$.bookingId') = ${id}`);
+    },
+    async paymentByRequest(key) {
+      return (
+        await db
+          .select()
+          .from(s.payments)
+          .where(eq(s.payments.adminRequestKey, key))
+      )[0];
+    },
     async batch(id) {
       return (
         await db

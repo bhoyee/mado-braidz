@@ -3,6 +3,8 @@ export function designAuth(catalog, realm = 'Mado owner design preview') {
     res.set('Cache-Control', 'no-store');
     if (req.app.get('env') === 'production' && !req.secure)
       return res.status(403).send('HTTPS is required');
+    if (res.locals.admin?.role === 'owner') return next();
+    if (req.app.locals.ownerPortal) return res.redirect('/admin/login');
     try {
       const header = req.headers.authorization || '';
       if (header.startsWith('Basic ')) {

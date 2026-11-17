@@ -28,12 +28,18 @@
     "test:payments:browser": "node scripts/qa/payments-browser.js",
     "test:manual:browser": "node scripts/qa/manual-payments-browser.js",
     "test:batch:browser": "node scripts/qa/batch-payments-browser.js",
-    "test:stripe:batch": "node scripts/qa/stripe-batch-sandbox.js"
+    "test:stripe:batch": "node scripts/qa/stripe-batch-sandbox.js",
+    "test:admin:browser": "node scripts/qa/admin-browser.js"
   },
   "dependencies": {
     "@alpinejs/csp": "^3.17.5",
     "@fontsource-variable/figtree": "^5.3.0",
     "@fontsource-variable/fraunces": "^5.3.0",
+    "@fullcalendar/core": "^6.1.22",
+    "@fullcalendar/daygrid": "^6.1.22",
+    "@fullcalendar/interaction": "^6.1.22",
+    "@fullcalendar/luxon3": "^6.1.22",
+    "@fullcalendar/timegrid": "^6.1.22",
     "alpinejs": "^3.17.5",
     "argon2": "^0.41.1",
     "compression": "^1.8.2",
@@ -65,6 +71,7 @@
     "@playwright/test": "^1.65.1",
     "@tailwindcss/cli": "^4.3.5",
     "drizzle-kit": "^0.31.11",
+    "esbuild": "^0.25.12",
     "eslint": "^9.39.5",
     "ffmpeg-static": "^5.3.0",
     "globals": "^17.14.0",

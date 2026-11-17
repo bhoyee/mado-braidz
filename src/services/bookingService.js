@@ -4,6 +4,8 @@ import { priceBooking } from './pricingService.js';
 import { daySlots, remainingCapacity, ZONE } from './availabilityService.js';
 import { BookingError } from './bookingErrors.js';
 import { batchBookingLifecycle } from './batchBookingLifecycle.js';
+import { adminBookingLifecycle } from './adminBookingLifecycle.js';
+import { payableBalance } from './paymentEligibility.js';
 
 // All state transitions, including initial creation, are owned by this service.
 export const transitions = {
@@ -153,6 +155,7 @@ function paymentLifecycle(repository, clock) {
     );
   }
   return {
+    ...adminBookingLifecycle(repository, clock, { change, reconcile, save }),
     ...batchBookingLifecycle(repository, {
       lockedMany,
       save,
@@ -184,7 +187,7 @@ function paymentLifecycle(repository, clock) {
           booking.holdExpiresAt > now.toJSDate();
         const balance =
           ['confirmed', 'completed'].includes(booking.status) &&
-          booking.paymentStatus === 'deposit_paid' &&
+          payableBalance(booking) &&
           booking.balanceCents > 0 &&
           !booking.priceSnapshot.consultation;
         if (!initial && !balance)
@@ -284,7 +287,7 @@ function paymentLifecycle(repository, clock) {
             await change(tx, booking, 'confirmed', now);
           } else if (
             !['confirmed', 'completed'].includes(booking.status) ||
-            booking.paymentStatus !== 'deposit_paid' ||
+            !payableBalance(booking) ||
             booking.balanceCents !== current.amountCents
           )
             throw new BookingError(
@@ -360,7 +363,7 @@ function paymentLifecycle(repository, clock) {
         if (type === 'balance') {
           if (
             !['confirmed', 'completed'].includes(booking.status) ||
-            booking.paymentStatus !== 'deposit_paid' ||
+            !payableBalance(booking) ||
             booking.balanceCents <= 0 ||
             booking.priceSnapshot.consultation
           )
@@ -763,7 +766,9 @@ export function createBookingService(
   tokenSecret = null,
 ) {
   const service = {
-    async createHold(input, inspiration = null) {
+    async createHold(input, inspiration = null, owner = null) {
+      if (owner && owner.admin?.role !== 'owner')
+        throw new BookingError('FORBIDDEN', 'Owner access required.', 403);
       const start = DateTime.fromISO(input.startAt, { setZone: true }).setZone(
         ZONE,
       );
@@ -785,7 +790,8 @@ export function createBookingService(
               existing.startAt.getTime() !== start.toMillis() ||
               existing.styleId !== input.styleId ||
               existing.styleVariantId !== (input.styleVariantId || null) ||
-              existing.paymentChoice !== input.paymentChoice ||
+              existing.paymentChoice !==
+                (owner?.mode === 'override' ? 'none' : input.paymentChoice) ||
               JSON.stringify(snapshot.addons.map((a) => a.id).sort()) !==
                 JSON.stringify([...input.addonIds].sort())
             )
@@ -798,7 +804,7 @@ export function createBookingService(
               id: existing.id,
               ref: existing.ref,
               status: existing.status,
-              holdExpiresAt: existing.holdExpiresAt.toISOString(),
+              holdExpiresAt: existing.holdExpiresAt?.toISOString() || null,
               price: snapshot,
               reused: true,
               manageToken: accessToken(existing.ref, tokenSecret),
@@ -811,10 +817,15 @@ export function createBookingService(
           start.startOf('day').toJSDate(),
           start.plus({ days: 1 }).startOf('day').toJSDate(),
         );
+        const settings = structuredClone(catalog.settings);
+        if (owner) {
+          settings.booking.minNoticeHours = 0;
+          settings.booking.maxAdvanceDays = 3650;
+        }
         const slots = daySlots({
           date: start.toISODate(),
           durationMin: price.durationMin,
-          settings: catalog.settings,
+          settings,
           ...schedule,
           now,
         });
@@ -865,17 +876,25 @@ export function createBookingService(
             startAt: DateTime.fromISO(slot.startAt).toJSDate(),
             endAt: DateTime.fromISO(slot.endAt).toJSDate(),
             blockEndAt: DateTime.fromISO(slot.blockEndAt).toJSDate(),
-            status: 'pending_payment',
+            status:
+              owner && owner.mode !== 'link' ? 'confirmed' : 'pending_payment',
             paymentStatus: 'unpaid',
-            paymentChoice: input.paymentChoice,
-            source: 'web',
-            holdExpiresAt: expires.toJSDate(),
+            paymentChoice:
+              owner?.mode === 'override' ? 'none' : input.paymentChoice,
+            source: owner ? 'admin' : 'web',
+            createdByAdminId: owner?.admin.id || null,
+            holdExpiresAt:
+              owner && owner.mode !== 'link' ? null : expires.toJSDate(),
             priceSnapshot: price,
             subtotalCents: price.subtotalCents,
             depositCents: price.depositCents,
             paidCents: 0,
             balanceCents: price.subtotalCents,
             clientNotes: input.notes || null,
+            adminNotes:
+              owner?.mode === 'override'
+                ? 'Owner override: chair reserved without payment.'
+                : null,
             inspirationMediaId,
             manageTokenHash: tokenHash(manageToken),
             checkoutRequestKey: input.checkoutRequestKey || null,
@@ -884,12 +903,67 @@ export function createBookingService(
           },
           price.addons,
         );
+        if (owner) {
+          if (owner.mode === 'manual') {
+            if (
+              !Number.isSafeInteger(owner.amountCents) ||
+              owner.amountCents < price.depositCents ||
+              owner.amountCents > price.subtotalCents
+            )
+              throw new BookingError(
+                'INVALID_PAYMENT',
+                'Record at least the deposit and no more than the total.',
+              );
+            await tx.insertPayment({
+              adminRequestKey: input.checkoutRequestKey,
+              bookingId: id,
+              type:
+                owner.amountCents === price.subtotalCents ? 'full' : 'deposit',
+              provider: 'manual',
+              method: owner.method,
+              amountCents: owner.amountCents,
+              recordedByAdminId: owner.admin.id,
+              createdAt: now.toJSDate(),
+            });
+            await tx.saveBooking(id, {
+              paidCents: owner.amountCents,
+              balanceCents: price.subtotalCents - owner.amountCents,
+              paymentStatus:
+                owner.amountCents === price.subtotalCents && !price.consultation
+                  ? 'paid_in_full'
+                  : 'deposit_paid',
+            });
+          }
+          await tx.audit({
+            adminId: owner.admin.id,
+            entity: 'booking',
+            entityId: id,
+            action: 'create',
+            after: { ...(await tx.bookingById(id)), mode: owner.mode },
+            ip: owner.admin.ip,
+          });
+          await tx.queueJob({
+            type: 'email',
+            payload: {
+              bookingId: id,
+              template:
+                owner.mode === 'link'
+                  ? 'deposit-payment'
+                  : 'booking-confirmation',
+            },
+            dedupeKey: `admin-create:${id}`,
+            runAt: now.toJSDate(),
+            status: 'pending',
+          });
+        }
         return {
           id,
           ref,
-          status: 'pending_payment',
+          status:
+            owner && owner.mode !== 'link' ? 'confirmed' : 'pending_payment',
           manageToken,
-          holdExpiresAt: expires.toUTC().toISO(),
+          holdExpiresAt:
+            owner && owner.mode !== 'link' ? null : expires.toUTC().toISO(),
           price,
           message:
             'Your time is temporarily held. No payment has been taken and your appointment is not confirmed. Online payment is coming next; call the studio to arrange your visit.',

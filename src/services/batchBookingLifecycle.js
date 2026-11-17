@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import { payableBalance } from './paymentEligibility.js';
 import { BookingError } from './bookingErrors.js';
 import { remainingCapacity } from './availabilityService.js';
 
@@ -141,7 +142,7 @@ export function batchBookingLifecycle(
             booking.holdExpiresAt > now.toJSDate();
           const balance =
             ['confirmed', 'completed'].includes(booking.status) &&
-            booking.paymentStatus === 'deposit_paid' &&
+            payableBalance(booking) &&
             booking.balanceCents > 0 &&
             !booking.priceSnapshot.consultation;
           if (!initial && !balance)

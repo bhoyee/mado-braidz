@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { buildSync } from 'esbuild';
 mkdirSync('public/build', { recursive: true });
 execFileSync(
   process.execPath,
@@ -40,3 +41,24 @@ copyFileSync('src/client/booking.js', 'public/build/booking.js');
 
 copyFileSync('src/client/payment.js', 'public/build/payment.js');
 copyFileSync('src/client/batch-payment.js', 'public/build/batch-payment.js');
+copyFileSync('src/client/admin.js', 'public/build/admin.js');
+buildSync({
+  entryPoints: ['src/client/admin-calendar.js'],
+  bundle: true,
+  minify: true,
+  outfile: 'public/build/admin-calendar.js',
+  target: 'es2020',
+});
+writeFileSync(
+  'public/build/admin-calendar-LICENSE.txt',
+  [
+    [
+      'FullCalendar core and plugins',
+      'node_modules/@fullcalendar/core/LICENSE.md',
+    ],
+    ['Preact', 'node_modules/preact/LICENSE'],
+    ['Luxon', 'node_modules/luxon/LICENSE.md'],
+  ]
+    .map(([name, path]) => `${name}\n\n${readFileSync(path, 'utf8')}`)
+    .join('\n\n'),
+);

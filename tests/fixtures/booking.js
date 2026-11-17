@@ -79,6 +79,12 @@ export async function memoryBookingRepository() {
         values,
       ),
     audit: async (values) => audits.push(values),
+    updateClient: async (id, values) => Object.assign(clients[id - 1], values),
+    replaceAddons: async () => {},
+    bookingJobs: async (id) =>
+      jobs.filter((job) => job.payload.bookingId === id),
+    paymentByRequest: async (key) =>
+      payments.find((p) => p.adminRequestKey === key),
     bookingById: async (id) => rows.find((r) => r.id === id),
     bookingByRef: async (ref) => rows.find((r) => r.ref === ref),
     bookingByToken: async (hash) =>
@@ -106,7 +112,12 @@ export async function memoryBookingRepository() {
       payments.find(
         (p) => p.stripePaymentIntentId === id && p.type !== 'refund',
       ),
-    insertPayment: async (values) => payments.push({ ...values }),
+    insertPayment: async (values) =>
+      payments.push({
+        id: payments.length + 1,
+        createdAt: new Date(),
+        ...values,
+      }),
     event: async (id, type, receivedAt) => {
       let row = events.find((e) => e.id === id);
       if (!row) {

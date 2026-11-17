@@ -1,0 +1,10 @@
+{% extends "layouts/admin.njk" %}{% block content %}
+<section class="owner-auth"><a href="/"><img src="/img/logo.webp" alt="Mado African Braidz" width="72" height="72"></a><p class="eyebrow">Your studio, in hand</p>
+<h1>{% if page == 'login' %}Welcome <em>back.</em>{% elif page == 'forgot' %}Find your <em>way in.</em>{% else %}A fresh <em>start.</em>{% endif %}</h1>
+<p class="owner-muted">{% if page == 'login' %}Sign in to manage your appointments and payments.{% elif page == 'forgot' %}Enter the owner email to request a password reset.{% else %}Choose a password with at least 12 characters.{% endif %}</p>
+{% if error %}<p class="owner-error" role="alert">{{ error }}</p>{% endif %}{% if message %}<p class="owner-success" role="status">{{ message }}</p>{% endif %}
+<form action="/admin/{{ page }}" method="post" class="owner-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
+{% if page != 'reset' %}<label>Email<input type="email" name="email" autocomplete="username" required maxlength="255"></label>{% endif %}
+{% if page == 'login' %}<label>Password<input type="password" name="password" autocomplete="current-password" required maxlength="128"></label><label>Authenticator code <span class="owner-muted">if enabled</span><input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>{% elif page == 'reset' %}<input type="hidden" name="token" id="reset-token"><label>New password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>{% endif %}
+<button class="button" type="submit">{% if page == 'login' %}Sign in{% elif page == 'forgot' %}Request reset link{% else %}Save new password{% endif %}</button></form>
+<a class="owner-text-link" href="/admin/{% if page == 'login' %}forgot{% else %}login{% endif %}">{% if page == 'login' %}Forgot your password?{% else %}Back to sign in{% endif %}</a></section>{% endblock %}

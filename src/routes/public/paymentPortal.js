@@ -15,6 +15,7 @@ import {
 import { BookingError } from '../../services/bookingErrors.js';
 import { generateToken } from '../../middleware/csrf.js';
 import { designAuth } from '../../middleware/designAuth.js';
+import { payableBalance } from '../../services/paymentEligibility.js';
 import {
   grantPaymentAccess,
   paymentToken,
@@ -115,7 +116,7 @@ export function paymentPortal(repository, config, payments, catalog) {
           booking.holdExpiresAt > new Date();
         const balance =
           ['confirmed', 'completed'].includes(booking.status) &&
-          booking.paymentStatus === 'deposit_paid' &&
+          payableBalance(booking) &&
           booking.balanceCents > 0 &&
           !price.consultation;
         if (!initial && !balance) continue;
