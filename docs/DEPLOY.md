@@ -16,14 +16,17 @@ Main domain: **https://madoafricanbraidz.com**. Local development stays on **htt
 
 `.github/workflows/production.yml` runs on pull requests, pushes to `main`, and manual dispatch. Verification uses Node 20, installs the lockfile, builds assets, runs ESLint/Prettier, Vitest/Supertest, and real MySQL 8 integration tests against a disposable database. It also exercises release cutover, migration failure and HTTP-failure rollback in an isolated fixture with fake packages and HTTP, preserving its private env. Run that fixture on Linux with `bash scripts/qa/deployment.sh`. No real payment keys are needed for CI. Failed checks prevent deployment.
 
-The GitHub `production` environment permits only the `main` branch and contains two encrypted secrets:
+The GitHub `production` environment permits only the `main` branch and contains these encrypted secrets:
 
 | Secret | Purpose |
 | --- | --- |
 | `PRODUCTION_SSH_KEY` | Dedicated deployment private key; its public key is authorized with `restrict` on the hosting account. |
 | `PRODUCTION_KNOWN_HOSTS` | Previously verified SSH host public key for `[madoafricanbraidz.com]:10022`; strict host checking is mandatory. |
+| `PRODUCTION_SSH_PASSWORD` | Supplied hosting SSH password, used as a fallback if public-key authentication is unavailable. It is never passed in command arguments or stored in a committed file. |
 
-The workflow does not use the cPanel password. Rotate the deployment key by authorizing a replacement public key, updating the environment secret, verifying a deployment, and removing the old public key. If the server host key changes, verify its new fingerprint with the provider before updating the known-hosts secret. Never disable host verification.
+Repository variables `PRODUCTION_SSH_HOST`, `PRODUCTION_SSH_PORT` and `PRODUCTION_SSH_USER` configure the SSH destination and username. The supplied password was added at the owner's request; it remains an encrypted environment secret. The workflow tries the dedicated key first, then password authentication through OpenSSH's askpass helper. Rotate the deployment key by authorizing a replacement public key, updating the environment secret, verifying a deployment, and removing the old public key. If the server host key changes, verify its new fingerprint before updating the known-hosts secret. Never disable host verification.
+
+The manually dispatched **Check production SSH connectivity** workflow tests the configured host and port from Linux, macOS and Windows runners without transmitting credentials. Use it to identify a working runner route when one runner network cannot reach the server. A connection timeout occurs before authentication and cannot be repaired by changing the username or password.
 
 After checks pass, CI uploads only application source, scripts, package manifests and built public assets. It excludes `.env`, Git metadata, design originals, uploads, logs, backups and Windows dependencies. The server verifies the archive checksum and uses `scripts/deploy-production.sh` to:
 
@@ -47,6 +50,14 @@ The last successful deployment's SHA, release path and previous snapshot path ar
 For recovery, first inspect the failed Actions job and server logs. Automatic rollback handles a failed cutover. For a later regression, revert the offending commit on `main` and let CI deploy the corrected revision; never force-push production history. If migrations changed data incompatibly, stop writes and review the private pre-migration database backup before restoring anything. Do not restore the database automatically over newer bookings.
 
 If the deploy job times out before SSH authentication while the same key works locally, ask the hosting provider to check inbound TCP **10022** from GitHub-hosted runners. The job prints its public IPv4 and resolved destination for their investigation. Runner IPs change, so allowing one observed address is not a lasting fix. If the host requires a fixed allowlist, arrange a runner with a stable outbound IP before relying on automatic releases. Do not disable host checking, broaden account privileges or copy cPanel passwords into Actions to work around a network restriction. After access is fixed, rerun the failed deployment job; it uses the already verified build artifact.
+
+### CI/CD verification — 17 November 2026
+
+GitHub verification passed: build, lint, 154 application tests, 10 real MySQL 8 integration tests, and isolated deployment/rollback checks. The dedicated deployment key and verified host key are configured as encrypted `production` environment secrets, with deployment restricted to `main`. A corrupt archive was also rejected on the host before migration or cutover.
+
+**Automatic deployment is not yet operational:** three Linux GitHub runner attempts timed out reaching `51.89.172.201:10022` before authentication, although the same dedicated key connects from the local PC. The diagnostic run observed source IP `128.85.46.211`. The owner requested using the supplied SSH login without contacting the provider; its password is now configured as an encrypted production secret, and alternate runner routes are being tested. No firewall settings were changed.
+
+The exact verified CI artifact for `788e9e3a4364274fd78f8253636826b233ba7237` was then uploaded through the working local SSH connection and deployed with the same release script. Its database backup completed at `20261117T175700Z`, migrations completed, and HTTPS health returned that exact revision. Styles and booking checks passed. The production `.env` was confirmed unchanged byte for byte. This manual verification does not count as a successful automatic GitHub deployment; the failed deployment job remains visible until hosting connectivity is resolved.
 
 The old web root is archived before cutover. Keep the backup until the owner has verified the replacement. Never publish `.env`, receipts, database dumps or deployment credentials under `public_html`.
 

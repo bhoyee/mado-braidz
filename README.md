@@ -6,7 +6,7 @@ Milestones 1–5: Express 4, Nunjucks SSR, Tailwind CSS v4, Alpine.js, MySQL thr
 
 For the cPanel server setup, see [docs/DEPLOY.md](docs/DEPLOY.md). Local development remains on port **4780**.
 
-Pushes to `main` now run GitHub Actions checks and automatically deploy production, including a database backup, Drizzle migrations, an app restart and served-revision checks. Pull requests run checks without deploying. See [the CI/CD setup and recovery instructions](docs/DEPLOY.md#github-actions-production-deployment) for the required encrypted environment secrets and rollback behavior. Production runtime credentials stay on the server; local `.env` is never deployed.
+The GitHub Actions workflow checks pushes to `main` and is configured to deploy production, including a database backup, Drizzle migrations, an app restart and served-revision checks. **Automatic deployment is currently blocked by SSH connectivity from Linux GitHub-hosted runners; alternate runner routes are being tested.** The verified CI artifact has been deployed successfully through the local SSH connection. Pull requests run checks without deploying. See [the CI/CD setup and recovery instructions](docs/DEPLOY.md#github-actions-production-deployment) for encrypted environment secrets and rollback behavior. Production runtime credentials stay on the server; local `.env` is never deployed.
 
 Use Node.js 20 LTS, npm, Git, and MySQL 8 (or MariaDB 10.6+). In PowerShell:
 

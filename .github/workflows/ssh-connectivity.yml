@@ -1,0 +1,38 @@
+name: Check production SSH connectivity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  connectivity:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 3
+    steps:
+      - name: Check network route without transmitting credentials
+        shell: bash
+        env:
+          SSH_HOST: ${{ vars.PRODUCTION_SSH_HOST }}
+          SSH_PORT: ${{ vars.PRODUCTION_SSH_PORT }}
+        run: |
+          node --input-type=module <<'JS'
+          import net from 'node:net';
+          import dns from 'node:dns/promises';
+          const host = process.env.SSH_HOST;
+          const port = Number(process.env.SSH_PORT);
+          console.log('Target:', host, port, await dns.lookup(host));
+          try {
+            console.log('Runner public IP:', await (await fetch('https://api.ipify.org', {signal: AbortSignal.timeout(10000)})).text());
+          } catch { console.log('Public-IP lookup unavailable'); }
+          const socket = net.createConnection({host, port});
+          socket.setTimeout(20000);
+          socket.on('connect', () => {console.log('SSH TCP connection succeeded'); socket.destroy();});
+          socket.on('timeout', () => socket.destroy(new Error('SSH TCP connection timed out')));
+          socket.on('error', error => {console.error(error.message); process.exitCode = 1;});
+          JS

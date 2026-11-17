@@ -70,7 +70,11 @@ jobs:
         shell: bash
         env:
           DEPLOY_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          DEPLOY_PASSWORD: ${{ secrets.PRODUCTION_SSH_PASSWORD }}
           KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
+          SSH_HOST: ${{ vars.PRODUCTION_SSH_HOST }}
+          SSH_PORT: ${{ vars.PRODUCTION_SSH_PORT }}
+          SSH_USER: ${{ vars.PRODUCTION_SSH_USER }}
         run: |
           set -euo pipefail
           umask 077
@@ -78,23 +82,26 @@ jobs:
           curl --fail --silent --show-error --max-time 15 https://api.ipify.org || true
           echo
           python3 - <<'PY'
-          import socket
-          host = 'madoafricanbraidz.com'
+          import os, socket
+          host = os.environ['SSH_HOST']
           print('Resolved SSH IPv4:', socket.gethostbyname(host), flush=True)
           try:
-              with socket.create_connection((host, 10022), timeout=20):
+              with socket.create_connection((host, int(os.environ['SSH_PORT'])), timeout=20):
                   print('Production SSH port is reachable', flush=True)
           except OSError as error:
-              raise SystemExit('Production SSH is unreachable from this runner: ' + str(error) + '. Ask the host to check inbound SSH access on TCP 10022.')
+              raise SystemExit('Production SSH is unreachable from this runner before authentication: ' + str(error))
           PY
           mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           unset DEPLOY_KEY KNOWN_HOSTS
-          trap 'rm -f ~/.ssh/deploy_key' EXIT
-          ssh_options=(-i ~/.ssh/deploy_key -p 10022 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=3)
-          host=madoafri@madoafricanbraidz.com
-          ssh "${ssh_options[@]}" "$host" 'mkdir -p /home/madoafri/mado-deploy/incoming /home/madoafri/mado-deploy/releases'
-          scp -i ~/.ssh/deploy_key -P 10022 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes artifact/* "$host:/home/madoafri/mado-deploy/incoming/"
+          printf '#!/bin/sh\nprintf "%%s\\n" "$DEPLOY_PASSWORD"\n' > ~/.ssh/askpass
+          chmod 700 ~/.ssh/askpass
+          export SSH_ASKPASS="$HOME/.ssh/askpass" SSH_ASKPASS_REQUIRE=force DISPLAY=:0
+          trap 'rm -f ~/.ssh/deploy_key ~/.ssh/askpass' EXIT
+          ssh_options=(-i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 -o NumberOfPasswordPrompts=1 -o PreferredAuthentications=publickey,password,keyboard-interactive)
+          host="$SSH_USER@$SSH_HOST"
+          ssh "${ssh_options[@]}" -p "$SSH_PORT" "$host" 'mkdir -p /home/madoafri/mado-deploy/incoming /home/madoafri/mado-deploy/releases'
+          scp "${ssh_options[@]}" -P "$SSH_PORT" artifact/* "$host:/home/madoafri/mado-deploy/incoming/"
           tar -xOf "artifact/$GITHUB_SHA.tar.gz" scripts/deploy-production.sh > deploy.sh
-          ssh "${ssh_options[@]}" "$host" "bash -s -- $GITHUB_SHA" < deploy.sh
+          ssh "${ssh_options[@]}" -p "$SSH_PORT" "$host" "bash -s -- $GITHUB_SHA" < deploy.sh
