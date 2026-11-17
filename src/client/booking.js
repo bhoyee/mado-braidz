@@ -418,6 +418,14 @@ if (root) {
         ? 'Final price at consultation'
         : dollars(data.subtotalCents);
       $('summary-today').textContent = dollars(data.dueTodayCents);
+      const payingFull =
+        selection().paymentChoice === 'full' && !data.consultation;
+      $('summary-payment-label').textContent = payingFull
+        ? 'Full payment'
+        : 'Deposit payment';
+      $('summary-balance-label').textContent = payingFull
+        ? 'Balance after payment'
+        : 'Balance after deposit';
       $('summary-balance').textContent = dollars(data.balanceAfterPaymentCents);
       if (startAt)
         $('summary-time').textContent =
