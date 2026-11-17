@@ -342,7 +342,7 @@ export function decorateCatalog(data) {
     }).format(new Date()),
   };
 }
-export function publicRouter(catalog, paymentRoutes) {
+export function publicRouter(catalog, paymentRoutes, contactRoutes) {
   const router = Router();
   router.use(async (req, res, next) => {
     try {
@@ -362,6 +362,7 @@ export function publicRouter(catalog, paymentRoutes) {
         ...extra,
       });
   if (paymentRoutes) router.use(paymentRoutes);
+  if (contactRoutes) router.use(contactRoutes);
   router.get('/', render('home', 'African hair braiding in Lanham, MD'));
   router.get('/styles', (req, res) => {
     const category = z
@@ -437,19 +438,6 @@ export function publicRouter(catalog, paymentRoutes) {
     }),
   );
   router.get('/about', render('about', 'Meet Mado'));
-  router.get('/contact', (req, res) =>
-    res.render('pages/contact', {
-      title: `Visit the studio | ${res.locals.business.name}`,
-      csrfToken: generateToken(req),
-    }),
-  );
-  router.post('/contact', (req, res) =>
-    res.status(503).render('pages/contact', {
-      title: 'Contact the studio',
-      csrfToken: generateToken(req),
-      contactUnavailable: true,
-    }),
-  );
   router.get('/book', (req, res) => {
     res.set('Cache-Control', 'no-store').render('pages/book', {
       title: `Book your chair | ${res.locals.business.name}`,

@@ -28,7 +28,7 @@ The old web root is archived before cutover. Keep the backup until the owner has
 
 ## Deferred integrations
 
-The owner explicitly requested bringing up the current application before adding Turnstile. The initial server configuration therefore uses **`TURNSTILE_ENABLED=false`**, while keeping production mode, HTTPS, CSRF, rate limits and the honeypot. The code default remains true. Later add genuine `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`, set the flag true and restart Passenger. Never insert fake keys to satisfy validation.
+The initial server configuration used `TURNSTILE_ENABLED=false` at the owner's request. The owner subsequently supplied genuine keys and requested activation; the server now uses **`TURNSTILE_ENABLED=true`**. Booking and contact tokens are verified server-side against the configured hostname and their respective `booking` / `contact` actions. Keep both keys private in the server runtime and restart Passenger after changes. Never insert fake keys on the server. The contact form remains disabled until email setup, as explicitly requested; its endpoint is already protected and no enquiries are stored or sent.
 
 Keep the current Stripe **test mode** during verification. Switching to real payments requires the owner's launch checks, live keys and a live-mode webhook endpoint. Client/admin booking email delivery is Milestone 7. Owner password-reset email requires the existing Resend configuration and a verified sender; production does not write reset links to local files.
 
@@ -48,6 +48,6 @@ Verified on the actual hosted site:
 - Daily database backup at 03:20 server time, with 14-day retention, installed at `/home/madoafri/mado-deploy/backup-database.sh`. The first compressed backup passed its integrity check. Backups live in `/home/madoafri/mado-backups/database`; database credentials are read from a private option file, not command arguments.
 - Local build/lint and 145 application tests passed; production dependency audit reports zero known vulnerabilities.
 
-Stripe is still in **test mode**. Turnstile is explicitly deferred as requested. Booking email delivery remains Milestone 7; sender verification and live-payment activation are not included in this deployment. A weekly off-server backup destination still needs explicit authorization/configuration.
+Stripe is still in **test mode**. Turnstile is now enabled with the supplied keys. Booking email delivery remains Milestone 7, and contact messages remain disabled until then. The owner explicitly authorized one off-server database backup download; it is saved in ignored `tmp/hosting/live/database-backup.sql.gz` and passed a local gzip integrity check. No backup contents or credentials are committed. A recurring off-server backup destination still needs configuration.
 
 The logging dependency is pinned to its Node 20-compatible major. `sanitize-html` is retained at the security-patched 2.18.x release because older 2.17.x releases have published vulnerabilities; npm reports its declared Node 22 engine requirement. The current SSR rendering and full application suite run successfully on the project's fixed Node 20 runtime; formal support for that package/runtime combination remains a dependency follow-up.

@@ -15,6 +15,7 @@ import { publicRouter, money } from './routes/public/index.js';
 import { designRouter } from './routes/admin/design.js';
 import { adminRouter } from './routes/admin/index.js';
 import { createAdminRepository } from './services/adminRepository.js';
+import { contactRouter } from './routes/public/contact.js';
 import { DateTime } from 'luxon';
 import { randomBytes } from 'node:crypto';
 import express from 'express';
@@ -218,6 +219,7 @@ export function createApp({
     publicRouter(
       catalog,
       paymentPages(bookingRepository, config, payments, catalog),
+      contactRouter(config),
     ),
   );
   app.use((_req, res) =>
