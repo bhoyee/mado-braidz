@@ -80,6 +80,11 @@ done
 [[ "$verified" == true ]]
 curl --fail --silent --show-error --max-time 30 https://madoafricanbraidz.com/styles -o /dev/null
 curl --fail --silent --show-error --max-time 30 https://madoafricanbraidz.com/book -o /dev/null
+if [[ -f "$release/scripts/run-deployment-queue.sh" ]]; then
+  bash -n "$release/scripts/run-deployment-queue.sh"
+  cp "$release/scripts/run-deployment-queue.sh" "$base/run-deployment-queue.sh.next"
+  mv "$base/run-deployment-queue.sh.next" "$base/run-deployment-queue.sh"
+fi
 trap - ERR
 printf '{"gitRevision":"%s","release":"%s","previous":"%s"}\n' "$revision" "$release" "$previous" > "$base/ci-release.json"
 echo "Production verified at revision $revision"

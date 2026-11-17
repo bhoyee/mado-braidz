@@ -2,6 +2,7 @@
 # Exercise real cutover/rollback logic with fake packages and HTTP, never a real DB.
 set -euo pipefail
 source_script=${1:-scripts/deploy-production.sh}
+queue_script=${2:-scripts/run-deployment-queue.sh}
 fixture=$(mktemp -d)
 trap 'rm -rf "$fixture"' EXIT
 export DEPLOY_FIXTURE="$fixture"
@@ -11,9 +12,9 @@ for entry in app.cjs package.json package-lock.json release.json; do
   printf 'original\n' > "$fixture/app/$entry"
 done
 mkdir "$fixture/app/src" "$fixture/app/scripts" "$fixture/app/public" "$fixture/app/node_modules"
-python3 - "$source_script" "$fixture" <<'PY'
+python3 - "$source_script" "$fixture" "$queue_script" <<'PY'
 import sys
-source, fixture = sys.argv[1:]
+source, fixture, queue_source = sys.argv[1:]
 with open(source) as f:
     script = f.read()
 script = script.replace('/home/madoafri/mado-deploy', fixture + '/base')
@@ -23,6 +24,10 @@ script = script.replace('export PATH=/opt/alt/alt-nodejs20/root/usr/bin:$PATH',
 script = script.replace('{1..24}', '{1..2}').replace('sleep 5', 'sleep 0')
 with open(fixture + '/deploy.sh', 'w') as f:
     f.write(script)
+with open(queue_source) as f:
+    queue = f.read().replace('/home/madoafri/mado-deploy', fixture + '/base')
+with open(fixture + '/queue.sh', 'w') as f:
+    f.write(queue)
 PY
 cat > "$fixture/bin/npm" <<'SH'
 #!/usr/bin/env bash
@@ -47,7 +52,9 @@ archive() {
   printf 'new application\n' > "$fixture/package/app.cjs"
   printf '{}\n' > "$fixture/package/package.json"
   printf '{}\n' > "$fixture/package/package-lock.json"
-  tar -czf "$fixture/base/incoming/$revision.tar.gz" -C "$fixture/package" .
+  cp "$fixture/deploy.sh" "$fixture/package/scripts/deploy-production.sh"
+  cp "$fixture/queue.sh" "$fixture/package/scripts/run-deployment-queue.sh"
+  tar -czf "$fixture/base/incoming/$revision.tar.gz" -C "$fixture/package" app.cjs package.json package-lock.json src scripts public
   (cd "$fixture/base/incoming"; sha256sum "$revision.tar.gz" > "$revision.tar.gz.sha256")
 }
 first=1111111111111111111111111111111111111111
@@ -72,4 +79,19 @@ if bash "$fixture/deploy.sh" "$third"; then echo 'Health failure was ignored'; e
 grep -q "$first" "$fixture/app/release.json"
 [[ $(cat "$fixture/app/.env") == private-env-must-survive ]]
 [[ $(wc -l < "$fixture/backups") -eq 3 ]]
-echo 'Deployment checks passed: cutover, pre-migration backup, migration failure, health rollback and env preservation.'
+rm "$fixture/fail-health"
+fourth=4444444444444444444444444444444444444444
+archive "$fourth"
+touch "$fixture/base/incoming/$fourth-123-1.request"
+bash "$fixture/queue.sh"
+grep -q '"state":"succeeded"' "$fixture/base/status/$fourth-123-1.json"
+grep -q "$fourth" "$fixture/app/release.json"
+fifth=5555555555555555555555555555555555555555
+archive "$fifth"
+printf '%064d  %s.tar.gz\n' 0 "$fifth" > "$fixture/base/incoming/$fifth.tar.gz.sha256"
+touch "$fixture/base/incoming/$fifth-123-1.request"
+bash "$fixture/queue.sh"
+grep -q '"state":"failed"' "$fixture/base/status/$fifth-123-1.json"
+grep -q "$fourth" "$fixture/app/release.json"
+[[ $(wc -l < "$fixture/backups") -eq 4 ]]
+echo 'Deployment checks passed: cutover, backups, migration failure, rollback, env preservation, queued deployment and corrupt archive rejection.'

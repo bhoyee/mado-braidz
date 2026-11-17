@@ -45,6 +45,7 @@ jobs:
         shell: bash
         run: |
           bash -n scripts/deploy-production.sh
+          bash -n scripts/run-deployment-queue.sh
           mkdir -p artifact
           tar -czf "artifact/$GITHUB_SHA.tar.gz" app.cjs package.json package-lock.json src scripts public
           cd artifact
@@ -66,42 +67,16 @@ jobs:
         with:
           name: production-release
           path: artifact
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
       - name: Deploy, migrate and verify the served revision
         shell: bash
         env:
-          DEPLOY_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
           DEPLOY_PASSWORD: ${{ secrets.PRODUCTION_SSH_PASSWORD }}
-          KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
-          SSH_HOST: ${{ vars.PRODUCTION_SSH_HOST }}
-          SSH_PORT: ${{ vars.PRODUCTION_SSH_PORT }}
+          CPANEL_URL: ${{ vars.PRODUCTION_CPANEL_URL }}
           SSH_USER: ${{ vars.PRODUCTION_SSH_USER }}
         run: |
           set -euo pipefail
-          umask 077
-          echo 'Runner public IPv4 (for hosting-provider SSH diagnostics):'
-          curl --fail --silent --show-error --max-time 15 https://api.ipify.org || true
-          echo
-          python3 - <<'PY'
-          import os, socket
-          host = os.environ['SSH_HOST']
-          print('Resolved SSH IPv4:', socket.gethostbyname(host), flush=True)
-          try:
-              with socket.create_connection((host, int(os.environ['SSH_PORT'])), timeout=20):
-                  print('Production SSH port is reachable', flush=True)
-          except OSError as error:
-              raise SystemExit('Production SSH is unreachable from this runner before authentication: ' + str(error))
-          PY
-          mkdir -p ~/.ssh
-          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          unset DEPLOY_KEY KNOWN_HOSTS
-          printf '#!/bin/sh\nprintf "%%s\\n" "$DEPLOY_PASSWORD"\n' > ~/.ssh/askpass
-          chmod 700 ~/.ssh/askpass
-          export SSH_ASKPASS="$HOME/.ssh/askpass" SSH_ASKPASS_REQUIRE=force DISPLAY=:0
-          trap 'rm -f ~/.ssh/deploy_key ~/.ssh/askpass' EXIT
-          ssh_options=(-i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=3 -o NumberOfPasswordPrompts=1 -o PreferredAuthentications=publickey,password,keyboard-interactive)
-          host="$SSH_USER@$SSH_HOST"
-          ssh "${ssh_options[@]}" -p "$SSH_PORT" "$host" 'mkdir -p /home/madoafri/mado-deploy/incoming /home/madoafri/mado-deploy/releases'
-          scp "${ssh_options[@]}" -P "$SSH_PORT" artifact/* "$host:/home/madoafri/mado-deploy/incoming/"
-          tar -xOf "artifact/$GITHUB_SHA.tar.gz" scripts/deploy-production.sh > deploy.sh
-          ssh "${ssh_options[@]}" -p "$SSH_PORT" "$host" "bash -s -- $GITHUB_SHA" < deploy.sh
+          tar -xOf "artifact/$GITHUB_SHA.tar.gz" scripts/ci/deploy-cpanel.js > deploy-cpanel.mjs
+          node deploy-cpanel.mjs
