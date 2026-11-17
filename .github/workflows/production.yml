@@ -74,12 +74,25 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
+          echo 'Runner public IPv4 (for hosting-provider SSH diagnostics):'
+          curl --fail --silent --show-error --max-time 15 https://api.ipify.org || true
+          echo
+          python3 - <<'PY'
+          import socket
+          host = 'madoafricanbraidz.com'
+          print('Resolved SSH IPv4:', socket.gethostbyname(host), flush=True)
+          try:
+              with socket.create_connection((host, 10022), timeout=20):
+                  print('Production SSH port is reachable', flush=True)
+          except OSError as error:
+              raise SystemExit('Production SSH is unreachable from this runner: ' + str(error) + '. Ask the host to check inbound SSH access on TCP 10022.')
+          PY
           mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           unset DEPLOY_KEY KNOWN_HOSTS
           trap 'rm -f ~/.ssh/deploy_key' EXIT
-          ssh_options=(-i ~/.ssh/deploy_key -p 10022 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20)
+          ssh_options=(-i ~/.ssh/deploy_key -p 10022 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=3)
           host=madoafri@madoafricanbraidz.com
           ssh "${ssh_options[@]}" "$host" 'mkdir -p /home/madoafri/mado-deploy/incoming /home/madoafri/mado-deploy/releases'
           scp -i ~/.ssh/deploy_key -P 10022 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes artifact/* "$host:/home/madoafri/mado-deploy/incoming/"

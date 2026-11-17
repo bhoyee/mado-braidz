@@ -46,6 +46,8 @@ The last successful deployment's SHA, release path and previous snapshot path ar
 
 For recovery, first inspect the failed Actions job and server logs. Automatic rollback handles a failed cutover. For a later regression, revert the offending commit on `main` and let CI deploy the corrected revision; never force-push production history. If migrations changed data incompatibly, stop writes and review the private pre-migration database backup before restoring anything. Do not restore the database automatically over newer bookings.
 
+If the deploy job times out before SSH authentication while the same key works locally, ask the hosting provider to check inbound TCP **10022** from GitHub-hosted runners. The job prints its public IPv4 and resolved destination for their investigation. Runner IPs change, so allowing one observed address is not a lasting fix. If the host requires a fixed allowlist, arrange a runner with a stable outbound IP before relying on automatic releases. Do not disable host checking, broaden account privileges or copy cPanel passwords into Actions to work around a network restriction. After access is fixed, rerun the failed deployment job; it uses the already verified build artifact.
+
 The old web root is archived before cutover. Keep the backup until the owner has verified the replacement. Never publish `.env`, receipts, database dumps or deployment credentials under `public_html`.
 
 ## Release process
