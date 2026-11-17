@@ -33,3 +33,21 @@ The owner explicitly requested bringing up the current application before adding
 Keep the current Stripe **test mode** during verification. Switching to real payments requires the owner's launch checks, live keys and a live-mode webhook endpoint. Client/admin booking email delivery is Milestone 7. Owner password-reset email requires the existing Resend configuration and a verified sender; production does not write reset links to local files.
 
 Back up MySQL daily through cPanel and retain off-server copies. Keep `SESSION_SECRET` stable between releases: it protects private visit links and encrypted owner TOTP secrets. Deployment documentation is not evidence that an integration passed; record the actual verification results after setup.
+
+## Verified server setup — 17 November 2026
+
+The main domain is running under CloudLinux Node **20.20.2** / Passenger in production mode. The dedicated database has 25 tables including Drizzle migration history, 13 styles and 30 variants. The server `.env` and database credentials are private, outside the web root. The original web root was backed up before cutover.
+
+Verified on the actual hosted site:
+
+- HTTPS home, styles, style detail, Our Work, booking, Pay and owner sign-in; HTTP redirects to HTTPS.
+- Real owner login, secure HttpOnly SameSite=Lax cookies, dashboard, bookings, calendar, review and activity history at 390/1440 px. No axe violations, page overflow or JavaScript errors in those checks.
+- All image paths in the style manifest respond successfully.
+- A real Stripe **sandbox** card checkout charged the $30 test deposit, Stripe's hosted webhook confirmed the booking, and the confirmation page appeared. The test payment was then refunded and its appointment cancelled through bookingService; net test money is zero and no chair remains blocked.
+- Five-minute hold/refund cron installed and run successfully.
+- Daily database backup at 03:20 server time, with 14-day retention, installed at `/home/madoafri/mado-deploy/backup-database.sh`. The first compressed backup passed its integrity check. Backups live in `/home/madoafri/mado-backups/database`; database credentials are read from a private option file, not command arguments.
+- Local build/lint and 145 application tests passed; production dependency audit reports zero known vulnerabilities.
+
+Stripe is still in **test mode**. Turnstile is explicitly deferred as requested. Booking email delivery remains Milestone 7; sender verification and live-payment activation are not included in this deployment. A weekly off-server backup destination still needs explicit authorization/configuration.
+
+The logging dependency is pinned to its Node 20-compatible major. `sanitize-html` is retained at the security-patched 2.18.x release because older 2.17.x releases have published vulnerabilities; npm reports its declared Node 22 engine requirement. The current SSR rendering and full application suite run successfully on the project's fixed Node 20 runtime; formal support for that package/runtime combination remains a dependency follow-up.

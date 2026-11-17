@@ -62,7 +62,7 @@ export const publicSettings = {
         {
           question: 'How does the deposit work?',
           answer:
-            'Your deposit is applied toward your total, rather than added as a fee. The remaining balance is due at your appointment. Online checkout is coming soon; please call to arrange a booking.',
+            'Your $30 non-refundable deposit reserves your chair and is applied toward your total, rather than added as a fee. Pay the remaining balance online or at your appointment.',
         },
         {
           question: 'Do I need to bring my own hair?',
