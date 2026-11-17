@@ -170,7 +170,7 @@ npm run build
 
 ## Hosting review deployment
 
-Current hosting checks, the proposed review deployment and remaining access/configuration requirements are recorded in [docs/HOSTING-PREVIEW.md](docs/HOSTING-PREVIEW.md). The local hosting credentials are never part of the deployable release.
+The current deployment and verification record is [docs/DEPLOY.md](docs/DEPLOY.md). Earlier access troubleshooting is retained in [docs/HOSTING-PREVIEW.md](docs/HOSTING-PREVIEW.md) as historical context. The local hosting credentials are never part of the deployable release.
 
 ## Owner amendment: capacity and included hair
 
@@ -262,7 +262,7 @@ npm run test:stripe:e2e
 
 The last command is a **real sandbox-only** hosted-card test using Stripe CLI and local Chrome. It refuses live keys, creates a disposable local database, opens the hosted test checkout, uses the published Stripe test card, waits for the actual forwarded webhook, then removes only its own temporary database and closes its browser/listener. Keys are passed through environment variables, not command arguments. It does not change the development database or occupy port 4780. Browser verification challenges may require a manual sandbox checkout. Run this only after adding valid test keys. It creates test-mode Stripe records; no real money is processed.
 
-The implementation and local mock-provider tests are ready; **real Stripe CLI/test-card acceptance is pending until test keys are supplied**. Full details are in [docs/MILESTONE-4.md](docs/MILESTONE-4.md). Remote deployment remains a separate task awaiting SSH access.
+On 17 November 2026, the hosted main-domain app completed a real Stripe sandbox-card checkout and confirmed through Stripe's actual webhook. The test payment was refunded and the test appointment cancelled. The separate local CLI harness is not recorded as passing. Full details are in [docs/DEPLOY.md](docs/DEPLOY.md) and [docs/MILESTONE-4.md](docs/MILESTONE-4.md). Real-money activation still requires the owner's launch checks.
 
 ## Pay page and manual transfer review
 

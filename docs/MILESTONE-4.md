@@ -1,6 +1,6 @@
 # Milestone 4 — Stripe payments
 
-Implementation is ready for review. **Real Stripe sandbox-card/CLI acceptance remains pending: the local Stripe keys have not been supplied.** No live charges or remote deployment have been performed.
+The main-domain deployment completed a real Stripe sandbox-card checkout and actual hosted-webhook confirmation on 17 November 2026. The test payment was refunded and its appointment cancelled; no real money was charged. The separate local CLI harness is not recorded as passing. See [DEPLOY.md](DEPLOY.md) for the verified server setup.
 
 ## Delivered
 
@@ -35,7 +35,7 @@ On cPanel, run `node scripts/run-jobs.js` from cron every five minutes using the
 
 ## Follow-ups
 
-Add the matching test keys to ignored `.env`, then complete the real Stripe CLI/card verification. Review the final sandbox Checkout payment methods and merchant branding in Stripe Dashboard. Keep this PR a draft until that external acceptance passes. Live keys, owner test bookings, full launch checks and deployment remain later work. Email delivery, admin payment/refund controls, staff permissions and appointment changes remain Milestones 5–7. Hosting still awaits working SSH access.
+Hosted sandbox-card verification and server deployment are complete; the local CLI harness remains a separate check. Review payment methods and merchant branding in Stripe Dashboard, complete the owner's launch checks and configure live-mode keys/webhook before real payments. Owner admin controls and appointment changes were added in Milestone 5. Email delivery remains Milestone 7; staff management is deferred by the owner. See [DEPLOY.md](DEPLOY.md).
 
 References: [Stripe Checkout sessions](https://docs.stripe.com/api/checkout/sessions/create), [webhook handling](https://docs.stripe.com/webhooks), [refunds](https://docs.stripe.com/api/refunds/create).
 
