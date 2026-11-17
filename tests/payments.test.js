@@ -56,7 +56,7 @@ describe('Stripe checkout and payment lifecycle', () => {
       });
       const expected = paymentChoice === 'deposit' ? 3000 : 22000;
       const request = provider.calls.create[0];
-      expect(request.key).toBe('hold-' + hold.id);
+      expect(request.key).toBe(`${hold.ref}:hold-${hold.id}`);
       expect(request.params.line_items[0].price_data.unit_amount).toBe(
         expected,
       );

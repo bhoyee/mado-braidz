@@ -332,8 +332,19 @@ if (root) {
     history.replaceState(null, '', url);
   }
   async function api(path, options) {
-    const response = await fetch(path, options);
-    const data = await response.json();
+    let response;
+    try {
+      response = await fetch(path, options);
+    } catch {
+      throw new Error(
+        'Connection lost. Please try again. Your details are saved.',
+      );
+    }
+    const data = await response.json().catch(() => null);
+    if (!data)
+      throw new Error(
+        'Unable to connect to booking. Please try again shortly.',
+      );
     if (!response.ok) {
       const e = new Error(data.message || 'Please try again shortly.');
       e.data = data;

@@ -78,10 +78,26 @@ try {
       .fill('payment@example.test');
     await page.getByLabel('Phone', { exact: true }).fill('4437434979');
     await page.getByRole('checkbox', { name: /I accept the/ }).check();
+    const failCheckout = (route) => route.abort('connectionreset');
+    await page.route('**/api/bookings/*/checkout', failCheckout);
+    await page
+      .getByRole('button', { name: 'Continue to secure payment' })
+      .click();
+    await page
+      .getByRole('alert')
+      .filter({ hasText: 'Connection lost.' })
+      .waitFor();
+    assert.equal(
+      await page.getByLabel('Full name', { exact: true }).inputValue(),
+      'Payment Browser Test',
+    );
+    const heldCount = repo.rows.length;
+    await page.unroute('**/api/bookings/*/checkout', failCheckout);
     await page
       .getByRole('button', { name: 'Continue to secure payment' })
       .click();
     await page.waitForURL('https://checkout.stripe.com/**');
+    assert.equal(repo.rows.length, heldCount, 'Retry reuses the existing hold');
     const cancelled = repo.rows.at(-1);
     await page.goto(origin + '/book?resume=' + cancelled.ref);
     await page.waitForFunction(

@@ -180,7 +180,9 @@ export function createPaymentService(repository, provider, config, clock) {
               ? `/booking/${token}?cancel=1`
               : `/book?resume=${encodeURIComponent(ref)}`),
         },
-        attempt.id,
+        // Numeric IDs may repeat across local and disposable test databases.
+        // Keep Stripe retries scoped to the globally unique booking reference.
+        `${booking.ref}:${attempt.id}`,
       );
       await bookings.attachCheckout(booking.id, attempt.id, session);
     }

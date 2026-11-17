@@ -132,6 +132,7 @@ try {
     .getByRole('button', { name: 'Choose extras', exact: true })
     .click();
   await page.getByRole('button', { name: 'Find a time', exact: true }).click();
+  await page.locator('#booking-calendar button').first().waitFor();
   const date = DateTime.now()
     .setZone('America/New_York')
     .plus({ days: 3 })
@@ -153,7 +154,12 @@ try {
   await page
     .getByRole('button', { name: 'Continue to secure payment' })
     .click();
-  await page.waitForURL('https://checkout.stripe.com/**', { timeout: 60000 });
+  try {
+    await page.waitForURL('https://checkout.stripe.com/**', { timeout: 60000 });
+  } catch {
+    const message = await page.locator('#booking-error').textContent();
+    throw new Error('Stripe checkout handoff failed: ' + message);
+  }
   console.log('Hosted Stripe sandbox checkout opened.');
   async function field(selectors) {
     for (let i = 0; i < 30; i++) {
@@ -183,7 +189,11 @@ try {
   if (await country.isVisible()) await country.selectOption('US');
   const postal = page.locator('input[name="billingPostalCode"]');
   if (await postal.isVisible()) await postal.fill('20706');
-  const submit = page.getByTestId('hosted-payment-submit-button');
+  const submit = page.getByRole('button', { name: /^Pay(?:\s|$)/i }).last();
+  await page.screenshot({
+    path: 'tmp/qa/stripe-hosted-checkout.png',
+    fullPage: true,
+  });
   await submit.click();
   await page.waitForURL(origin + '/book/success**', { timeout: 90000 });
   await page

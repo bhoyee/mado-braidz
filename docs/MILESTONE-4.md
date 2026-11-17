@@ -31,7 +31,7 @@ On cPanel, run `node scripts/run-jobs.js` from cron every five minutes using the
 - Six real database tests pass in a disposable database: the earlier 20-request capacity tests plus concurrent webhook/payment/job deduplication and a persisted late-payment conflict/refund.
 - Mobile/desktop payment browser checks pass with a **mock Stripe provider**: redirect handoff, cancel/resume, confirmation, private balance checkout, calendar link and tested WCAG A/AA checks. This does not substitute for a real Stripe sandbox payment.
 - The existing 17-case booking browser suite is retained.
-- `npm run test:stripe:e2e` is prepared for a real hosted sandbox card test through Stripe CLI. It refuses live keys, uses a disposable local database and ephemeral test listener, passes keys through environment variables, and closes its own browser/listener afterward. The test-card acceptance check has not been run successfully because test keys are absent.
+- `npm run test:stripe:e2e` is prepared for a real hosted sandbox card test through Stripe CLI. It refuses live keys, uses a disposable local database and ephemeral test listener, passes keys through environment variables, and closes its own browser/listener afterward. With the supplied sandbox keys, real Checkout creation and the hosted handoff have been verified. Automated hosted-card completion remains pending because the current Stripe page does not expose the expected Pay control.
 
 ## Follow-ups
 
