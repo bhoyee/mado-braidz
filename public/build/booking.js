@@ -613,6 +613,10 @@ if (root) {
     });
   for (const button of form.querySelectorAll('[data-book-next]'))
     button.addEventListener('click', async () => {
+      const sourceStep = Number(
+        button.closest('[data-booking-step]').dataset.bookingStep,
+      );
+      if (step !== sourceStep) return;
       if (!quote) {
         const missing = [
           style,
@@ -628,7 +632,7 @@ if (root) {
         return error('Check your selection');
       }
       if (step === 3 && !startAt) return error('Select a time');
-      await showStep(step + 1);
+      await showStep(sourceStep + 1);
     });
   for (const button of form.querySelectorAll('[data-book-back]'))
     button.addEventListener('click', () => showStep(step - 1));
