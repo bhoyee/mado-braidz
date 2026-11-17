@@ -50,7 +50,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-All 21 Section 9 tables are included. DATETIME(3) values use UTC, money uses integer cents. Sessions use the express-mysql-session schema with automatic table creation disabled. Section 10 seeds 13 styles, 30 price variants, six categories, Head wash and the 100% human hair upgrade, business/booking settings, and one owner. Seed runs in a transaction and preserves existing prices/settings/passwords on reruns, including nullable-length variants. Stop the app before running migrations. To change the existing owner email or password, edit ADMIN_EMAIL / ADMIN_PASSWORD in `.env` and run `npm run db:seed -- --update-owner`. This explicitly rotates the single owner account; ordinary seed reruns preserve its password.
+All 21 Section 9 foundation tables are included; Milestone 4 adds checkout_attempts (22 total). DATETIME(3) values use UTC, money uses integer cents. Sessions use the express-mysql-session schema with automatic table creation disabled. Section 10 seeds 13 styles, 30 price variants, six categories, Head wash and the 100% human hair upgrade, business/booking settings, and one owner. Seed runs in a transaction and preserves existing prices/settings/passwords on reruns, including nullable-length variants. Stop the app before running migrations. To change the existing owner email or password, edit ADMIN_EMAIL / ADMIN_PASSWORD in `.env` and run `npm run db:seed -- --update-owner`. This explicitly rotates the single owner account; ordinary seed reruns preserve its password.
 
 ## Checks
 
@@ -202,10 +202,84 @@ npm run test:booking:browser
 
 `npm test` runs unit/Supertest tests without a database; the database integration file is intentionally skipped in this command. `npm run test:db` explicitly enables that suite and creates a random `mado_booking_test_*` database, migrates it, exercises 20 simultaneous holds, and removes only that disposable database afterward. It uses DATABASE_URL from ignored .env, or optional TEST_DATABASE_URL if provided. That database user needs CREATE/DROP DATABASE privileges for testing only; do not grant those privileges to the deployed application user. `test:booking:browser` uses local Chrome and an isolated app on an ephemeral test port with synthetic data, so it does not occupy port 4780 or write real appointments.
 
-Follow-ups: Stripe checkout, webhook confirmation, late-payment conflict handling, expiry state cleanup, email delivery, full admin workflows and production deployment remain in later milestones or the separate hosting task. No confirmed booking can be created through the current public flow.
+Follow-ups: Stripe checkout, webhook confirmation, late-payment conflict handling, expiry state cleanup, email delivery, full admin workflows and production deployment remain in later milestones or the separate hosting task. Milestone 3 only creates unpaid holds; Milestone 4 below adds Stripe confirmation.
 
 Milestone 3 validation: **91 unit/Supertest tests**, **4 real database integration tests**, and **17 mobile/desktop accessibility cases** pass. Details: [docs/MILESTONE-3.md](docs/MILESTONE-3.md).
 
 Booking page controls use scrollable, touch-friendly menus for style, braid size and length, with keyboard/typeahead support and purple hover/selection feedback. The compact intro highlights included hair in yellow and displays the non-refundable deposit policy.
 
 Booking contact numbers are restricted to valid US numbers on the server. Form errors use red inline messages and borders with short labels such as “Required field”, “Invalid email” and “Invalid phone number”. The policy is a full-width bold banner; it stays on one line on wide screens and wraps on mobile.
+
+## Milestone 4: Stripe Checkout and webhooks
+
+Install dependencies, apply migration `0002_amazing_ezekiel_stane.sql`, and rebuild:
+
+```powershell
+npm install
+npm run db:migrate
+npm run build
+npm run dev
+```
+
+The local application remains **http://localhost:4780**. Set STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY in ignored `.env` using matching **test** keys. Local/test environments reject live keys. Use production mode and matching live credentials only during the later launch process. The public form enables secure Stripe checkout when a secret key is configured; without keys, the existing unpaid-hold preview remains available. No card details touch this application.
+
+For manual local webhook testing, run Stripe CLI in another terminal:
+
+```powershell
+stripe login
+stripe listen --forward-to http://localhost:4780/webhooks/stripe --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired,charge.refunded,refund.updated,refund.failed
+```
+
+Copy the listener's signing secret into STRIPE_WEBHOOK_SECRET in ignored `.env`, then restart the app. The listener secret differs from a Dashboard endpoint's secret. Do not commit or paste keys into logs. Hosted Checkout uses the payment methods enabled in the Stripe Dashboard, USD prices and no automatic tax/adaptive conversion. No Stripe.js card form is embedded.
+
+Checkout attempts persist the server snapshot amount, expiry, type and session ID. Initial checkout uses `hold-<bookingId>` as its Stripe idempotency key; balance attempts have separate keys. Retrying a failed redirect reuses the same hold/session; a session-bound request key prevents duplicate hold creation on replay. Checkout reserves about 30 minutes with a **10-second network allowance**, and the local hold matches Stripe's expiry. Returning through `/book?resume=<ref>` expires the unpaid Stripe session and releases the hold before restoring details. If payment completed during cancellation, the client goes to the confirmation check instead.
+
+Only verified raw-body webhooks confirm appointments. Event IDs, payment-intent checks and date locks make duplicate deliveries safe. Late payment rechecks full-interval capacity three and time blocks; if the slot is full, a durable idempotent refund task is created and attempted immediately. Failed or pending refunds are retried by cron. Partial/full `charge.refunded` events reconcile cumulative refunds without subtracting twice. A private `/booking/:token` page shows the saved appointment and offers an exact balance checkout for eligible deposit-paid bookings. Consultation bookings need a final quote before balance checkout.
+
+`/book/success` polls stored payment status every two seconds for up to one minute. It never confirms from the redirect URL alone. Confirmation includes the paid amount, balance, directions, a calendar download and a private manage link. Status requires the original session or private booking link. Session IDs and private manage tokens are masked in application request logs.
+
+On cPanel, schedule this command every five minutes using the host's Node 20 executable:
+
+```text
+*/5 * * * * cd /home/<user>/mado-app && /path/to/node scripts/run-jobs.js >> /home/<user>/logs/mado-jobs.log 2>&1
+```
+
+The runner holds MySQL `GET_LOCK('jobs', 0)` so two cron runs do not overlap. It expires unpaid holds and retries durable Stripe refunds. Email jobs and admin notifications are queued, but email delivery and the full admin interface remain later milestones. Existing holds stop blocking as soon as they expire even before cron updates their status.
+
+Checks:
+
+```powershell
+npm run build
+npm run lint
+npm test
+npm run test:db
+npm run test:booking:browser
+npm run test:payments:browser
+npm run test:stripe:e2e
+```
+
+The last command is a **real sandbox-only** hosted-card test using Stripe CLI and local Chrome. It refuses live keys, creates a disposable local database, opens the hosted test checkout, uses the published Stripe test card, waits for the actual forwarded webhook, then removes only its own temporary database and closes its browser/listener. Keys are passed through environment variables, not command arguments. It does not change the development database or occupy port 4780. Browser verification challenges may require a manual sandbox checkout. Run this only after adding valid test keys. It creates test-mode Stripe records; no real money is processed.
+
+The implementation and local mock-provider tests are ready; **real Stripe CLI/test-card acceptance is pending until test keys are supplied**. Full details are in [docs/MILESTONE-4.md](docs/MILESTONE-4.md). Remote deployment remains a separate task awaiting SSH access.
+
+## Pay page and manual transfer review
+
+`/pay` is linked from the footer. One search field accepts an exact phone number, email address or booking confirmation code. Phone/email lookups can return multiple pending payments without an additional code. Results grant payment-only access tied to the current browser session for one hour, without exposing private management tokens, client contact details, notes or proofs. This does not authorize cancellation. The original private visit link remains available. Cancelled/expired bookings and known-price bookings without an eligible balance do not offer payment.
+
+Set `MANUAL_PAYMENT_NAME` (default Magdaline Arrey), `ZELLE_RECIPIENT` (the verified Zelle email/phone), and `CASHAPP_CASHTAG` (the verified $cashtag) in ignored `.env` locally and cPanel environment settings on the server. A transfer method is displayed only when its destination is configured. Do not invent transfer destinations. Restart the app after changing config. `MANUAL_REVIEW_HOURS` defaults to 24 (1–48); initial proof submission extends the existing capacity hold up to this limit, never beyond the appointment start. Unreviewed holds then expire normally. Balance submissions do not change an already confirmed appointment.
+
+Run `npm run db:migrate` before starting the updated app; the additive `payment_proofs` migration stores private, re-encoded image references and review metadata. Proofs accept JPEG/PNG/WebP, up to 8 MB, stored under ignored/outside-webroot `UPLOAD_DIR`. Do not put receipts in public media. Submitting a proof does not record money or confirm a visit. Card Checkout is blocked while proof review is pending to prevent duplicate payment.
+
+The owner can open `/admin/payment-reviews` using the seeded owner's email/password through the existing owner-only Basic authentication (HTTPS required in production). This is a narrow review screen; the full admin portal remains a later milestone. Verify the transfer in the actual Zelle/Cash App account, inspect the private screenshot, then approve or reject. Owner decisions are CSRF protected, date locked, audited and idempotent. Approval records the expected server-calculated amount, reconciles the balance and confirms only if capacity is still available. If the appointment is no longer available or money differs, arrange a manual refund/reconciliation with the client; do not approve the proof. Rejection of an initial proof releases the chair. Staff cannot review proofs. Confirmation email jobs are queued; actual email delivery remains Milestone 7.
+
+Manual-payment browser verification: `npm run test:manual:browser` uses generated test images, fake Stripe and an isolated in-memory repository. It does not send transfers or modify the development database. Run `npm run test:db` for real disposable-database row locking and concurrent approval verification.
+
+## Multiple appointments and Pay all
+
+A phone/email search lists **every eligible linked booking**, with an individual Pay now action and the total due now. A booking reference lists only that booking. Results have no fixed booking-count cutoff. Payments already awaiting manual review stay visible but are excluded from card checkout to prevent paying twice.
+
+When at least two payments are ready, **Pay all** opens one Stripe Checkout for the server-computed sum. `payment_batches` stores immutable per-booking allocations; its attempts prevent a simultaneous individual or manual payment for those same bookings. Reservation and webhook allocation take all affected calendar-day locks in sorted order. Only a verified paid webhook credits the entries. Group cancellation/expiry releases unpaid initial holds while preserving appointments that were already confirmed. Conflict refunds apply only to the affected allocation; other appointments remain paid.
+
+Run `npm run db:migrate` for `0004_misty_ozymandias.sql` before starting/deploying this version (24 tables). Cron also expires combined checkouts. No new environment variables are required. In Stripe webhooks, retain the existing events and add `refund.updated` and `refund.failed` for asynchronous combined-refund reconciliation. Do not issue allocation-specific refunds using the old single-booking refund code: shared PaymentIntents must use the combined-refund path. Untagged refunds issued directly in Stripe Dashboard are allocated in booking order and create an owner reconciliation notification; verify these against the intended bookings.
+
+Validation commands: `npm run test:batch:browser` checks phone/email versus reference lookup, individual/combined controls, deposits, balances, cancellation and accessibility in mobile/desktop Chrome using fake Stripe. `npm run test:stripe:batch` uses real **test-only** Stripe keys, creates a disposable local database, verifies a combined Checkout total, expires only its own unpaid session, and drops only its own database. It never submits a card or takes payment. Real hosted-card confirmation remains the separate `npm run test:stripe:e2e` acceptance check.

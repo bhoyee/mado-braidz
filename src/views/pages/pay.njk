@@ -1,0 +1,14 @@
+{% extends "layouts/base.njk" %}
+{% block content %}
+<section class="wrap appointment-result pay-page">
+  <header class="appointment-result-heading"><p class="eyebrow">Payments</p><h1>Take care of <em>your balance.</em></h1><p>Find your appointment and make a secure payment.</p></header>
+  <div class="pay-layout"><div class="pay-search">
+    {% if lookupMessage %}<p class="pay-lookup-message" role="status">{{ lookupMessage }}</p>{% endif %}
+    <form action="/pay/search" method="post"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><label for="payment-search">Phone, email or booking confirmation code</label><input id="payment-search" name="query" value="{{ query }}" required maxlength="255" autocomplete="off" placeholder="MADO-… or your phone / email"><p class="small">Enter the phone number or email used for your booking, or your confirmation code.</p><button class="button" type="submit">Find my payment</button></form>
+    {% if found.length %}<div class="pay-results-summary"><p><strong>{{ found.length }} appointment{% if found.length != 1 %}s{% endif %}</strong> with pending payment{% if found.length != 1 %}s{% endif %}</p><p>Total due now <strong>{{ totalDueCents | money }}</strong></p></div>{% endif %}
+    {% if payableCount > 1 and paymentsEnabled %}<form class="pay-all-panel" data-pay-all data-csrf="{{ csrfToken }}"><p>Pay each appointment separately below, or settle all {{ payableCount }} payments together.</p><button class="button" type="submit">Pay all {{ payableTotalCents | money }} by card</button><p class="small">One Stripe checkout. Payments already awaiting review are not charged again.</p><p class="field-error" role="alert" hidden></p></form>{% endif %}
+    {% for payment in found %}<article class="pay-found"><div class="appointment-reference"><span>Booking reference</span><strong>{{ payment.ref }}</strong></div><h2>{{ payment.styleName }}</h2><p>{{ payment.time }} Eastern</p><dl><dt>Payment due</dt><dd>{{ payment.amountCents | money }}</dd></dl><a class="button" href="{{ payment.url }}">{% if payment.pendingReview %}View payment review{% else %}Pay now{% endif %}</a></article>{% endfor %}
+  </div><aside class="pay-alternatives"><p class="eyebrow">Other ways to pay</p><h2>Zelle &amp; Cash App</h2><p class="pay-recipient">Recipient: <strong>{{ paymentName }}</strong></p>{% for method in manualMethods %}<dl><dt>{{ method.name }}</dt><dd>{{ method.recipient }}</dd></dl>{% endfor %}{% if not manualMethods.length %}<p>Call the studio to confirm the payment details before sending money.</p>{% endif %}<p>Find your appointment first, then submit your payment screenshot from your visit page. Transfers need owner approval.</p><a href="tel:{{ business.phone }}">{{ phoneDisplay }}</a></aside></div>
+</section>
+<script defer src="/build/batch-payment.js"></script>
+{% endblock %}

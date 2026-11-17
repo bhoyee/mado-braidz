@@ -11,6 +11,8 @@ import { priceBooking } from '../../services/pricingService.js';
 import { createAvailabilityService } from '../../services/availabilityService.js';
 import { createBookingService } from '../../services/bookingService.js';
 import { BookingError } from '../../services/bookingErrors.js';
+import { createHash } from 'node:crypto';
+import { paymentToken, paymentPageUrl } from '../../services/paymentAccess.js';
 
 const id = z.coerce.number().int().positive().safe();
 const addonIds = z
@@ -55,6 +57,7 @@ export const holdSchema = selectionSchema
     marketingConsent: z.boolean().default(false),
     website: z.string().max(0).default(''),
     turnstileToken: z.string().max(2048).default(''),
+    requestKey: z.uuid().optional(),
   })
   .strict();
 const upload = multer({
@@ -62,7 +65,7 @@ const upload = multer({
   limits: { fileSize: 8 * 1024 * 1024, files: 1, fields: 1, fieldSize: 32768 },
 }).single('inspiration');
 
-export function bookingRouter(repository, config) {
+export function bookingRouter(repository, config, payments) {
   const router = Router();
   router.use((req, res, next) =>
     repository
@@ -73,7 +76,9 @@ export function bookingRouter(repository, config) {
         }),
   );
   const availability = repository && createAvailabilityService(repository);
-  const booking = repository && createBookingService(repository);
+  const booking =
+    repository &&
+    createBookingService(repository, undefined, config.SESSION_SECRET);
   async function selection(raw) {
     const input = selectionSchema.parse(raw);
     if (!input.styleId && input.styleVariantId) {
@@ -150,6 +155,10 @@ export function bookingRouter(repository, config) {
           }
         }
         const input = holdSchema.parse(raw);
+        if (input.requestKey)
+          input.checkoutRequestKey = createHash('sha256')
+            .update(req.sessionID + ':' + input.requestKey)
+            .digest('hex');
         if (config.TURNSTILE_SECRET_KEY) {
           let verification;
           try {
@@ -226,6 +235,13 @@ export function bookingRouter(repository, config) {
           };
         }
         const result = await booking.createHold(input, media);
+        if (result.reused && path) {
+          await unlink(path).catch(() => {});
+          path = null;
+        }
+        req.session.bookingAccess ||= {};
+        req.session.bookingAccess[result.ref] = result.manageToken;
+        delete result.manageToken;
         req.session.lastHold = {
           ref: result.ref,
           holdExpiresAt: result.holdExpiresAt,
@@ -235,6 +251,73 @@ export function bookingRouter(repository, config) {
         if (path) await unlink(path).catch(() => {});
         throw e;
       }
+    }),
+  );
+  const refSchema = z.string().regex(/^MADO-[A-F0-9]{16}$/);
+  const empty = z.object({}).strict();
+  for (const action of ['checkout', 'balance', 'cancel'])
+    router.post(
+      `/bookings/:ref/${action}`,
+      run(async (req, res) => {
+        const ref = refSchema.parse(req.params.ref);
+        empty.parse(req.body || {});
+        const token =
+          action === 'cancel'
+            ? req.session.bookingAccess?.[ref]
+            : paymentToken(req, ref);
+        if (!payments)
+          throw new BookingError(
+            'PAYMENT_UNAVAILABLE',
+            'Online payment is unavailable.',
+            503,
+          );
+        const result =
+          action === 'cancel'
+            ? await payments.cancel(ref, token)
+            : await payments.checkout(
+                ref,
+                token,
+                action === 'balance',
+                req.session.bookingAccess?.[ref]
+                  ? null
+                  : paymentPageUrl(req, ref),
+              );
+        res.set('Cache-Control', 'no-store').json(result);
+      }),
+    );
+  router.get(
+    '/bookings/payment-status',
+    run(async (req, res) => {
+      const sessionId = z
+        .string()
+        .regex(/^cs_[a-zA-Z0-9_]+$/)
+        .parse(req.query.session_id);
+      const attempt = await repository.attemptBySession?.(sessionId);
+      const row = attempt && (await repository.bookingById(attempt.bookingId));
+      if (!row || !payments)
+        throw new BookingError('NOT_FOUND', 'Payment not found.', 404);
+      res.set('Cache-Control', 'no-store').json({
+        ...(await payments.status(sessionId, paymentToken(req, row.ref))),
+        manageUrl: paymentPageUrl(req, row.ref),
+      });
+    }),
+  );
+  router.get(
+    '/bookings/:ref/status',
+    run(async (req, res) => {
+      const ref = refSchema.parse(req.params.ref);
+      const row = await payments.authorize(ref, paymentToken(req, ref));
+      const attempts = await repository.attempts(row.id);
+      const attempt = attempts.filter((a) => a.stripeSessionId).at(-1);
+      res.set('Cache-Control', 'no-store').json({
+        ...(attempt
+          ? await payments.status(
+              attempt.stripeSessionId,
+              paymentToken(req, ref),
+            )
+          : { ref, status: row.status, paymentStatus: row.paymentStatus }),
+        manageUrl: paymentPageUrl(req, ref),
+      });
     }),
   );
   router.use((err, req, res, next) => {

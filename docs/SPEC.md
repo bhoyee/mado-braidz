@@ -826,7 +826,7 @@ The site handles money and personal data, so security and the booking tests are 
 ```text
 NODE_ENV=production
 APP_URL=https://madoafricanbraidz.com
-PORT=3000
+PORT=4780
 SESSION_SECRET=
 DATABASE_URL=mysql://user:pass@localhost:3306/mado
 STRIPE_SECRET_KEY=sk_test_...
@@ -884,3 +884,19 @@ The build runs in 9 milestones, each a separate Codex task and pull request. Pas
 - [ ] Search Console verified, sitemap submitted
 - [ ] Backups confirmed running
 - [ ] First real booking taken and refunded as a final live test
+
+## Owner amendment — public Pay page and manual transfers (November 17, 2026)
+
+This explicitly extends Milestone 4 with `/pay` in the footer, booking/visit payment-method selection, private Zelle/Cash App proof upload, and owner review before an initial appointment is confirmed. Card payments retain Stripe Checkout and signed-webhook confirmation. Transfer recipient name and destinations come only from env (`MANUAL_PAYMENT_NAME`, `ZELLE_RECIPIENT`, `CASHAPP_CASHTAG`), so a restart after changing env updates every payment screen. Never infer payment receipt from a screenshot.
+
+Owner correction: `/pay` has exactly one search field accepting an exact phone number, email address or booking confirmation code. Phone/email searches require no second code and may show multiple eligible payments. Results contain payment-related appointment details, not client contact details, notes or receipt files. Search is rate limited and grants session-bound, expiring payment access; it must not disclose the private booking-management token or authorize cancellation. No eligible payment returns “No pending payments found.”
+
+Manual proofs are private re-encoded JPEG/PNG/WebP inputs, max 8 MB; metadata and review status live in `payment_proofs`. Submitting an initial proof keeps `pending_payment` and unpaid totals, extending its capacity hold for `MANUAL_REVIEW_HOURS` (working default 24, range 1–48), capped at appointment start. The owner must review promptly; expiry releases capacity. An owner approval rechecks full-interval capacity and time blocks under the date lock before recording money and confirming. A late conflict requires owner reconciliation/manual refund, never overbooking. An initial rejection cancels and frees the chair. Balance review leaves the confirmed chair intact. Duplicate submissions/decisions cannot duplicate payment, and card Checkout is blocked during proof review.
+
+A narrow `/admin/payment-reviews` screen uses the existing seeded-owner Basic authentication with HTTPS in production, rate limiting, CSRF and audit entries. This is a payment-review bridge until Milestone 5 replaces it with the full session-authenticated admin portal. Staff cannot approve, reject or read proofs. Actual client/admin email delivery remains Milestone 7; payment confirmation jobs are recorded for that delivery layer.
+
+### Owner amendment — multiple bookings and one combined checkout
+
+Phone/email search must return every linked eligible pending payment; booking-code lookup returns only that booking. Each result retains individual payment. If two or more payments are ready, Pay all offers one combined Stripe card payment, with amounts recomputed and snapshotted on the server. Manual transfers already awaiting review remain listed and must not be charged again.
+
+Combined Checkout stores a durable `payment_batches` record and batch-linked `checkout_attempts`. Payment allocation, capacity checks and all booking state changes go through bookingService, using sorted locks for all affected dates. A paid group webhook allocates the single PaymentIntent across bookings exactly once. One late/conflicting appointment is refunded only for its allocation; other paid bookings remain intact. Cancellation/expiry releases initial unpaid holds but never cancels an already confirmed appointment whose balance was being paid. Refund webhook reconciliation supports partial/full refunds and out-of-order delivery; asynchronous refund updates also subscribe to `refund.updated` and `refund.failed`. Dashboard refunds without booking metadata are allocated in booking order and flagged for owner verification. Full owner refund controls remain Milestone 5.

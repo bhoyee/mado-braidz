@@ -217,6 +217,9 @@ if (root) {
   } catch {
     /* storage is optional */
   }
+  const paymentsEnabled = form.dataset.paymentsEnabled === 'true';
+  let requestKey = saved.requestKey || crypto.randomUUID();
+  let checkoutRef = saved.checkoutRef || '';
   const error = (message) => {
     $('booking-error').textContent = message;
     $('booking-error').hidden = !message;
@@ -297,6 +300,8 @@ if (root) {
   function persist() {
     const data = {
       ...selection(),
+      requestKey,
+      checkoutRef,
       size: size.value,
       startAt,
       date,
@@ -327,8 +332,19 @@ if (root) {
     history.replaceState(null, '', url);
   }
   async function api(path, options) {
-    const response = await fetch(path, options);
-    const data = await response.json();
+    let response;
+    try {
+      response = await fetch(path, options);
+    } catch {
+      throw new Error(
+        'Connection lost. Please try again. Your details are saved.',
+      );
+    }
+    const data = await response.json().catch(() => null);
+    if (!data)
+      throw new Error(
+        'Unable to connect to booking. Please try again shortly.',
+      );
     if (!response.ok) {
       const e = new Error(data.message || 'Please try again shortly.');
       e.data = data;
@@ -377,7 +393,11 @@ if (root) {
       variant.selectedIndex = 1;
     pickers.forEach((picker) => picker.refresh());
   }
-  async function refreshQuote(resetTime = true) {
+  async function refreshQuote(resetTime = true, renewRequest = true) {
+    if (renewRequest) {
+      requestKey = crypto.randomUUID();
+      checkoutRef = '';
+    }
     const current = ++serial;
     quote = null;
     if (resetTime) {
@@ -409,6 +429,16 @@ if (root) {
         ? 'Final price at consultation'
         : dollars(data.subtotalCents);
       $('summary-today').textContent = dollars(data.dueTodayCents);
+      if ($('booking-manual-amount'))
+        $('booking-manual-amount').textContent = dollars(data.dueTodayCents);
+      const payingFull =
+        selection().paymentChoice === 'full' && !data.consultation;
+      $('summary-payment-label').textContent = payingFull
+        ? 'Full payment'
+        : 'Deposit payment';
+      $('summary-balance-label').textContent = payingFull
+        ? 'Balance after payment'
+        : 'Balance after deposit';
       $('summary-balance').textContent = dollars(data.balanceAfterPaymentCents);
       if (startAt)
         $('summary-time').textContent =
@@ -533,6 +563,10 @@ if (root) {
           button.disabled = !slot.available;
           button.setAttribute('aria-pressed', String(slot.startAt === startAt));
           button.addEventListener('click', () => {
+            if (startAt !== slot.startAt) {
+              checkoutRef = '';
+              requestKey = crypto.randomUUID();
+            }
             startAt = slot.startAt;
             $('summary-time').textContent =
               date + ' · ' + slot.label + ' Eastern';
@@ -600,6 +634,10 @@ if (root) {
     });
   for (const button of form.querySelectorAll('[data-book-next]'))
     button.addEventListener('click', async () => {
+      const sourceStep = Number(
+        button.closest('[data-booking-step]').dataset.bookingStep,
+      );
+      if (step !== sourceStep) return;
       if (!quote) {
         const missing = [
           style,
@@ -615,7 +653,7 @@ if (root) {
         return error('Check your selection');
       }
       if (step === 3 && !startAt) return error('Select a time');
-      await showStep(step + 1);
+      await showStep(sourceStep + 1);
     });
   for (const button of form.querySelectorAll('[data-book-back]'))
     button.addEventListener('click', () => showStep(step - 1));
@@ -642,6 +680,21 @@ if (root) {
     });
   for (const input of form.querySelectorAll('input,textarea'))
     input.addEventListener('input', persist);
+  const selectedMethod = () =>
+    form.querySelector('[name="paymentMethod"]:checked')?.value || 'card';
+  for (const input of form.querySelectorAll('[name="paymentMethod"]'))
+    input.addEventListener('change', () => {
+      const manual = selectedMethod() !== 'card';
+      $('booking-manual-payment').hidden = !manual;
+      form
+        .querySelectorAll('[data-manual-recipient]')
+        .forEach(
+          (el) => (el.hidden = el.dataset.manualRecipient !== selectedMethod()),
+        );
+      $('booking-submit').textContent = manual
+        ? 'Submit payment for review'
+        : 'Continue to secure payment';
+    });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (submitted) return;
@@ -656,6 +709,10 @@ if (root) {
       return;
     }
     if (!quote || !startAt) return error('Select a time');
+    const method = selectedMethod();
+    const proof = $('booking-payment-proof')?.files[0];
+    if (method !== 'card' && (!proof || proof.size > 8 * 1024 * 1024))
+      return error('Upload a payment screenshot up to 8 MB.');
     const file = $('booking-inspiration').files[0];
     if (file && file.size > 8 * 1024 * 1024)
       return error('Choose an image smaller than 8 MB.');
@@ -664,6 +721,7 @@ if (root) {
     if (/^1\d{10}$/.test(phone)) phone = '+' + phone;
     const payload = {
       ...selection(),
+      requestKey,
       startAt,
       name: form.elements.name.value,
       email: form.elements.email.value,
@@ -681,11 +739,41 @@ if (root) {
     button.disabled = true;
     error('');
     try {
-      const result = await api('/api/bookings/hold', {
-        method: 'POST',
-        headers: { 'x-csrf-token': form.dataset.csrf },
-        body,
-      });
+      const result = checkoutRef
+        ? { ref: checkoutRef }
+        : await api('/api/bookings/hold', {
+            method: 'POST',
+            headers: { 'x-csrf-token': form.dataset.csrf },
+            body,
+          });
+      if (paymentsEnabled || method !== 'card') {
+        checkoutRef = result.ref;
+        persist();
+        if (method !== 'card') {
+          const proofBody = new FormData();
+          proofBody.append('method', method);
+          proofBody.append('proof', proof);
+          const submission = await api(`/api/bookings/${result.ref}/proof`, {
+            method: 'POST',
+            headers: { 'x-csrf-token': form.dataset.csrf },
+            body: proofBody,
+          });
+          submitted = true;
+          location.assign(submission.url);
+          return;
+        }
+        const checkout = await api(`/api/bookings/${result.ref}/checkout`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-csrf-token': form.dataset.csrf,
+          },
+          body: '{}',
+        });
+        submitted = true;
+        location.assign(checkout.url);
+        return;
+      }
       submitted = true;
       for (const section of root.querySelectorAll('[data-booking-step]'))
         section.hidden = true;
@@ -706,7 +794,9 @@ if (root) {
       $('booking-result').scrollIntoView({ block: 'center' });
     } catch (e) {
       window.turnstile?.reset();
-      if (e.data?.error === 'SLOT_TAKEN') {
+      if (['SLOT_TAKEN', 'HOLD_EXPIRED'].includes(e.data?.error)) {
+        checkoutRef = '';
+        requestKey = crypto.randomUUID();
         startAt = '';
         await showStep(3);
         error(e.message + ' Select another available start.');
@@ -766,7 +856,42 @@ if (root) {
   startAt = params.get('startAt') || saved.startAt || '';
   date = params.get('date') || saved.date || '';
   if (/^\d{4}-\d{2}/.test(date)) month = date.slice(0, 7);
-  refreshQuote(false).then(() =>
-    showStep(quote ? Number(params.get('step') || saved.step || 1) : 1, false),
-  );
+  async function initialize() {
+    const resume = params.get('resume');
+    if (resume && paymentsEnabled) {
+      try {
+        const state = await api(
+          `/api/bookings/${encodeURIComponent(resume)}/cancel`,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-csrf-token': form.dataset.csrf,
+            },
+            body: '{}',
+          },
+        );
+        if (state.paid) {
+          location.replace(
+            '/book/success?session_id=' + encodeURIComponent(state.sessionId),
+          );
+          return;
+        }
+        requestKey = crypto.randomUUID();
+        checkoutRef = '';
+        const url = new URL(location.href);
+        url.searchParams.delete('resume');
+        history.replaceState(null, '', url);
+      } catch (e) {
+        error(e.message);
+        return;
+      }
+    }
+    await refreshQuote(false, false);
+    await showStep(
+      quote ? Number(resume ? 4 : params.get('step') || saved.step || 1) : 1,
+      false,
+    );
+  }
+  initialize();
 }

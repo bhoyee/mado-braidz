@@ -134,9 +134,21 @@ try {
       () => document.getElementById('summary-total').textContent === '$180',
     );
 
+    // Repeated activation of the same Continue button must not skip extras.
     await page
       .getByRole('button', { name: 'Choose extras', exact: true })
-      .click();
+      .evaluate((button) => {
+        button.click();
+        button.click();
+      });
+    assert.equal(
+      await page.locator('[data-booking-step="2"]').isVisible(),
+      true,
+    );
+    assert.equal(
+      await page.getByRole('checkbox', { name: /Head wash/ }).isVisible(),
+      true,
+    );
     await page.getByRole('checkbox', { name: /100% human hair/ }).check();
     await page.waitForFunction(
       () => document.getElementById('summary-total').textContent === '$220',

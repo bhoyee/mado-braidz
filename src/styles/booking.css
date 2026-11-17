@@ -43,10 +43,35 @@
 .booking-addon {
   border-bottom: 1px solid var(--color-linen);
 }
+.booking-form .booking-payment-options {
+  margin: 16px 0 8px;
+}
+.booking-payment-options legend {
+  margin-bottom: 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.booking-form .booking-check {
+  min-height: 44px;
+  padding: 8px 0;
+  margin: 0;
+  gap: 10px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.booking-form .booking-payment-note {
+  margin: 14px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--color-violet-deep);
+}
 .booking-addon input,
 .booking-check input {
   width: 22px;
   height: 22px;
+  min-height: 22px;
+  padding: 0;
   flex-shrink: 0;
   margin-top: 3px;
   accent-color: var(--color-violet);
@@ -176,6 +201,22 @@
 
 .booking-summary-toggle {
   display: none;
+}
+.booking-summary .summary-payment-row {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.booking-summary .booking-summary-note {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.booking-summary #summary-total {
+  background: #f5d878;
+  color: var(--color-night);
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-weight: 700;
 }
 @media (max-width: 800px) {
   .booking-layout .booking-summary {
@@ -408,4 +449,499 @@
   .booking-time-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+}
+
+/* A compact appointment receipt, with the key visit and payment details first. */
+.appointment-result {
+  padding-block: 32px 56px;
+}
+.appointment-result-heading {
+  margin-bottom: 24px;
+}
+.appointment-result-heading .eyebrow {
+  margin-bottom: 8px;
+}
+.appointment-result h1 {
+  font-size: clamp(32px, 4vw, 52px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  margin-bottom: 10px;
+}
+.appointment-result-heading > p:last-child {
+  font-size: 15px;
+  color: var(--muted);
+}
+.appointment-receipt {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr);
+  border: 1px solid var(--color-lilac);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-cream);
+}
+.appointment-receipt[hidden] {
+  display: none;
+}
+.appointment-visit {
+  padding: 28px 32px;
+}
+.appointment-reference {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.appointment-reference > span,
+.appointment-detail-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.appointment-reference strong {
+  padding: 5px 9px;
+  background: #f5d878;
+  color: var(--color-night);
+  font-size: 14px;
+  letter-spacing: 0.025em;
+  overflow-wrap: anywhere;
+}
+.appointment-visit .eyebrow {
+  margin-bottom: 6px;
+}
+.appointment-visit h2 {
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.15;
+  margin-bottom: 22px;
+}
+.appointment-date p {
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 5px;
+}
+.appointment-timezone {
+  font-size: 12px;
+  color: var(--muted);
+}
+.appointment-location {
+  padding: 0 32px 28px;
+  grid-column: 1;
+  grid-row: 2;
+}
+.appointment-location p {
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 6px 0;
+}
+.appointment-location .text-link {
+  font-size: 14px;
+}
+.appointment-payment {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  background: var(--color-night);
+  color: var(--color-cream);
+  padding: 28px 32px;
+}
+.appointment-payment .eyebrow {
+  color: var(--color-lilac);
+  margin-bottom: 20px;
+}
+.appointment-payment dt {
+  font-size: 14px;
+  font-weight: 600;
+}
+.appointment-payment dd {
+  margin: 5px 0 0;
+  font-family: var(--font-serif);
+  font-size: clamp(30px, 3vw, 42px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.appointment-paid dd {
+  color: var(--color-gold);
+}
+.appointment-balance {
+  border-top: 1px solid var(--color-plum);
+  margin-top: 18px;
+  padding-top: 18px;
+}
+.appointment-payment-caption {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-lilac);
+  margin-top: 18px;
+  max-width: 32ch;
+}
+.appointment-actions {
+  margin-top: 22px;
+  display: grid;
+  gap: 10px;
+}
+.appointment-actions .button {
+  background: var(--color-cream);
+  color: var(--color-night);
+  margin: 0;
+  text-align: center;
+}
+.appointment-actions .button:hover {
+  background: var(--color-lilac);
+}
+.appointment-calendar {
+  color: var(--color-cream);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.appointment-help {
+  font-size: 14px;
+  margin-top: 20px;
+}
+.appointment-help a {
+  font-weight: 700;
+  color: var(--color-violet-deep);
+}
+@media (max-width: 700px) {
+  .appointment-result {
+    padding-block: 22px 36px;
+  }
+  .appointment-result-heading {
+    margin-bottom: 18px;
+  }
+  .appointment-receipt {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .appointment-visit,
+  .appointment-payment {
+    padding: 22px;
+  }
+  .appointment-payment {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .appointment-location {
+    grid-row: 3;
+    padding: 20px 22px;
+  }
+  .appointment-reference {
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+  }
+  .appointment-visit h2 {
+    margin-bottom: 16px;
+  }
+  .appointment-payment dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .appointment-balance {
+    border-top: 0;
+    border-left: 1px solid var(--color-lilac);
+    margin-top: 0;
+    padding: 0 0 0 16px;
+  }
+}
+
+.visit-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.visit-heading p:last-child {
+  font-size: 15px;
+  color: var(--muted);
+}
+.visit-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--color-mist);
+  color: var(--color-violet-deep);
+  border: 1px solid var(--color-lilac);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.visit-status[data-status='confirmed']::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+.visit-status[data-status='cancelled'],
+.visit-status[data-status='payment_conflict'] {
+  color: var(--color-danger);
+}
+.visit-style-options {
+  font-size: 14px;
+  color: var(--muted);
+  margin: -12px 0 20px;
+}
+.visit-extras {
+  margin-top: 20px;
+}
+.visit-extras ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+.visit-extras li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 6px;
+}
+.visit-extras li span {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.visit-payment-hint {
+  color: var(--color-lilac);
+  font-size: 12px;
+  text-align: center;
+}
+.visit-page .appointment-actions .field-error {
+  color: #ffb4ab;
+  font-size: 14px;
+}
+.visit-paid-note {
+  padding-top: 16px;
+  margin-top: 20px;
+  border-top: 1px solid var(--color-plum);
+  color: var(--color-lilac);
+  font-size: 14px;
+  font-weight: 700;
+}
+.visit-support {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 24px;
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
+.visit-support h2 {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+.visit-support p {
+  max-width: 60ch;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.visit-support .text-link {
+  font-size: 14px;
+}
+.visit-support .button {
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .visit-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .visit-support {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .visit-page .appointment-actions .button {
+    white-space: normal;
+  }
+}
+
+.pay-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.pay-search,
+.manual-proof-form,
+.payment-review {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 28px;
+  background: var(--color-cream);
+}
+.pay-search input,
+.manual-proof-form input,
+.payment-review textarea {
+  max-width: 100%;
+}
+.pay-search .small,
+.manual-proof-form .small {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.pay-search .button,
+.manual-proof-form .button {
+  margin-top: 18px;
+}
+.pay-alternatives {
+  padding: 28px;
+  background: var(--color-night);
+  color: var(--color-cream);
+  border-radius: 12px;
+}
+.pay-alternatives .eyebrow,
+.pay-alternatives a {
+  color: var(--color-lilac);
+}
+.pay-alternatives h2,
+.manual-proof-form h2,
+.pay-found h2 {
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+.pay-alternatives p {
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.pay-alternatives dl {
+  padding-block: 16px;
+  border-top: 1px solid var(--color-plum);
+}
+.pay-alternatives dt {
+  font-size: 13px;
+}
+.pay-alternatives dd {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.pay-found {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.pay-found dd {
+  font: 700 36px var(--font-serif);
+  color: var(--color-violet-deep);
+}
+.pay-found dl {
+  margin-top: 16px;
+}
+.pay-found p,
+.manual-proof-form p,
+.payment-review p {
+  font-size: 15px;
+}
+.pay-lookup-message {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--color-danger);
+  background: #fceceb;
+  color: var(--color-danger);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.manual-review-notice {
+  margin-block: 20px;
+  padding: 16px 20px;
+  border-left: 3px solid var(--color-violet);
+  background: var(--color-mist);
+  color: var(--color-night);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.manual-proof-form {
+  margin-block: 24px;
+  max-width: 760px;
+}
+.manual-proof-form .booking-check {
+  min-height: 44px;
+  padding: 10px 0;
+  font-size: 15px;
+}
+.manual-proof-form .booking-check input {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.manual-proof-form .button {
+  white-space: normal;
+}
+.payment-review {
+  margin-bottom: 24px;
+}
+@media (max-width: 700px) {
+  .pay-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .pay-search,
+  .pay-alternatives,
+  .manual-proof-form,
+  .payment-review {
+    padding: 20px;
+  }
+  .visit-status {
+    white-space: normal;
+  }
+}
+
+.pay-results-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 20px;
+  margin-top: 24px;
+  padding: 16px 0;
+  border-block: 1px solid var(--line);
+  font-size: 14px;
+}
+.pay-results-summary strong {
+  color: var(--color-violet-deep);
+}
+.pay-all-panel {
+  padding: 20px;
+  margin-top: 20px;
+  background: var(--color-mist);
+  border-left: 3px solid var(--color-violet);
+}
+.pay-all-panel p {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.pay-all-panel .small {
+  font-size: 12px;
+  margin-top: 10px;
+}
+.pay-all-panel .button {
+  margin-top: 14px;
+  white-space: normal;
+}
+#batch-details[hidden] {
+  display: none;
+}
+.batch-entry {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin: 0 0 20px;
+}
+.batch-entry p {
+  margin-bottom: 8px;
 }

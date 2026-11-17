@@ -37,3 +37,6 @@ for (const [source, target] of [
   );
 
 copyFileSync('src/client/booking.js', 'public/build/booking.js');
+
+copyFileSync('src/client/payment.js', 'public/build/payment.js');
+copyFileSync('src/client/batch-payment.js', 'public/build/batch-payment.js');

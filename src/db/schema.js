@@ -198,6 +198,7 @@ export const bookings = mysqlTable(
     manageTokenHash: str('manage_token_hash', 64).notNull(),
     policyAcceptedAt: dt('policy_accepted_at'),
     stripeCheckoutSessionId: str('stripe_checkout_session_id'),
+    checkoutRequestKey: str('checkout_request_key', 64).unique(),
     createdByAdminId: ref('created_by_admin_id').references(() => admins.id),
     completedAt: dt('completed_at'),
     cancelledAt: dt('cancelled_at'),
@@ -259,11 +260,70 @@ export const payments = mysqlTable('payments', {
   recordedByAdminId: ref('recorded_by_admin_id').references(() => admins.id),
   createdAt: created(),
 });
+export const paymentProofs = mysqlTable('payment_proofs', {
+  id: id(),
+  bookingId: ref('booking_id')
+    .notNull()
+    .references(() => bookings.id),
+  method: mysqlEnum('method', ['zelle', 'cashapp']).notNull(),
+  paymentType: mysqlEnum('payment_type', [
+    'deposit',
+    'full',
+    'balance',
+  ]).notNull(),
+  amountCents: int('amount_cents').notNull(),
+  path: str('path', 1024).notNull(),
+  status: mysqlEnum('status', ['pending', 'approved', 'rejected'])
+    .notNull()
+    .default('pending'),
+  reviewedBy: ref('reviewed_by').references(() => admins.id),
+  reviewedAt: dt('reviewed_at'),
+  reviewNote: text('review_note'),
+  createdAt: created(),
+});
 export const stripeEvents = mysqlTable('stripe_events', {
   id: str('id').primaryKey(),
   type: str('type').notNull(),
   receivedAt: dt('received_at').notNull(),
   processedAt: dt('processed_at'),
+});
+export const checkoutAttempts = mysqlTable('checkout_attempts', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  bookingId: ref('booking_id')
+    .notNull()
+    .references(() => bookings.id),
+  batchId: varchar('batch_id', { length: 64 }),
+  paymentType: mysqlEnum('payment_type', [
+    'deposit',
+    'full',
+    'balance',
+  ]).notNull(),
+  amountCents: int('amount_cents').notNull(),
+  status: mysqlEnum('status', [
+    'creating',
+    'open',
+    'paid',
+    'expired',
+  ]).notNull(),
+  stripeSessionId: str('stripe_session_id').unique(),
+  stripePaymentIntentId: str('stripe_payment_intent_id').unique(),
+  expiresAt: dt('expires_at').notNull(),
+  createdAt: created(),
+});
+export const paymentBatches = mysqlTable('payment_batches', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  items: json('items').notNull(),
+  totalCents: int('total_cents').notNull(),
+  status: mysqlEnum('status', [
+    'creating',
+    'open',
+    'paid',
+    'expired',
+  ]).notNull(),
+  stripeSessionId: str('stripe_session_id').unique(),
+  stripePaymentIntentId: str('stripe_payment_intent_id').unique(),
+  expiresAt: dt('expires_at').notNull(),
+  createdAt: created(),
 });
 export const jobs = mysqlTable(
   'jobs',

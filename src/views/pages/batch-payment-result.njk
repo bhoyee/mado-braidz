@@ -1,0 +1,9 @@
+{% extends "layouts/base.njk" %}
+{% block content %}
+<section class="wrap appointment-result" data-batch-result data-session="{{ sessionId }}" data-batch-id="{{ batchId }}" data-cancel="{{ 'true' if cancelRequested else 'false' }}" data-csrf="{{ csrfToken }}">
+  <header class="appointment-result-heading"><p class="eyebrow">Your payments</p><h1 id="batch-heading">Confirming your payments…</h1><p id="batch-message" role="status">Please wait while we verify your Stripe payment.</p></header>
+  <div class="pay-layout" id="batch-details" hidden><div id="batch-entries"></div><aside class="pay-alternatives"><p class="eyebrow">Combined payment</p><h2 id="batch-total"></h2><p id="batch-refund"></p><p>All amounts in USD. Each payment is recorded against its own appointment.</p><a href="/pay">Back to payments</a></aside></div>
+  <p class="appointment-help">Need a hand? <a href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></p>
+  <noscript><p>Please enable JavaScript to check payment confirmation, or call the studio before paying again.</p></noscript>
+</section><script defer src="/build/batch-payment.js"></script>
+{% endblock %}

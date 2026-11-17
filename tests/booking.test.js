@@ -461,3 +461,33 @@ it.each(['4437434979', '(443) 743-4979', '14437434979', '+14437434979'])(
     );
   },
 );
+
+it('rejects live or mixed Stripe keys in local development', () => {
+  const base = {
+    NODE_ENV: 'development',
+    SESSION_SECRET: 'test-secret-that-is-at-least-32-characters',
+    DATABASE_URL: 'mysql://unused:unused@localhost/mado',
+    UPLOAD_DIR: 'tmp/uploads',
+  };
+  expect(() =>
+    parseEnv({
+      ...base,
+      STRIPE_SECRET_KEY: 'sk_live_test',
+      STRIPE_PUBLISHABLE_KEY: 'pk_live_test',
+    }),
+  ).toThrow();
+  expect(() =>
+    parseEnv({
+      ...base,
+      STRIPE_SECRET_KEY: 'sk_test_test',
+      STRIPE_PUBLISHABLE_KEY: 'pk_live_test',
+    }),
+  ).toThrow();
+  expect(
+    parseEnv({
+      ...base,
+      STRIPE_SECRET_KEY: 'sk_test_test',
+      STRIPE_PUBLISHABLE_KEY: 'pk_test_test',
+    }).STRIPE_SECRET_KEY,
+  ).toBe('sk_test_test');
+});

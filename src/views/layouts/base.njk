@@ -90,7 +90,7 @@
     </div>
     <nav aria-label="Footer navigation">
       <h2 class="footer-heading">Explore</h2>
-      {% for url,name in [['/styles','Styles'],['/our-work','Our Work'],['/about','Our Story'],['/contact','Visit'],['/policies','Policies'],['/privacy','Privacy'],['/terms','Terms']] %}<a href="{{ url }}">{{ name }}</a>{% endfor %}
+      {% for url,name in [['/styles','Styles'],['/our-work','Our Work'],['/about','Our Story'],['/contact','Visit'],['/pay','Make a payment'],['/policies','Policies'],['/privacy','Privacy'],['/terms','Terms']] %}<a href="{{ url }}">{{ name }}</a>{% endfor %}
     </nav>
   </div>
   <div class="wrap footer-payments">
@@ -104,7 +104,7 @@
 </footer>
 
 {% if not isDesign %}
-{% if currentPath != '/book' %}<div class="mobile-book">
+{% if currentPath != '/book' and currentPath != '/book/success' and not hideMobileBooking %}<div class="mobile-book">
   <a href="tel:{{ business.phone }}" class="mobile-book-call">Call</a>
   <a href="/book" class="button">Book your chair</a>
 </div>

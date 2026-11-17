@@ -15,6 +15,10 @@ export const envSchema = z
     STRIPE_SECRET_KEY: optional,
     STRIPE_PUBLISHABLE_KEY: optional,
     STRIPE_WEBHOOK_SECRET: optional,
+    MANUAL_PAYMENT_NAME: z.string().default('Magdaline Arrey'),
+    ZELLE_RECIPIENT: optional,
+    CASHAPP_CASHTAG: optional,
+    MANUAL_REVIEW_HOURS: z.coerce.number().int().min(1).max(48).default(24),
     EMAIL_PROVIDER: z.enum(['resend', 'postmark', 'log']).default('log'),
     RESEND_API_KEY: optional,
     EMAIL_FROM: z
@@ -38,6 +42,34 @@ export const envSchema = z
     LOG_DIR: z.string().default('logs'),
   })
   .superRefine((env, ctx) => {
+    if (env.STRIPE_SECRET_KEY || env.STRIPE_PUBLISHABLE_KEY) {
+      const secret = env.STRIPE_SECRET_KEY.match(/^sk_(test|live)_/);
+      const publishable = env.STRIPE_PUBLISHABLE_KEY.match(/^pk_(test|live)_/);
+      if (!secret)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['STRIPE_SECRET_KEY'],
+          message: 'Use a valid Stripe secret key',
+        });
+      if (!publishable)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['STRIPE_PUBLISHABLE_KEY'],
+          message: 'Use a valid Stripe publishable key',
+        });
+      if (secret && publishable && secret[1] !== publishable[1])
+        ctx.addIssue({
+          code: 'custom',
+          path: ['STRIPE_PUBLISHABLE_KEY'],
+          message: 'Stripe key modes must match',
+        });
+      if (secret?.[1] === 'live' && env.NODE_ENV !== 'production')
+        ctx.addIssue({
+          code: 'custom',
+          path: ['STRIPE_SECRET_KEY'],
+          message: 'Use Stripe test keys outside production',
+        });
+    }
     if (env.NODE_ENV === 'production') {
       for (const key of [
         'STRIPE_SECRET_KEY',

@@ -342,7 +342,7 @@ export function decorateCatalog(data) {
     }).format(new Date()),
   };
 }
-export function publicRouter(catalog) {
+export function publicRouter(catalog, paymentRoutes) {
   const router = Router();
   router.use(async (req, res, next) => {
     try {
@@ -361,6 +361,7 @@ export function publicRouter(catalog) {
         title: `${title} | ${res.locals.business.name}`,
         ...extra,
       });
+  if (paymentRoutes) router.use(paymentRoutes);
   router.get('/', render('home', 'African hair braiding in Lanham, MD'));
   router.get('/styles', (req, res) => {
     const category = z

@@ -12,6 +12,12 @@ export function createLogger(config) {
         'res.headers.set-cookie',
         'password',
         'DATABASE_URL',
+        'STRIPE_SECRET_KEY',
+        'STRIPE_WEBHOOK_SECRET',
+        'manageToken',
+        'req.query.session_id',
+        'req.params.token',
+        'req.headers["x-csrf-token"]',
       ],
     },
     createStream('app.log', {

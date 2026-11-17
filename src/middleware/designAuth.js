@@ -1,4 +1,4 @@
-export function designAuth(catalog) {
+export function designAuth(catalog, realm = 'Mado owner design preview') {
   return async (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     if (req.app.get('env') === 'production' && !req.secure)
@@ -23,10 +23,7 @@ export function designAuth(catalog) {
           }
         }
       }
-      res.set(
-        'WWW-Authenticate',
-        'Basic realm="Mado owner design preview", charset="UTF-8"',
-      );
+      res.set('WWW-Authenticate', `Basic realm="${realm}", charset="UTF-8"`);
       return res.status(401).send('Owner sign-in required');
     } catch (error) {
       return next(error);
