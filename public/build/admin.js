@@ -36,14 +36,27 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
     ];
     buttons.forEach((button) => (button.disabled = true));
     try {
-      const response = await fetch(form.action, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
+      // A control named "action" shadows HTMLFormElement.action. Read the
+      // attribute so booking actions and hidden action fields cannot replace
+      // the request URL with a select/input element.
+      const response = await fetch(
+        form.getAttribute('action') || location.href,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+      );
+      if (!response.headers.get('content-type')?.includes('application/json'))
+        throw new Error(
+          response.redirected &&
+            new URL(response.url).pathname === '/admin/login'
+            ? 'Your session expired. Sign in again.'
+            : 'Unable to save. Refresh the page and try again.',
+        );
       const result = await response.json();
       if (!response.ok)
         throw new Error(

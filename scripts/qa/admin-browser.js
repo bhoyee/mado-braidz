@@ -83,6 +83,95 @@ try {
     console.log(`Owner created appointment at ${width}px`);
     const bookingId = Number(page.url().split('/').pop());
     assert.equal(repo.rows.find((b) => b.id === bookingId).status, 'confirmed');
+    async function submitDetailForm(button) {
+      const posted = page.waitForResponse(
+        (response) => response.request().method() === 'POST',
+      );
+      await button.click();
+      const response = await posted;
+      assert.equal(
+        new URL(response.url()).pathname,
+        `/admin/bookings/${bookingId}/action`,
+      );
+      assert.equal(response.status(), 200);
+      assert.match(response.headers()['content-type'], /application\/json/);
+      await page.locator('.owner-alert').waitFor({ state: 'visible' });
+      assert.equal(
+        await page.locator('.owner-alert').textContent(),
+        'Booking updated.',
+      );
+    }
+    await page
+      .getByLabel('Only visible to the owner')
+      .fill('Saved from the private notes form.');
+    await page.route(
+      `${origin}/admin/bookings/${bookingId}/action`,
+      (route) =>
+        route.fulfill({
+          status: 503,
+          contentType: 'text/html',
+          body: '<!doctype html><title>Unavailable</title>',
+        }),
+      { times: 1 },
+    );
+    await page.getByRole('button', { name: 'Save note', exact: true }).click();
+    await page.locator('.owner-alert').waitFor({ state: 'visible' });
+    assert.equal(
+      await page.locator('.owner-alert').textContent(),
+      'Unable to save. Refresh the page and try again.',
+    );
+    assert.notEqual(
+      (await repo.bookingById(bookingId)).adminNotes,
+      'Saved from the private notes form.',
+    );
+    await submitDetailForm(
+      page.getByRole('button', { name: 'Save note', exact: true }),
+    );
+    assert.equal(
+      (await repo.bookingById(bookingId)).adminNotes,
+      'Saved from the private notes form.',
+    );
+    await page.getByLabel('Amount received (USD)').fill('30');
+    await page
+      .getByLabel('Payment note', { exact: true })
+      .fill('Cash received at the studio.');
+    await submitDetailForm(
+      page.getByRole('button', {
+        name: 'Record received payment',
+        exact: true,
+      }),
+    );
+    assert.equal((await repo.bookingById(bookingId)).paidCents, 3000);
+    assert.equal((await repo.payments(bookingId)).length, 1);
+    // The action select used to hide the form's URL property just like the
+    // hidden action fields on payment and notes forms.
+    await page.locator('select[name="action"]').selectOption('balance-link');
+    await page
+      .getByLabel('Reason / note', { exact: true })
+      .fill('Requested by the client.');
+    const queuedResponse = page.waitForResponse(
+      (response) => response.request().method() === 'POST',
+    );
+    await page
+      .getByRole('button', { name: 'Apply action', exact: true })
+      .click();
+    const queued = await queuedResponse;
+    assert.equal(
+      new URL(queued.url()).pathname,
+      `/admin/bookings/${bookingId}/action`,
+    );
+    assert.equal(queued.status(), 200);
+    await page.locator('.owner-alert').waitFor({ state: 'visible' });
+    assert.ok(
+      repo.jobRows.some(
+        (job) =>
+          job.payload.bookingId === bookingId &&
+          job.payload.template === 'balance-payment',
+      ),
+    );
+    console.log(
+      `PASS private notes, cash payment and booking action forms at ${width}px`,
+    );
     await page.screenshot({
       path: `tmp/qa/admin-detail-${width}.png`,
       fullPage: true,
@@ -264,6 +353,22 @@ try {
     );
     // Use a standard UUID to exercise the exact production validation.
     if (response.status() !== 200) throw new Error(await response.text());
+    await page.goto(origin + `/admin/bookings/${bookingId}`);
+    await page.getByLabel('Refund amount (USD)').fill('5');
+    await page
+      .getByLabel('Reason', { exact: true })
+      .fill('Cash returned to the client.');
+    page.once('dialog', (dialog) => dialog.accept());
+    await submitDetailForm(
+      page.getByRole('button', { name: 'Submit refund', exact: true }),
+    );
+    assert.equal((await repo.bookingById(bookingId)).paidCents, 2500);
+    assert.equal(
+      (await repo.payments(bookingId)).filter(
+        (payment) => payment.type === 'refund',
+      ).length,
+      1,
+    );
     console.log(
       `PASS owner login, create, edit, move, private balance and accessible screens at ${width}px`,
     );
