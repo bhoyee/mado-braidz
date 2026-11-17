@@ -8,7 +8,7 @@ import { stripeWebhook } from './routes/webhooks/stripe.js';
 import { bookingRouter } from './routes/public/booking.js';
 import { createBookingRepository } from './services/bookingRepository.js';
 import { join } from 'node:path';
-import { statSync } from 'node:fs';
+import { statSync, existsSync, readFileSync } from 'node:fs';
 import { createDatabase } from './db/index.js';
 import { createCatalogService } from './services/catalogService.js';
 import { publicRouter, money } from './routes/public/index.js';
@@ -114,7 +114,13 @@ export function createApp({
     }),
   );
   app.use(compression());
-  app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+  const releaseFile = new URL('../release.json', import.meta.url);
+  const revision = existsSync(releaseFile)
+    ? JSON.parse(readFileSync(releaseFile, 'utf8')).revision
+    : undefined;
+  app.get('/health', (_req, res) =>
+    res.set('Cache-Control', 'no-store').json({ status: 'ok', revision }),
+  );
   app.use(
     '/build',
     express.static(fileURLToPath(new URL('../public/build', import.meta.url))),

@@ -1,0 +1,85 @@
+name: Test and deploy production
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-password
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pci-only-password"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      TEST_DATABASE_URL: mysql://root:ci-only-password@127.0.0.1:3306/mysql
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:db
+      - name: Package built release without credentials or local data
+        shell: bash
+        run: |
+          bash -n scripts/deploy-production.sh
+          mkdir -p artifact
+          tar -czf "artifact/$GITHUB_SHA.tar.gz" app.cjs package.json package-lock.json src scripts public
+          cd artifact
+          sha256sum "$GITHUB_SHA.tar.gz" > "$GITHUB_SHA.tar.gz.sha256"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: production-release
+          path: artifact/
+          retention-days: 7
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: verify
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: production-release
+          path: artifact
+      - name: Deploy, migrate and verify the served revision
+        shell: bash
+        env:
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          unset DEPLOY_KEY KNOWN_HOSTS
+          trap 'rm -f ~/.ssh/deploy_key' EXIT
+          ssh_options=(-i ~/.ssh/deploy_key -p 10022 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20)
+          host=madoafri@madoafricanbraidz.com
+          ssh "${ssh_options[@]}" "$host" 'mkdir -p /home/madoafri/mado-deploy/incoming /home/madoafri/mado-deploy/releases'
+          scp -i ~/.ssh/deploy_key -P 10022 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes artifact/* "$host:/home/madoafri/mado-deploy/incoming/"
+          tar -xOf "artifact/$GITHUB_SHA.tar.gz" scripts/deploy-production.sh > deploy.sh
+          ssh "${ssh_options[@]}" "$host" "bash -s -- $GITHUB_SHA" < deploy.sh

@@ -12,6 +12,40 @@ Main domain: **https://madoafricanbraidz.com**. Local development stays on **htt
 - Deployment state/credentials: `/home/madoafri/mado-deploy`, private, outside `public_html`.
 - Backups: `/home/madoafri/mado-backups`, private, outside `public_html`.
 
+## GitHub Actions production deployment
+
+`.github/workflows/production.yml` runs on pull requests, pushes to `main`, and manual dispatch. Verification uses Node 20, installs the lockfile, builds assets, runs ESLint/Prettier, Vitest/Supertest, and real MySQL 8 integration tests against a disposable database. No real payment keys are needed for CI. Failed checks prevent deployment.
+
+The GitHub `production` environment permits only the `main` branch and contains two encrypted secrets:
+
+| Secret | Purpose |
+| --- | --- |
+| `PRODUCTION_SSH_KEY` | Dedicated deployment private key; its public key is authorized with `restrict` on the hosting account. |
+| `PRODUCTION_KNOWN_HOSTS` | Previously verified SSH host public key for `[madoafricanbraidz.com]:10022`; strict host checking is mandatory. |
+
+The workflow does not use the cPanel password. Rotate the deployment key by authorizing a replacement public key, updating the environment secret, verifying a deployment, and removing the old public key. If the server host key changes, verify its new fingerprint with the provider before updating the known-hosts secret. Never disable host verification.
+
+After checks pass, CI uploads only application source, scripts, package manifests and built public assets. It excludes `.env`, Git metadata, design originals, uploads, logs, backups and Windows dependencies. The server verifies the archive checksum and uses `scripts/deploy-production.sh` to:
+
+1. Acquire a deployment lock and install production-only Linux dependencies into a new private release directory.
+2. Link the existing server `.env`, create a database backup, and run `npm run db:migrate`. Migration failure stops before changing the running release. Routine deployment does not seed, reset owner credentials or synchronize content.
+3. Preserve the registered `/home/madoafri/mado-app` directory and its `.env`; switch only the application entries to the new release. Uploads, logs, cron, webhook keys and session secrets remain in their existing locations.
+4. Gracefully restart only the account-owned worker for this app. Verify `/health` returns the exact deployed Git SHA and verify the database-backed styles and booking pages respond successfully.
+5. Restore the previous application entries and restart if cutover or HTTP verification fails. Completed database migrations are **not** automatically reversed: migrations must remain compatible with the previous release. A destructive schema change requires a separate, reviewed rollout.
+
+`/health` includes `revision` only when a release manifest exists, and disables caching. This value is captured at process startup, so old workers cannot pass a new release's revision check. The deployment job is serialized and is not cancelled by a newer push. Server locking also prevents simultaneous manual deployment.
+
+View progress under **GitHub → Actions → Test and deploy production**. To redeploy, use **Run workflow → main**, or run:
+
+```powershell
+gh workflow run production.yml --ref main
+gh run list --workflow production.yml
+```
+
+The last successful deployment's SHA, release path and previous snapshot path are recorded in `/home/madoafri/mado-deploy/ci-release.json`. Previous application snapshots and release directories are retained for recovery; check disk usage and remove obsolete releases only after confirming they are not referenced by the app root or a retained rollback snapshot. Database backups retain their existing 14-day policy. GitHub build artifacts expire after seven days and contain no runtime credentials or database dumps.
+
+For recovery, first inspect the failed Actions job and server logs. Automatic rollback handles a failed cutover. For a later regression, revert the offending commit on `main` and let CI deploy the corrected revision; never force-push production history. If migrations changed data incompatibly, stop writes and review the private pre-migration database backup before restoring anything. Do not restore the database automatically over newer bookings.
+
 The old web root is archived before cutover. Keep the backup until the owner has verified the replacement. Never publish `.env`, receipts, database dumps or deployment credentials under `public_html`.
 
 ## Release process
@@ -20,7 +54,7 @@ The old web root is archived before cutover. Keep the backup until the owner has
 2. Commit the prepared `public/build` assets. Package the verified release with Git, excluding local secrets, uploads and Windows dependencies.
 3. Upload/extract the release into the app root; preserve the private server `.env` and external uploads. Install Linux packages using the selected CloudLinux Node environment and `npm ci --omit=dev`. Do not build on this shared host.
 4. Set server-specific production configuration in the app's private `.env` (or cPanel environment settings). Required settings include `NODE_ENV=production`, HTTPS `APP_URL`, `PORT=4780`, a stable random `SESSION_SECRET`, the server `DATABASE_URL`, Stripe keys and endpoint-specific webhook secret, `CRON_SECRET`, owner seed credentials, and the persistent absolute upload/log paths. Never upload the local `.env` containing cPanel/SSH credentials.
-5. Run `npm run db:migrate`, then `npm run db:seed` in the app root. Seeding preserves existing prices, settings and passwords. Back up an existing database before migrations. Never use `--update-owner` during a routine deployment.
+5. Run `npm run db:migrate`, then `npm run db:seed` only during initial setup. Routine deployments run migrations without seeding or synchronizing content. Back up an existing database before migrations. Never use `--update-owner` during a routine deployment.
 6. Register the Node app with CloudLinux on the main domain at `/`, production mode, Node 20, startup `app.cjs`. Restart it through cPanel or `cloudlinux-selector restart --json --interpreter nodejs --app-root mado-app`.
 7. Add a five-minute cron entry using the selected Node executable, changing into the app root before `node scripts/run-jobs.js`. Preserve unrelated cron entries. The runner uses the existing MySQL lock and handles expired holds and refund retries.
 8. Configure the Stripe **test-mode** webhook endpoint at `https://madoafricanbraidz.com/webhooks/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`, `refund.updated`, `refund.failed`. Its `whsec_...` differs from the local Stripe CLI listener secret.
