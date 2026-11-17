@@ -885,6 +885,10 @@ The build runs in 9 milestones, each a separate Codex task and pull request. Pas
 - [ ] Backups confirmed running
 - [ ] First real booking taken and refunded as a final live test
 
+## Owner amendment — Milestone 5 owner access (November 17, 2026)
+
+Build the admin core for one owner only. Staff accounts, invitations and staff management UI are deferred until requested; existing non-owner records must be denied access. The owner can edit a booking, especially its date and start time, with the same full-interval capacity of three, opening-hours, 30-minute start-step and buffer checks. Date-only changes retain the agreed price snapshot. An explicit style/extra change recomputes the affected appointment's total on the server; consultation-priced visits can receive an agreed final total. Owner-created short-notice appointments may bypass public notice/advance restrictions, but never opening hours, time blocks or capacity. Email requests from admin actions are queued for Milestone 7; password reset has its own Resend delivery path and a private ignored local-development file fallback.
+
 ## Owner amendment — public Pay page and manual transfers (November 17, 2026)
 
 This explicitly extends Milestone 4 with `/pay` in the footer, booking/visit payment-method selection, private Zelle/Cash App proof upload, and owner review before an initial appointment is confirmed. Card payments retain Stripe Checkout and signed-webhook confirmation. Transfer recipient name and destinations come only from env (`MANUAL_PAYMENT_NAME`, `ZELLE_RECIPIENT`, `CASHAPP_CASHTAG`), so a restart after changing env updates every payment screen. Never infer payment receipt from a screenshot.
