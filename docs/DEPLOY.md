@@ -14,7 +14,7 @@ Main domain: **https://madoafricanbraidz.com**. Local development stays on **htt
 
 ## GitHub Actions production deployment
 
-`.github/workflows/production.yml` runs on pull requests, pushes to `main`, and manual dispatch. Verification uses Node 20, installs the lockfile, builds assets, runs ESLint/Prettier, Vitest/Supertest, and real MySQL 8 integration tests against a disposable database. No real payment keys are needed for CI. Failed checks prevent deployment.
+`.github/workflows/production.yml` runs on pull requests, pushes to `main`, and manual dispatch. Verification uses Node 20, installs the lockfile, builds assets, runs ESLint/Prettier, Vitest/Supertest, and real MySQL 8 integration tests against a disposable database. It also exercises release cutover, migration failure and HTTP-failure rollback in an isolated fixture with fake packages and HTTP, preserving its private env. Run that fixture on Linux with `bash scripts/qa/deployment.sh`. No real payment keys are needed for CI. Failed checks prevent deployment.
 
 The GitHub `production` environment permits only the `main` branch and contains two encrypted secrets:
 

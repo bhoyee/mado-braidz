@@ -39,6 +39,8 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:db
+      - name: Verify deployment and rollback without production access
+        run: bash scripts/qa/deployment.sh
       - name: Package built release without credentials or local data
         shell: bash
         run: |
