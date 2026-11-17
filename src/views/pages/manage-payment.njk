@@ -1,2 +1,24 @@
-{% extends "layouts/base.njk" %}
-{% block content %}<section class="wrap section prose"><p class="eyebrow">{{ appointment.ref }}</p><h1>Your <em>visit.</em></h1><h2>{{ price.styleName }}</h2><p>{{ appointmentTime }} Eastern</p><p>Status: {{ appointment.status | replace('_',' ') }}</p><dl><div><dt>Paid</dt><dd>{{ appointment.paidCents | money }}</dd></div><div><dt>Balance</dt><dd>{% if price.consultation %}Agreed at consultation{% else %}{{ appointment.balanceCents | money }}{% endif %}</dd></div></dl>{% if canPayBalance %}<form data-balance-form data-ref="{{ appointment.ref }}" data-csrf="{{ csrfToken }}"><button type="submit" class="button">Pay {{ appointment.balanceCents | money }} balance securely</button><p class="field-error" role="alert" hidden></p></form>{% endif %}<p>For appointment changes, call <a href="tel:{{ business.phone }}">{{ phoneDisplay }}</a>.</p></section><script defer src="/build/payment.js"></script>{% endblock %}
+﻿{% extends "layouts/base.njk" %}
+{% block content %}
+<section class="wrap appointment-result visit-page">
+  <header class="appointment-result-heading visit-heading"><div><p class="eyebrow">Your appointment</p><h1>Your <em>visit.</em></h1><p>All the details for your time in our chair.</p></div><span class="visit-status" data-status="{{ appointment.status }}">{{ appointment.status | replace('_', ' ') }}</span></header>
+  <div class="appointment-receipt">
+    <div class="appointment-visit">
+      <div class="appointment-reference"><span>Booking reference</span><strong>{{ appointment.ref }}</strong></div>
+      <p class="eyebrow">Your look</p><h2>{{ price.styleName }}</h2>
+      {% if price.size or price.length %}<p class="visit-style-options">{% if price.size %}{{ price.size | replace('_', ' ') | title }}{% endif %}{% if price.size and price.length %} · {% endif %}{% if price.length %}{{ price.length | replace('_', ' ') | title }}{% endif %}</p>{% endif %}
+      <div class="appointment-date"><span class="appointment-detail-label">Date &amp; time</span><p>{{ appointmentTime }} Eastern</p><span class="appointment-timezone">America/New_York</span></div>
+      {% if price.addons.length %}<div class="visit-extras"><span class="appointment-detail-label">Your extras</span><ul>{% for addon in price.addons %}<li>{{ addon.name }} <span>{{ addon.priceCents | money }}</span></li>{% endfor %}</ul></div>{% endif %}
+    </div>
+    <aside class="appointment-payment" aria-label="Your payment summary">
+      <p class="eyebrow">Payment summary</p>
+      <dl><div class="appointment-paid"><dt>Amount paid</dt><dd>{{ appointment.paidCents | money }}</dd></div><div class="appointment-balance"><dt>Remaining balance</dt><dd>{% if price.consultation %}Agreed at consultation{% else %}{{ appointment.balanceCents | money }}{% endif %}</dd></div></dl>
+      <p class="appointment-payment-caption">All amounts in USD. Your payment is applied to your appointment total.</p>
+      {% if canPayBalance %}<form class="appointment-actions" data-balance-form data-ref="{{ appointment.ref }}" data-csrf="{{ csrfToken }}"><button type="submit" class="button">Pay {{ appointment.balanceCents | money }} balance securely</button><p class="visit-payment-hint">Secure checkout with Stripe.</p><p class="field-error" role="alert" hidden></p></form>{% elif appointment.paymentStatus == 'paid_in_full' %}<p class="visit-paid-note">Paid in full · No remaining balance</p>{% elif price.consultation %}<p class="visit-paid-note">Your final price will be agreed at consultation.</p>{% endif %}
+    </aside>
+    <div class="appointment-location"><span class="appointment-detail-label">Meet us at the studio</span><p>{{ business.street }}<br>{{ business.city }}, {{ business.region }} {{ business.postalCode }}</p><a class="text-link" href="{{ directions }}" target="_blank" rel="noopener">Get directions</a></div>
+  </div>
+  <div class="visit-support"><div><h2>A change of plans?</h2><p>Call the studio for appointment changes. Please give at least 48 hours’ notice for rescheduling.</p><a class="text-link" href="/policies">Appointment policies</a></div><a class="button outline" href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></div>
+</section>
+<script defer src="/build/payment.js"></script>
+{% endblock %}

@@ -134,6 +134,20 @@ try {
     await page
       .getByRole('link', { name: 'View your visit', exact: true })
       .click();
+    const visitReport = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+      .analyze();
+    assert.deepEqual(visitReport.violations, []);
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      false,
+    );
+    await page.screenshot({
+      path: `tmp/qa/visit-${width}.png`,
+      fullPage: true,
+    });
     await page.getByRole('button', { name: /Pay.*balance securely/ }).click();
     await page.waitForURL('https://checkout.stripe.com/**');
     const balance = [...provider.sessions.values()].at(-1);
@@ -149,6 +163,13 @@ try {
       await page.locator('#payment-totals').innerText(),
       /180\.00.*0\.00/s,
     );
+    await page
+      .getByRole('link', { name: 'View your visit', exact: true })
+      .click();
+    await page
+      .getByText('Paid in full · No remaining balance', { exact: true })
+      .waitFor();
+    assert.equal(await page.locator('[data-balance-form]').count(), 0);
     assert.deepEqual(errors, []);
     await context.close();
   }

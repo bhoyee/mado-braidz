@@ -649,3 +649,120 @@
     padding: 0 0 0 16px;
   }
 }
+
+.visit-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.visit-heading p:last-child {
+  font-size: 15px;
+  color: var(--muted);
+}
+.visit-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--color-mist);
+  color: var(--color-violet-deep);
+  border: 1px solid var(--color-lilac);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.visit-status[data-status='confirmed']::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+.visit-status[data-status='cancelled'],
+.visit-status[data-status='payment_conflict'] {
+  color: var(--color-danger);
+}
+.visit-style-options {
+  font-size: 14px;
+  color: var(--muted);
+  margin: -12px 0 20px;
+}
+.visit-extras {
+  margin-top: 20px;
+}
+.visit-extras ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+.visit-extras li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 6px;
+}
+.visit-extras li span {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.visit-payment-hint {
+  color: var(--color-lilac);
+  font-size: 12px;
+  text-align: center;
+}
+.visit-page .appointment-actions .field-error {
+  color: #ffb4ab;
+  font-size: 14px;
+}
+.visit-paid-note {
+  padding-top: 16px;
+  margin-top: 20px;
+  border-top: 1px solid var(--color-plum);
+  color: var(--color-lilac);
+  font-size: 14px;
+  font-weight: 700;
+}
+.visit-support {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 24px;
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
+.visit-support h2 {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+.visit-support p {
+  max-width: 60ch;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.visit-support .text-link {
+  font-size: 14px;
+}
+.visit-support .button {
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .visit-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .visit-support {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .visit-page .appointment-actions .button {
+    white-space: normal;
+  }
+}

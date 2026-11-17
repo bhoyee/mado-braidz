@@ -37,6 +37,7 @@ export function paymentPages(repository) {
         })
         .render('pages/manage-payment', {
           title: 'Your visit | Mado African Braidz',
+          hideMobileBooking: true,
           appointment: row,
           price,
           appointmentTime: row.startAt.toLocaleString('en-US', {
