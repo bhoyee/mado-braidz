@@ -114,8 +114,190 @@ function paymentLifecycle(repository, clock) {
     );
   }
   return {
+    async submitPaymentProof(id, input, reviewHours = 24) {
+      if (
+        !['zelle', 'cashapp'].includes(input.method) ||
+        !Number.isInteger(reviewHours) ||
+        reviewHours < 1 ||
+        reviewHours > 48
+      )
+        throw new BookingError(
+          'INVALID_INPUT',
+          'Invalid manual payment details.',
+        );
+      return locked(id, async (tx, booking, now) => {
+        const prior = await tx.proofs(id);
+        if (prior.some((p) => p.status === 'pending'))
+          throw new BookingError(
+            'REVIEW_PENDING',
+            'Your payment is already awaiting review.',
+            409,
+          );
+        const initial =
+          booking.status === 'pending_payment' &&
+          booking.holdExpiresAt > now.toJSDate();
+        const balance =
+          ['confirmed', 'completed'].includes(booking.status) &&
+          booking.paymentStatus === 'deposit_paid' &&
+          booking.balanceCents > 0 &&
+          !booking.priceSnapshot.consultation;
+        if (!initial && !balance)
+          throw new BookingError(
+            'PAYMENT_UNAVAILABLE',
+            'No payment is due for this booking.',
+            409,
+          );
+        if (
+          (await tx.attempts(id)).some((a) =>
+            ['creating', 'open'].includes(a.status),
+          )
+        )
+          throw new BookingError(
+            'CHECKOUT_OPEN',
+            'Return to your card checkout or call the studio before sending another payment.',
+            409,
+          );
+        const amountCents = initial
+          ? booking.priceSnapshot.dueTodayCents
+          : booking.balanceCents;
+        const paymentType = initial ? booking.paymentChoice : 'balance';
+        const proofId = await tx.insertProof({
+          bookingId: id,
+          method: input.method,
+          paymentType,
+          amountCents,
+          path: input.path,
+          status: 'pending',
+          createdAt: now.toJSDate(),
+        });
+        if (initial)
+          await save(
+            tx,
+            booking,
+            {
+              holdExpiresAt: new Date(
+                Math.min(
+                  now.plus({ hours: reviewHours }).toMillis(),
+                  booking.startAt.getTime(),
+                ),
+              ),
+            },
+            now,
+          );
+        await tx.notify({
+          type: 'payment_review',
+          title: 'Payment proof needs review',
+          body: `${booking.ref}: ${input.method} payment submitted. Verify receipt before approval.`,
+          url: '/admin/payment-reviews',
+        });
+        return { id: proofId, status: 'pending', amountCents };
+      });
+    },
+    async reviewPaymentProof(proofId, decision, admin, note = '') {
+      if (admin?.role !== 'owner')
+        throw new BookingError('FORBIDDEN', 'Owner access required.', 403);
+      const proof = await repository.proof(proofId);
+      if (!proof)
+        throw new BookingError('NOT_FOUND', 'Payment proof not found.', 404);
+      return locked(proof.bookingId, async (tx, booking, now) => {
+        const current = await tx.proof(proofId);
+        if (current.status !== 'pending') return { status: current.status };
+        if (decision === 'approve') {
+          if (current.paymentType !== 'balance') {
+            if (!['pending_payment', 'expired'].includes(booking.status))
+              throw new BookingError(
+                'BOOKING_CHANGED',
+                'This booking needs manual reconciliation. Do not approve twice.',
+                409,
+              );
+            const schedule = await tx.schedule(
+              booking.startAt,
+              booking.blockEndAt,
+            );
+            const catalog = await tx.catalog();
+            const remaining = remainingCapacity(
+              DateTime.fromJSDate(booking.startAt),
+              DateTime.fromJSDate(booking.blockEndAt),
+              schedule.bookings.filter((b) => b.id !== booking.id),
+              catalog.settings.booking.capacity,
+              now,
+            );
+            if (
+              booking.startAt <= now.toJSDate() ||
+              remaining < 1 ||
+              schedule.timeBlocks.some(
+                (b) =>
+                  b.startAt < booking.blockEndAt && b.endAt > booking.startAt,
+              )
+            )
+              throw new BookingError(
+                'PAYMENT_CONFLICT',
+                'This time is unavailable. Contact the client to arrange another time or a manual refund.',
+                409,
+              );
+            await change(tx, booking, 'confirmed', now);
+          } else if (
+            !['confirmed', 'completed'].includes(booking.status) ||
+            booking.paymentStatus !== 'deposit_paid' ||
+            booking.balanceCents !== current.amountCents
+          )
+            throw new BookingError(
+              'BOOKING_CHANGED',
+              'The balance changed. Reconcile this payment before approval.',
+              409,
+            );
+          await tx.insertPayment({
+            bookingId: booking.id,
+            type: current.paymentType,
+            provider: 'manual',
+            method: current.method,
+            amountCents: current.amountCents,
+            recordedByAdminId: admin.id,
+            note: `Verified payment proof ${proofId}`,
+          });
+          await reconcile(tx, booking, now);
+          await queue(
+            tx,
+            booking,
+            current.paymentType === 'balance'
+              ? 'balance-receipt'
+              : 'booking-confirmation',
+            now,
+          );
+        } else if (decision === 'reject') {
+          if (
+            current.paymentType !== 'balance' &&
+            booking.status === 'pending_payment'
+          )
+            await change(tx, booking, 'cancelled', now);
+        } else
+          throw new BookingError('INVALID_INPUT', 'Choose approve or reject.');
+        const status = decision === 'approve' ? 'approved' : 'rejected';
+        await tx.saveProof(proofId, {
+          status,
+          reviewedBy: admin.id,
+          reviewedAt: now.toJSDate(),
+          reviewNote: note,
+        });
+        await tx.audit({
+          adminId: admin.id,
+          entity: 'payment_proof',
+          entityId: proofId,
+          action: decision,
+          before: { status: 'pending' },
+          after: { status, bookingId: booking.id },
+        });
+        return { status };
+      });
+    },
     async reserveCheckout(id, type) {
       return locked(id, async (tx, booking, now) => {
+        if ((await tx.proofs(id)).some((p) => p.status === 'pending'))
+          throw new BookingError(
+            'REVIEW_PENDING',
+            'Your payment is awaiting review. Please do not pay again.',
+            409,
+          );
         if (type === 'balance') {
           if (
             !['confirmed', 'completed'].includes(booking.status) ||

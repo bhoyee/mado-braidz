@@ -15,6 +15,33 @@ function context(db, locking = false) {
       }));
       return catalog;
     },
+    async proofs(bookingId) {
+      const query = db.select().from(s.paymentProofs);
+      return bookingId
+        ? query.where(eq(s.paymentProofs.bookingId, bookingId))
+        : query;
+    },
+    async proof(id) {
+      return (
+        await db
+          .select()
+          .from(s.paymentProofs)
+          .where(eq(s.paymentProofs.id, id))
+      )[0];
+    },
+    async insertProof(values) {
+      return (await db.insert(s.paymentProofs).values(values).$returningId())[0]
+        .id;
+    },
+    async saveProof(id, values) {
+      await db
+        .update(s.paymentProofs)
+        .set(values)
+        .where(eq(s.paymentProofs.id, id));
+    },
+    async audit(values) {
+      await db.insert(s.auditLog).values(values);
+    },
     async lockDates(dates) {
       for (const date of [...new Set(dates)].sort()) {
         await db.execute(

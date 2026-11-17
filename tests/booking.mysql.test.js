@@ -33,6 +33,13 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       source.pathname = '/' + database;
       ({ db, pool } = createDatabase(source.toString()));
       await migrate(db, { migrationsFolder: 'src/db/migrations' });
+      await db.insert(s.admins).values({
+        id: 1,
+        email: 'owner@example.test',
+        name: 'Test Owner',
+        passwordHash: 'unused-in-service-test',
+        role: 'owner',
+      });
       const { data } = await memoryBookingRepository();
       await db.insert(s.styleCategories).values(data.categories);
       for (const style of data.styles) {
@@ -61,6 +68,8 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       repository = createBookingRepository(db);
     }, 30000);
     beforeEach(async () => {
+      await db.delete(s.auditLog);
+      await db.delete(s.paymentProofs);
       await db.delete(s.checkoutAttempts);
       await db.delete(s.payments);
       await db.delete(s.stripeEvents);
@@ -119,6 +128,35 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       },
       30000,
     );
+    it('persists private proof and approves a manual payment exactly once under concurrent review', async () => {
+      const service = createBookingService(
+        repository,
+        () => now,
+        paymentConfig.SESSION_SECRET,
+      );
+      const hold = await service.createHold(validHold);
+      const proof = await service.submitPaymentProof(hold.id, {
+        method: 'zelle',
+        path: 'private-proof.webp',
+      });
+      expect((await repository.bookingById(hold.id)).paidCents).toBe(0);
+      await Promise.all(
+        Array.from({ length: 5 }, () =>
+          service.reviewPaymentProof(proof.id, 'approve', {
+            id: 1,
+            role: 'owner',
+          }),
+        ),
+      );
+      expect(await repository.payments(hold.id)).toHaveLength(1);
+      expect(await repository.bookingById(hold.id)).toMatchObject({
+        status: 'confirmed',
+        paidCents: 3000,
+        balanceCents: 15000,
+      });
+      expect((await repository.proof(proof.id)).status).toBe('approved');
+      expect(await db.select().from(s.auditLog)).toHaveLength(1);
+    }, 30000);
     it('accepts exactly three of 20 simultaneous HTTP requests on the real database', async () => {
       const app = createApp({
         config: parseEnv({

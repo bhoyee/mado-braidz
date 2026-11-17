@@ -260,6 +260,27 @@ export const payments = mysqlTable('payments', {
   recordedByAdminId: ref('recorded_by_admin_id').references(() => admins.id),
   createdAt: created(),
 });
+export const paymentProofs = mysqlTable('payment_proofs', {
+  id: id(),
+  bookingId: ref('booking_id')
+    .notNull()
+    .references(() => bookings.id),
+  method: mysqlEnum('method', ['zelle', 'cashapp']).notNull(),
+  paymentType: mysqlEnum('payment_type', [
+    'deposit',
+    'full',
+    'balance',
+  ]).notNull(),
+  amountCents: int('amount_cents').notNull(),
+  path: str('path', 1024).notNull(),
+  status: mysqlEnum('status', ['pending', 'approved', 'rejected'])
+    .notNull()
+    .default('pending'),
+  reviewedBy: ref('reviewed_by').references(() => admins.id),
+  reviewedAt: dt('reviewed_at'),
+  reviewNote: text('review_note'),
+  createdAt: created(),
+});
 export const stripeEvents = mysqlTable('stripe_events', {
   id: str('id').primaryKey(),
   type: str('type').notNull(),

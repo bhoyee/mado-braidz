@@ -20,6 +20,8 @@ export async function memoryBookingRepository() {
     clients = [],
     media = [];
   const attempts = [],
+    proofs = [],
+    audits = [],
     payments = [],
     events = [],
     jobs = [],
@@ -36,6 +38,20 @@ export async function memoryBookingRepository() {
     eventRows: events,
     jobRows: jobs,
     notificationRows: notifications,
+    proofRows: proofs,
+    auditRows: audits,
+    proofs: async (id) => proofs.filter((p) => !id || p.bookingId === id),
+    proof: async (id) => proofs.find((p) => p.id === id),
+    insertProof: async (values) => {
+      proofs.push({ ...values, id: proofs.length + 1 });
+      return proofs.length;
+    },
+    saveProof: async (id, values) =>
+      Object.assign(
+        proofs.find((p) => p.id === id),
+        values,
+      ),
+    audit: async (values) => audits.push(values),
     bookingById: async (id) => rows.find((r) => r.id === id),
     bookingByRef: async (ref) => rows.find((r) => r.ref === ref),
     bookingByToken: async (hash) =>
@@ -132,6 +148,8 @@ export async function memoryBookingRepository() {
         events,
         jobs,
         notifications,
+        proofs,
+        audits,
       ];
       const snapshots = arrays.map((array) => structuredClone(array));
       try {
