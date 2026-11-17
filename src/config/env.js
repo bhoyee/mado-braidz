@@ -27,6 +27,10 @@ export const envSchema = z
     ADMIN_ALERT_EMAILS: optional,
     VAPID_PUBLIC_KEY: optional,
     VAPID_PRIVATE_KEY: optional,
+    TURNSTILE_ENABLED: z
+      .union([z.boolean(), z.enum(['true', 'false'])])
+      .default(true)
+      .transform((value) => value === true || value === 'true'),
     TURNSTILE_SITE_KEY: optional,
     TURNSTILE_SECRET_KEY: optional,
     UPLOAD_DIR: z.string().min(1),
@@ -75,8 +79,6 @@ export const envSchema = z
         'STRIPE_SECRET_KEY',
         'STRIPE_PUBLISHABLE_KEY',
         'STRIPE_WEBHOOK_SECRET',
-        'TURNSTILE_SITE_KEY',
-        'TURNSTILE_SECRET_KEY',
         'CRON_SECRET',
       ]) {
         if (!env[key])
@@ -85,6 +87,16 @@ export const envSchema = z
             path: [key],
             message: 'Required in production',
           });
+      }
+      if (env.TURNSTILE_ENABLED) {
+        for (const key of ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY']) {
+          if (!env[key])
+            ctx.addIssue({
+              code: 'custom',
+              path: [key],
+              message: 'Required when Turnstile is enabled in production',
+            });
+        }
       }
       if (!env.APP_URL.startsWith('https://'))
         ctx.addIssue({

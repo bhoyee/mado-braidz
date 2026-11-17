@@ -4,6 +4,8 @@ Milestones 1–5: Express 4, Nunjucks SSR, Tailwind CSS v4, Alpine.js, MySQL thr
 
 ## Requirements and Windows setup
 
+For the cPanel server setup, see [docs/DEPLOY.md](docs/DEPLOY.md). Local development remains on port **4780**.
+
 Use Node.js 20 LTS, npm, Git, and MySQL 8 (or MariaDB 10.6+). In PowerShell:
 
 ```powershell
@@ -295,3 +297,5 @@ Login has persistent lockout after five failures for 15 minutes, optional authen
 Client emails requested from owner actions are queued for Milestone 7. Until delivery is enabled, copy the private visit/payment link from the booking details. Stripe refunds are durable jobs retried by the existing cron command; manual refunds only record money the owner has already returned herself. Settings, catalog CRUD and time-block editing remain Milestone 6.
 
 Verify with `npm run lint`, `npm test`, `npm run test:db` and `npm run test:admin:browser`. The owner browser test uses fake Stripe, in-memory data and an ephemeral port; MySQL integration tests use a disposable database. See [docs/MILESTONE-5.md](docs/MILESTONE-5.md) for the full scope and owner setup notes.
+
+`TURNSTILE_ENABLED` defaults to `true`. The owner requested deferring Turnstile for the initial server setup, so that server explicitly sets it to `false`; production still requires HTTPS, Stripe/webhook credentials and `CRON_SECRET`, and retains CSRF, rate limits and the honeypot. Add genuine `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`, set `TURNSTILE_ENABLED=true`, then restart Passenger to enable it. Do not use dummy keys. The Passenger startup file is `app.cjs`, which loads the ES-module server; command-line development still uses `src/server.js`.

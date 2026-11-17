@@ -159,7 +159,7 @@ export function bookingRouter(repository, config, payments) {
           input.checkoutRequestKey = createHash('sha256')
             .update(req.sessionID + ':' + input.requestKey)
             .digest('hex');
-        if (config.TURNSTILE_SECRET_KEY) {
+        if (config.TURNSTILE_ENABLED && config.TURNSTILE_SECRET_KEY) {
           let verification;
           try {
             const response = await fetch(

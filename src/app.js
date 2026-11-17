@@ -62,7 +62,9 @@ export function createApp({
   app.locals.manualMethods = manualMethods(config);
   app.locals.paymentName = config.MANUAL_PAYMENT_NAME;
   app.locals.closeDatabase = () => database?.pool.end();
-  app.locals.turnstileSiteKey = config.TURNSTILE_SITE_KEY;
+  app.locals.turnstileSiteKey = config.TURNSTILE_ENABLED
+    ? config.TURNSTILE_SITE_KEY
+    : '';
   app.disable('x-powered-by');
   app.use(
     pinoHttp({
