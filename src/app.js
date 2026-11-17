@@ -192,6 +192,12 @@ export function createApp({
     if (err === invalidCsrfTokenError)
       return res.status(403).json({ error: 'Invalid CSRF token' });
     req.log.error({ err }, 'Request failed');
+    if (req.path.startsWith('/api/'))
+      return res.status(503).json({
+        error: 'SERVICE_UNAVAILABLE',
+        message:
+          'Booking is temporarily unavailable. Please try again shortly.',
+      });
     res
       .status(503)
       .send(

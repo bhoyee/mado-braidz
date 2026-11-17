@@ -152,38 +152,55 @@ export function createPaymentService(repository, provider, config, clock) {
         application: 'mado-braidz',
         bookingRef: booking.ref,
       };
-      session = await provider.createSession(
-        {
-          mode: 'payment',
-          adaptive_pricing: { enabled: false },
-          automatic_tax: { enabled: false },
-          customer_email: client.email,
-          client_reference_id: String(booking.id),
-          metadata,
-          payment_intent_data: { metadata },
-          line_items: [
-            {
-              price_data: {
-                currency: 'usd',
-                unit_amount: attempt.amountCents,
-                product_data: { name },
+      try {
+        session = await provider.createSession(
+          {
+            mode: 'payment',
+            adaptive_pricing: { enabled: false },
+            automatic_tax: { enabled: false },
+            customer_email: client.email,
+            client_reference_id: String(booking.id),
+            metadata,
+            payment_intent_data: { metadata },
+            line_items: [
+              {
+                price_data: {
+                  currency: 'usd',
+                  unit_amount: attempt.amountCents,
+                  product_data: { name },
+                },
+                quantity: 1,
               },
-              quantity: 1,
-            },
-          ],
-          expires_at: Math.floor(attempt.expiresAt.getTime() / 1000),
-          success_url:
-            origin + '/book/success?session_id={CHECKOUT_SESSION_ID}',
-          cancel_url:
-            origin +
-            (balance
-              ? `/booking/${token}?cancel=1`
-              : `/book?resume=${encodeURIComponent(ref)}`),
-        },
-        // Numeric IDs may repeat across local and disposable test databases.
-        // Keep Stripe retries scoped to the globally unique booking reference.
-        `${booking.ref}:${attempt.id}`,
-      );
+            ],
+            expires_at: Math.floor(attempt.expiresAt.getTime() / 1000),
+            success_url:
+              origin + '/book/success?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url:
+              origin +
+              (balance
+                ? `/booking/${token}?cancel=1`
+                : `/book?resume=${encodeURIComponent(ref)}`),
+          },
+          // Numeric IDs may repeat across local and disposable test databases.
+          // Keep Stripe retries scoped to the globally unique booking reference.
+          `${booking.ref}:${attempt.id}`,
+        );
+      } catch (error) {
+        if (
+          error.type === 'StripeInvalidRequestError' &&
+          (error.param === 'expires_at' ||
+            /expires_at.*at least 30 minutes/.test(error.message))
+        ) {
+          if (type !== 'balance')
+            await bookings.releaseHold(booking.id, 'expired');
+          throw new BookingError(
+            'HOLD_EXPIRED',
+            'Please choose your time again.',
+            409,
+          );
+        }
+        throw error;
+      }
       await bookings.attachCheckout(booking.id, attempt.id, session);
     }
     if (session.status === 'expired')

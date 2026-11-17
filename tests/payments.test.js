@@ -46,6 +46,62 @@ async function setup(input = validHold) {
   };
 }
 describe('Stripe checkout and payment lifecycle', () => {
+  it('returns JSON for unexpected booking API failures', async () => {
+    const repo = await memoryBookingRepository();
+    repo.catalog = async () => {
+      throw new Error('Database unavailable');
+    };
+    const app = createApp({
+      config: parseEnv(paymentConfig),
+      catalog: fixtureCatalog(),
+      bookingRepository: repo,
+      stripeProvider: fakeStripe(),
+    });
+    await request(app)
+      .get('/api/bookings/quote')
+      .query({
+        styleId: validHold.styleId,
+        styleVariantId: validHold.styleVariantId,
+      })
+      .expect(503)
+      .expect('Content-Type', /json/)
+      .expect((response) => {
+        expect(response.body.error).toBe('SERVICE_UNAVAILABLE');
+        expect(response.body.message).not.toContain('Database');
+      });
+  });
+  it('releases an unpaid hold when Stripe rejects its stale checkout expiry', async () => {
+    const repo = await memoryBookingRepository();
+    const provider = fakeStripe();
+    const bookings = createBookingService(
+      repo,
+      () => now,
+      paymentConfig.SESSION_SECRET,
+    );
+    const hold = await bookings.createHold(validHold);
+    provider.createSession = async () => {
+      throw Object.assign(
+        new Error(
+          'The expires_at timestamp must be at least 30 minutes from Checkout Session creation.',
+        ),
+        {
+          type: 'StripeInvalidRequestError',
+          param: 'expires_at',
+        },
+      );
+    };
+    const payments = createPaymentService(
+      repo,
+      provider,
+      paymentConfig,
+      () => now,
+    );
+    await expect(
+      payments.checkout(hold.ref, hold.manageToken),
+    ).rejects.toMatchObject({ code: 'HOLD_EXPIRED', status: 409 });
+    expect(repo.rows[0].status).toBe('expired');
+    expect(repo.rows[0].paidCents).toBe(0);
+  });
   it.each(['deposit', 'full'])(
     'builds server-owned %s checkout and confirms once under duplicate events',
     async (paymentChoice) => {
