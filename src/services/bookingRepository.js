@@ -6,6 +6,50 @@ import { BookingError } from './bookingErrors.js';
 
 function context(db, locking = false) {
   return {
+    async batch(id) {
+      return (
+        await db
+          .select()
+          .from(s.paymentBatches)
+          .where(eq(s.paymentBatches.id, id))
+      )[0];
+    },
+    async batchBySession(id) {
+      return (
+        await db
+          .select()
+          .from(s.paymentBatches)
+          .where(eq(s.paymentBatches.stripeSessionId, id))
+      )[0];
+    },
+    async batchByIntent(id) {
+      return (
+        await db
+          .select()
+          .from(s.paymentBatches)
+          .where(eq(s.paymentBatches.stripePaymentIntentId, id))
+      )[0];
+    },
+    async expiredBatches(now) {
+      return db
+        .select({ id: s.paymentBatches.id })
+        .from(s.paymentBatches)
+        .where(
+          and(
+            inArray(s.paymentBatches.status, ['creating', 'open']),
+            lt(s.paymentBatches.expiresAt, now),
+          ),
+        );
+    },
+    async insertBatch(values) {
+      await db.insert(s.paymentBatches).values(values);
+    },
+    async saveBatch(id, values) {
+      await db
+        .update(s.paymentBatches)
+        .set(values)
+        .where(eq(s.paymentBatches.id, id));
+    },
     async paymentMatches(kind, value) {
       const field =
         kind === 'email'
@@ -29,7 +73,6 @@ function context(db, locking = false) {
             ),
           )
           .orderBy(s.bookings.startAt)
-          .limit(50)
       ).map((row) => row.booking);
     },
     async catalog() {

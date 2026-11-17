@@ -20,6 +20,7 @@ export async function memoryBookingRepository() {
     clients = [],
     media = [];
   const attempts = [],
+    batches = [],
     proofs = [],
     audits = [],
     payments = [],
@@ -38,6 +39,23 @@ export async function memoryBookingRepository() {
     eventRows: events,
     jobRows: jobs,
     notificationRows: notifications,
+    batchRows: batches,
+    expiredBatches: async (now) =>
+      batches
+        .filter(
+          (b) => ['creating', 'open'].includes(b.status) && b.expiresAt < now,
+        )
+        .map((b) => ({ id: b.id })),
+    batch: async (id) => batches.find((b) => b.id === id),
+    batchBySession: async (id) => batches.find((b) => b.stripeSessionId === id),
+    batchByIntent: async (id) =>
+      batches.find((b) => b.stripePaymentIntentId === id),
+    insertBatch: async (values) => batches.push({ ...values }),
+    saveBatch: async (id, values) =>
+      Object.assign(
+        batches.find((b) => b.id === id),
+        values,
+      ),
     paymentMatches: async (kind, value) =>
       rows.filter((row) => {
         const client = clients[row.clientId - 1];
@@ -153,6 +171,7 @@ export async function memoryBookingRepository() {
         clients,
         media,
         attempts,
+        batches,
         payments,
         events,
         jobs,

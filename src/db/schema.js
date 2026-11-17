@@ -292,12 +292,28 @@ export const checkoutAttempts = mysqlTable('checkout_attempts', {
   bookingId: ref('booking_id')
     .notNull()
     .references(() => bookings.id),
+  batchId: varchar('batch_id', { length: 64 }),
   paymentType: mysqlEnum('payment_type', [
     'deposit',
     'full',
     'balance',
   ]).notNull(),
   amountCents: int('amount_cents').notNull(),
+  status: mysqlEnum('status', [
+    'creating',
+    'open',
+    'paid',
+    'expired',
+  ]).notNull(),
+  stripeSessionId: str('stripe_session_id').unique(),
+  stripePaymentIntentId: str('stripe_payment_intent_id').unique(),
+  expiresAt: dt('expires_at').notNull(),
+  createdAt: created(),
+});
+export const paymentBatches = mysqlTable('payment_batches', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  items: json('items').notNull(),
+  totalCents: int('total_cents').notNull(),
   status: mysqlEnum('status', [
     'creating',
     'open',

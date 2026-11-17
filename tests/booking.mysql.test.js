@@ -71,6 +71,7 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       await db.delete(s.auditLog);
       await db.delete(s.paymentProofs);
       await db.delete(s.checkoutAttempts);
+      await db.delete(s.paymentBatches);
       await db.delete(s.payments);
       await db.delete(s.stripeEvents);
       await db.delete(s.jobs);
@@ -166,6 +167,72 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       });
       expect((await repository.proof(proof.id)).status).toBe('approved');
       expect(await db.select().from(s.auditLog)).toHaveLength(1);
+    }, 30000);
+    it('allocates a combined charge exactly once with concurrent real database webhooks', async () => {
+      const bookings = createBookingService(
+          repository,
+          () => now,
+          paymentConfig.SESSION_SECRET,
+        ),
+        provider = fakeStripe(),
+        payments = createPaymentService(
+          repository,
+          provider,
+          paymentConfig,
+          () => now,
+        );
+      const holds = [
+        await bookings.createHold(validHold),
+        await bookings.createHold(validHold),
+      ];
+      const checkout = await payments.checkoutBatch(
+        holds.map((h) => h.ref),
+        Object.fromEntries(holds.map((h) => [h.ref, h.manageToken])),
+        'batch-' + randomBytes(16).toString('hex'),
+      );
+      const session = provider.sessions.get(checkout.sessionId);
+      await Promise.all(
+        Array.from({ length: 5 }, () =>
+          payments.handleEvent(paidEvent(session)),
+        ),
+      );
+      expect(await db.select().from(s.payments)).toHaveLength(2);
+      for (const hold of holds)
+        expect(await repository.bookingById(hold.id)).toMatchObject({
+          status: 'confirmed',
+          paidCents: 3000,
+          balanceCents: 15000,
+        });
+      provider.refundRows.push({
+        id: 're_database_batch',
+        status: 'succeeded',
+        currency: 'usd',
+        amount: 3000,
+        payment_intent: session.payment_intent,
+        metadata: {
+          application: 'mado-braidz',
+          batchId: session.metadata.batchId,
+          bookingId: String(holds[1].id),
+        },
+      });
+      const refund = {
+        id: 'evt_database_batch_refund',
+        type: 'charge.refunded',
+        data: {
+          object: {
+            object: 'charge',
+            payment_intent: session.payment_intent,
+            currency: 'usd',
+            amount_refunded: 3000,
+          },
+        },
+      };
+      await Promise.all([
+        payments.handleEvent(refund),
+        payments.handleEvent(refund),
+      ]);
+      expect((await repository.bookingById(holds[0].id)).paidCents).toBe(3000);
+      expect((await repository.bookingById(holds[1].id)).paidCents).toBe(0);
     }, 30000);
     it('accepts exactly three of 20 simultaneous HTTP requests on the real database', async () => {
       const app = createApp({

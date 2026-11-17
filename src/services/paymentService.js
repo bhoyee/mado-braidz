@@ -18,6 +18,39 @@ export function createStripeProvider(config) {
         signature,
         config.STRIPE_WEBHOOK_SECRET,
       ),
+    async batchRefunds(intentId) {
+      const refunds = [];
+      for await (const refund of stripe.refunds.list({
+        payment_intent: intentId,
+        limit: 100,
+      }))
+        refunds.push(refund);
+      return refunds;
+    },
+    async refundBatch(payload, key) {
+      const refund = payload.refundId
+        ? await stripe.refunds.retrieve(payload.refundId)
+        : await stripe.refunds.create(
+            {
+              payment_intent: payload.paymentIntentId,
+              amount: payload.amountCents,
+              reason: 'requested_by_customer',
+              metadata: {
+                application: 'mado-braidz',
+                batchId: payload.batchId,
+                bookingId: String(payload.bookingId),
+              },
+            },
+            { idempotencyKey: key },
+          );
+      if (['failed', 'canceled'].includes(refund.status))
+        throw new BookingError(
+          'REFUND_REVIEW_REQUIRED',
+          'Refund needs manual review.',
+          503,
+        );
+      return refund;
+    },
     async inspectPayment(id) {
       const intent = await stripe.paymentIntents.retrieve(id, {
         expand: ['latest_charge'],
@@ -270,6 +303,28 @@ export function createPaymentService(repository, provider, config, clock) {
       const payload =
         typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
       try {
+        if (payload.batchId) {
+          const batch = await repository.batch(payload.batchId);
+          const items =
+            typeof batch.items === 'string'
+              ? JSON.parse(batch.items)
+              : batch.items;
+          const item = items.find((i) => i.bookingId === payload.bookingId);
+          const remaining = Math.max(
+            0,
+            payload.amountCents - (item.refundedCents || 0),
+          );
+          await bookings.finishBatchRefund(
+            job,
+            remaining === 0
+              ? null
+              : await provider.refundBatch(
+                  { ...payload, amountCents: remaining },
+                  job.dedupeKey,
+                ),
+          );
+          continue;
+        }
         await bookings.finishRefund(
           job,
           await provider.refund(payload, job.dedupeKey),
@@ -289,12 +344,176 @@ export function createPaymentService(repository, provider, config, clock) {
     cancel,
     authorize,
     runRefunds,
+    async checkoutBatch(refs, tokens, id, expectations) {
+      if (!provider)
+        throw new BookingError(
+          'PAYMENT_UNAVAILABLE',
+          'Card payment is unavailable.',
+          503,
+        );
+      const rows = await Promise.all(
+        refs.map((ref) => authorize(ref, tokens[ref])),
+      );
+      const batch = await bookings.reservePaymentBatch(
+        rows.map((row) => row.id),
+        id,
+        expectations,
+      );
+      const successUrl =
+        origin + '/pay/success?session_id={CHECKOUT_SESSION_ID}';
+      if (batch.status === 'paid')
+        return {
+          url: origin + '/pay/success?session_id=' + batch.stripeSessionId,
+          sessionId: batch.stripeSessionId,
+        };
+      if (batch.status === 'expired')
+        throw new BookingError(
+          'HOLD_EXPIRED',
+          'This checkout expired. Search again.',
+          409,
+        );
+      let session;
+      if (batch.stripeSessionId)
+        session = await provider.retrieveSession(batch.stripeSessionId);
+      else {
+        const metadata = { application: 'mado-braidz', batchId: batch.id };
+        try {
+          session = await provider.createSession(
+            {
+              mode: 'payment',
+              adaptive_pricing: { enabled: false },
+              automatic_tax: { enabled: false },
+              metadata,
+              payment_intent_data: { metadata },
+              line_items: [
+                {
+                  price_data: {
+                    currency: 'usd',
+                    unit_amount: batch.totalCents,
+                    product_data: {
+                      name: `Payment for ${rows.length} Mado African Braidz appointments`,
+                    },
+                  },
+                  quantity: 1,
+                },
+              ],
+              expires_at: Math.floor(batch.expiresAt.getTime() / 1000),
+              success_url: successUrl,
+              cancel_url: origin + '/pay/batch/' + id + '?cancel=1',
+            },
+            id,
+          );
+        } catch (error) {
+          if (
+            error.type === 'StripeInvalidRequestError' &&
+            (error.param === 'expires_at' ||
+              /expires_at.*at least 30 minutes/.test(error.message))
+          ) {
+            await bookings.expirePaymentBatch(id);
+            throw new BookingError(
+              'HOLD_EXPIRED',
+              'This checkout expired. Search again.',
+              409,
+            );
+          }
+          throw error;
+        }
+        await bookings.attachPaymentBatch(id, session);
+      }
+      if (session.status === 'expired')
+        throw new BookingError(
+          'HOLD_EXPIRED',
+          'This checkout expired. Search again.',
+          409,
+        );
+      if (session.status === 'complete')
+        return {
+          url: origin + '/pay/success?session_id=' + session.id,
+          sessionId: session.id,
+        };
+      if (!/^https:\/\/checkout\.stripe\.com\//.test(session.url || ''))
+        throw new BookingError(
+          'INVALID_SESSION',
+          'Could not open secure payment.',
+          503,
+        );
+      return { url: session.url, sessionId: session.id };
+    },
+    async cancelBatch(id) {
+      const batch = await repository.batch(id);
+      if (!batch)
+        throw new BookingError('NOT_FOUND', 'Payment not found.', 404);
+      if (batch.status === 'paid')
+        return { paid: true, sessionId: batch.stripeSessionId };
+      if (!batch.stripeSessionId)
+        throw new BookingError(
+          'CHECKOUT_PENDING',
+          'Checkout is opening. Try again shortly.',
+          409,
+        );
+      let session = await provider.retrieveSession(batch.stripeSessionId);
+      if (session.status === 'complete')
+        return { paid: true, sessionId: session.id };
+      if (session.status === 'open') {
+        try {
+          await provider.expireSession(session.id);
+        } catch (error) {
+          session = await provider.retrieveSession(session.id);
+          if (session.status === 'complete')
+            return { paid: true, sessionId: session.id };
+          throw error;
+        }
+      }
+      await bookings.expirePaymentBatch(id, 'cancelled');
+      return { cancelled: true };
+    },
     async handleEvent(event) {
       const object = event.data.object;
       const intentId =
         typeof object.payment_intent === 'string'
           ? object.payment_intent
           : object.payment_intent?.id;
+      if (object.metadata?.batchId && object.object === 'checkout.session') {
+        let batchInfo;
+        if (provider?.inspectPayment && object.payment_status === 'paid') {
+          const info = await provider.inspectPayment(intentId);
+          batchInfo = info;
+          event = {
+            ...event,
+            paymentMethod: ['card', 'cashapp'].includes(info.method)
+              ? info.method
+              : 'other',
+          };
+        }
+        const result = await bookings.applyBatchStripeEvent(event);
+        if (batchInfo?.refunded)
+          await bookings.applyBatchRefundEvent(
+            {
+              id: `reconcile_batch_${intentId}_${batchInfo.refunded}`,
+              type: 'charge.refunded',
+            },
+            object.metadata.batchId,
+            await provider.batchRefunds(intentId),
+          );
+        for (const id of result.bookingIds) await runRefunds(id);
+        return result;
+      }
+      if (
+        ['charge.refunded', 'refund.updated', 'refund.failed'].includes(
+          event.type,
+        ) &&
+        intentId
+      ) {
+        const batch = await repository.batchByIntent(intentId);
+        if (batch) {
+          await bookings.applyBatchRefundEvent(
+            event,
+            batch.id,
+            await provider.batchRefunds(intentId),
+          );
+          return { batchId: batch.id };
+        }
+      }
       let info;
       if (
         provider?.inspectPayment &&

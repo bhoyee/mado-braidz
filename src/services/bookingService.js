@@ -3,6 +3,7 @@ import { DateTime } from 'luxon';
 import { priceBooking } from './pricingService.js';
 import { daySlots, remainingCapacity, ZONE } from './availabilityService.js';
 import { BookingError } from './bookingErrors.js';
+import { batchBookingLifecycle } from './batchBookingLifecycle.js';
 
 // All state transitions, including initial creation, are owned by this service.
 export const transitions = {
@@ -31,6 +32,44 @@ export const accessToken = (ref, secret) =>
 const decode = (value) =>
   typeof value === 'string' ? JSON.parse(value) : value;
 function paymentLifecycle(repository, clock) {
+  async function lockedMany(ids, run) {
+    const unique = [...new Set(ids)].sort((a, b) => a - b);
+    const initial = await Promise.all(
+      unique.map((id) => repository.bookingById(id)),
+    );
+    if (initial.some((row) => !row))
+      throw new BookingError('NOT_FOUND', 'Booking not found.', 404);
+    return repository.transaction(async (tx) => {
+      const dates = [];
+      for (const row of initial) {
+        const end = DateTime.fromJSDate(row.blockEndAt, { zone: ZONE })
+          .minus({ milliseconds: 1 })
+          .startOf('day');
+        for (
+          let day = DateTime.fromJSDate(row.startAt, { zone: ZONE }).startOf(
+            'day',
+          );
+          day <= end;
+          day = day.plus({ days: 1 })
+        )
+          dates.push(day.toISODate());
+      }
+      await tx.lockDates(dates);
+      const rows = [];
+      for (const before of initial) {
+        const row = await tx.bookingById(before.id);
+        if (row.startAt.getTime() !== before.startAt.getTime())
+          throw new BookingError(
+            'BOOKING_CHANGED',
+            'Please search again.',
+            409,
+          );
+        row.priceSnapshot = decode(row.priceSnapshot);
+        rows.push(row);
+      }
+      return run(tx, rows, clock());
+    });
+  }
   async function locked(id, run) {
     const initial = await repository.bookingById(id);
     if (!initial)
@@ -114,6 +153,13 @@ function paymentLifecycle(repository, clock) {
     );
   }
   return {
+    ...batchBookingLifecycle(repository, {
+      lockedMany,
+      save,
+      change,
+      reconcile,
+      queue,
+    }),
     async submitPaymentProof(id, input, reviewHours = 24) {
       if (
         !['zelle', 'cashapp'].includes(input.method) ||
@@ -292,6 +338,19 @@ function paymentLifecycle(repository, clock) {
     },
     async reserveCheckout(id, type) {
       return locked(id, async (tx, booking, now) => {
+        if (
+          (await tx.attempts(id)).some(
+            (a) =>
+              a.batchId &&
+              ['creating', 'open'].includes(a.status) &&
+              a.expiresAt > now.toJSDate(),
+          )
+        )
+          throw new BookingError(
+            'CHECKOUT_OPEN',
+            'A combined checkout is open for this booking. Return to Pay all or wait for it to expire.',
+            409,
+          );
         if ((await tx.proofs(id)).some((p) => p.status === 'pending'))
           throw new BookingError(
             'REVIEW_PENDING',

@@ -12,9 +12,37 @@ export function fakeStripe() {
     keys = new Map(),
     refundKeys = new Map();
   const calls = { create: [], refund: [], expire: [] };
+  const refunds = [];
   return {
     sessions,
     calls,
+    refundRows: refunds,
+    batchRefunds: async (intent) =>
+      refunds.filter((refund) => refund.payment_intent === intent),
+    async refundBatch(payload, key) {
+      calls.refund.push({ payload, key });
+      if (this.failRefund) {
+        this.failRefund = false;
+        throw new Error('Temporary Stripe failure');
+      }
+      if (refundKeys.has(key)) return refundKeys.get(key);
+      const refund = {
+        id: 're_test_' + (refundKeys.size + 1),
+        status: 'succeeded',
+        currency: 'usd',
+        amount: payload.amountCents,
+        payment_intent: payload.paymentIntentId,
+        metadata: {
+          application: 'mado-braidz',
+          batchId: payload.batchId,
+          bookingId: String(payload.bookingId),
+        },
+        created: refunds.length,
+      };
+      refundKeys.set(key, refund);
+      refunds.push(refund);
+      return refund;
+    },
     failRefund: false,
     async createSession(params, key) {
       calls.create.push({ params, key });
