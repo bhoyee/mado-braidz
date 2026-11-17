@@ -51,3 +51,13 @@ Verified on the actual hosted site:
 Stripe is still in **test mode**. Turnstile is now enabled with the supplied keys. Booking email delivery remains Milestone 7, and contact messages remain disabled until then. The owner explicitly authorized one off-server database backup download; it is saved in ignored `tmp/hosting/live/database-backup.sql.gz` and passed a local gzip integrity check. No backup contents or credentials are committed. A recurring off-server backup destination still needs configuration.
 
 The logging dependency is pinned to its Node 20-compatible major. `sanitize-html` is retained at the security-patched 2.18.x release because older 2.17.x releases have published vulnerabilities; npm reports its declared Node 22 engine requirement. The current SSR rendering and full application suite run successfully on the project's fixed Node 20 runtime; formal support for that package/runtime combination remains a dependency follow-up.
+
+## Turnstile follow-up
+
+Release `5a9fae4` enables the supplied Turnstile key pair without changing the server session secret, Stripe webhook secret or database credentials. Verification checks the `APP_URL` hostname and the expected form action, rejects missing/invalid/replayed tokens and fails closed on provider errors. Contact delivery stays disabled until Milestone 7; no enquiry table or inbox was added.
+
+Build, lint and 154 application tests passed. The actual hosted booking/contact endpoints reject missing verification, the widget renders on both forms, and HTTPS/public/admin routes remain healthy. Cloudflare presented a human checkbox that the automated browser could not complete; a normal-browser success check remains pending. Mocked tests cover a valid provider response, wrong hostname/action, invalid/replayed responses and provider outages. No fabricated tokens or test keys were enabled on the server.
+
+This host uses a LiteSpeed `lsnode` worker behind the Passenger-compatible configuration. CloudLinux reported a successful restart while leaving the original worker running. An app-scoped graceful SIGTERM to the exact owned `lsnode:/home/madoafri/mado-app/` process restarted it, after which the new route and widget were confirmed over HTTPS. Directory permissions were left unchanged. For future releases, verify the served revision/content and worker start time rather than relying only on the panel's restart status.
+
+With the owner's explicit permission, a full database backup was downloaded to `tmp/hosting/live/database-backup.sql.gz` and validated by decompression. The file remains ignored and private; its contents are never included in Git or deployment archives. Daily server backups continue separately.
