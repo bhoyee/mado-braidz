@@ -401,5 +401,55 @@
       ],
       "size": "small"
     }
+  },
+  {
+    "slug": "freestyle-stitch-cornrows",
+    "styleSlug": "freestyle-stitch-cornrows",
+    "path": "/img/styles/freestyle-stitch-cornrows-960.webp",
+    "width": 960,
+    "height": 1280,
+    "alt": "Freestyle stitch cornrows with curved scalp sections and braids gathered at the nape",
+    "variants": {
+      "origin": "supplied",
+      "sizes": [
+        {
+          "avif": "/img/styles/freestyle-stitch-cornrows-480.avif",
+          "path": "/img/styles/freestyle-stitch-cornrows-480.webp",
+          "width": 480,
+          "height": 640
+        },
+        {
+          "avif": "/img/styles/freestyle-stitch-cornrows-960.avif",
+          "path": "/img/styles/freestyle-stitch-cornrows-960.webp",
+          "width": 960,
+          "height": 1280
+        }
+      ]
+    }
+  },
+  {
+    "slug": "mens-invisible-locs",
+    "styleSlug": "mens-invisible-locs",
+    "path": "/img/styles/mens-invisible-locs-960.webp",
+    "width": 960,
+    "height": 1280,
+    "alt": "Men’s invisible locs with neat scalp sections, photographed from above and behind",
+    "variants": {
+      "origin": "supplied",
+      "sizes": [
+        {
+          "avif": "/img/styles/mens-invisible-locs-480.avif",
+          "path": "/img/styles/mens-invisible-locs-480.webp",
+          "width": 480,
+          "height": 640
+        },
+        {
+          "avif": "/img/styles/mens-invisible-locs-960.avif",
+          "path": "/img/styles/mens-invisible-locs-960.webp",
+          "width": 960,
+          "height": 1280
+        }
+      ]
+    }
   }
 ]

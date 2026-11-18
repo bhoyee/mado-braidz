@@ -1039,6 +1039,16 @@ figcaption {
 /* ---------- Style cards ----------
    The whole card is one link. Name and price sit on the photo over a soft
    dark fade at the bottom; the photo eases in slightly on hover. */
+.section:has(+ .mens-section) {
+  padding-bottom: 24px;
+}
+.mens-section {
+  padding-top: 24px;
+  padding-bottom: clamp(40px, 5vw, 64px);
+}
+.mens-section .section-head {
+  margin-bottom: 24px;
+}
 .mens-grid {
   display: grid;
   gap: 24px;
@@ -1068,7 +1078,7 @@ figcaption {
 }
 .mens-photo {
   display: block;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 4 / 5;
   overflow: hidden;
   margin-bottom: 20px;
 }

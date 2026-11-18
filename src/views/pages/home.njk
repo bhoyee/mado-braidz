@@ -52,12 +52,11 @@
 <section class="section wrap mens-section" aria-labelledby="mens-heading">
   <div class="section-head">
     <div><p class="eyebrow">Men’s Braids &amp; Locs</p><h2 id="mens-heading">A fresh look. <em>Your way.</em></h2></div>
-    <div class="section-head-aside"><p>Invisible locs or a freestyle stitch pattern. Four hours reserved for your look.</p><a class="text-link" href="/styles?category=mens">Explore men’s styles</a></div>
+    <div class="section-head-aside"><p>Invisible locs or a freestyle stitch pattern, tailored to you.</p><a class="text-link" href="/styles?category=mens">Explore men’s styles</a></div>
   </div>
   <div class="mens-grid">{% for style in mensStyles %}
     <article class="mens-style">
       {% if style.photo %}<a href="/styles/{{ style.slug }}" class="mens-photo">{{ photo(style.photo,style.name) }}</a>{% endif %}
-      <p class="eyebrow">{{ style.durationMin / 60 }} hours · {{ booking.depositCents | money }} deposit</p>
       <h3><a href="/styles/{{ style.slug }}">{{ style.name }}</a></h3>
       <p>{{ style.shortDesc }}</p>
       <div class="mens-style-bottom"><strong>{{ style.from | money }}</strong><a class="button compact" href="/book?style={{ style.slug }}">Book this style<span class="sr-only">: {{ style.name }}</span></a></div>
@@ -81,13 +80,13 @@
     </div>
 
     <div class="price-tabs" data-price-tabs hidden aria-label="Choose a style">
-      {% for style in styles %}{% if style.matrix %}<button type="button" class="price-tab" id="tab-{{ style.slug }}" data-panel="panel-{{ style.slug }}">{{ style.name }}</button>{% endif %}{% endfor %}
+      {% for style in styles %}{% if style.matrix and style.category != "mens" %}<button type="button" class="price-tab" id="tab-{{ style.slug }}" data-panel="panel-{{ style.slug }}">{{ style.name }}</button>{% endif %}{% endfor %}
       {% for style in consultStyles %}{% if style.from %}<button type="button" class="price-tab" id="tab-{{ style.slug }}" data-panel="panel-{{ style.slug }}">{{ style.name }}</button>{% endif %}{% endfor %}
       <button type="button" class="price-tab" id="tab-other-styles" data-panel="panel-other-styles">Other styles</button>
     </div>
 
     <div class="price-panels">
-      {% for style in styles %}{% if style.matrix %}
+      {% for style in styles %}{% if style.matrix and style.category != "mens" %}
       <section class="price-panel" id="panel-{{ style.slug }}" aria-label="{{ style.name }} prices">
         <div class="price-panel-head">
           <h3>{{ style.name }}</h3>

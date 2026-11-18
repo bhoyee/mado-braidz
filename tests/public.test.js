@@ -18,11 +18,19 @@ describe('Milestone 2 public pages', () => {
     const app = makeApp();
     const home = await request(app).get('/').expect(200);
     expect(home.text).toContain('id="mens-heading"');
+    const mensSection = home.text.match(
+      /<section[^>]*mens-section[\s\S]*?<\/section>/,
+    )[0];
+    expect(mensSection).not.toContain('deposit');
+    expect(mensSection).not.toContain('hours');
     for (const [slug, price] of [
       ['mens-invisible-locs', '$120'],
       ['freestyle-stitch-cornrows', '$80'],
     ]) {
       expect(home.text).toContain(`/book?style=${slug}`);
+      expect(mensSection).toContain(`/img/styles/${slug}-960.webp`);
+      expect(home.text).not.toContain(`id="panel-${slug}"`);
+      expect(home.text).not.toContain(`id="tab-${slug}"`);
       const detail = await request(app).get(`/styles/${slug}`).expect(200);
       expect(detail.text).toContain(price);
       expect(detail.text).toContain('4 hours reserved');

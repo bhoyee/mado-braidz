@@ -100,5 +100,17 @@
     "source": "assets/style-references/knotless-size-small.png",
     "origin": "generated",
     "alt": "AI size reference: small knotless box braids, showing scalp sections and braid thickness"
+  },
+  {
+    "slug": "freestyle-stitch-cornrows",
+    "source": "docs/design/imgs/freestyle-cornrow.png",
+    "origin": "supplied",
+    "alt": "Freestyle stitch cornrows with curved scalp sections and braids gathered at the nape"
+  },
+  {
+    "slug": "mens-invisible-locs",
+    "source": "docs/design/imgs/men-nvisible-Locs.png",
+    "origin": "supplied",
+    "alt": "Men’s invisible locs with neat scalp sections, photographed from above and behind"
   }
 ]

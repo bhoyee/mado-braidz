@@ -312,6 +312,6 @@ Verify with `npm run lint`, `npm test`, `npm run test:db` and `npm run test:admi
 
 # Men’s services
 
-Men’s Invisible Locs ($120) and Freestyle Stitch Cornrows ($80) reserve four hours each, use a single standard service option and the existing $30 deposit. Both appear on the home page, under the Men’s Braids & Locs category and in booking. Upload their real photos through the owner’s Photos & Our Work screen.
+Men’s Invisible Locs ($120) and Freestyle Stitch Cornrows ($80) reserve four hours each, use a single standard service option and the existing $30 deposit. Both appear on the home page, under the Men’s Braids & Locs category and in booking. The supplied hairstyle photos appear on the home page and style pages; replace them through the owner’s Photos & Our Work screen. Men’s prices appear in their dedicated home section rather than being repeated in the home price menu.
 
-Fresh installs include these services in `npm run db:seed`. For an existing database, `npm run catalog:men` adds only missing men’s styles and their initial prices; it preserves existing services, owner edits and bookings. Production deployment runs this additive command after migrations. No new environment variables are needed.
+Fresh installs include these services in `npm run db:seed`. For an existing database, `npm run catalog:men` adds only missing men’s styles and their initial prices, and imports the supplied men’s photos once; it preserves existing services, owner edits and bookings. Production deployment runs this additive command after migrations. No new environment variables are needed.
