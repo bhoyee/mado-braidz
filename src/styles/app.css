@@ -1527,6 +1527,10 @@ figcaption {
 .studio-section {
   background: var(--color-linen);
   padding-block: clamp(64px, 9vw, 120px);
+  padding-bottom: clamp(32px, 4vw, 48px);
+}
+.studio-section + .faq-section > .section {
+  padding-top: clamp(32px, 4vw, 48px);
 }
 .studio-grid {
   display: grid;
