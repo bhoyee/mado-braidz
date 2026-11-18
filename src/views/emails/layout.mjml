@@ -35,10 +35,11 @@
     ><mj-section padding="20px"
       ><mj-column
         ><mj-text align="center" font-size="12px"
-          >{{ businessName }} · {{ address }}<br />{{ phone }}<br /><a
-            href="{{ preferencesUrl }}"
-            >Email preferences</a
-          ></mj-text
+          ><strong>{{ businessName }}</strong
+          ><br />{{ street }}<br />{{ locality }}<br />{{ country }}<br /><a
+            href="tel:{{ phoneHref }}"
+            >{{ phone }}</a
+          ><br /><a href="{{ preferencesUrl }}">Email preferences</a></mj-text
         ></mj-column
       ></mj-section
     ></mj-body

@@ -269,10 +269,11 @@
                   
       <div
          style="font-family:Arial, sans-serif;font-size:12px;line-height:1.6;text-align:center;color:#1c0f26;"
-      >{{ businessName }} · {{ address }}<br />{{ phone }}<br /><a
-            href="{{ preferencesUrl }}"
-            >Email preferences</a
-          ></div>
+      ><strong>{{ businessName }}</strong
+          ><br />{{ street }}<br />{{ locality }}<br />{{ country }}<br /><a
+            href="tel:{{ phoneHref }}"
+            >{{ phone }}</a
+          ><br /><a href="{{ preferencesUrl }}">Email preferences</a></div>
     
                 </td>
               </tr>
