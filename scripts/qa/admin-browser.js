@@ -74,7 +74,8 @@ try {
       .setZone('America/New_York')
       .plus({ days: width === 390 ? 0 : 1 });
     await page.getByLabel('Date', { exact: true }).fill(start.toISODate());
-    await page.getByLabel('Start time').fill('09:00');
+    // Sunday opens at 10:00; keep the fixture valid on every weekday.
+    await page.getByLabel('Start time').fill('10:00');
     await page.getByLabel('Payment arrangement').selectOption('override');
     await page.getByRole('button', { name: 'Show available times' }).click();
     await page.locator('[data-owner-slots] button').first().waitFor();
@@ -358,10 +359,15 @@ try {
     await page
       .getByLabel('Reason', { exact: true })
       .fill('Cash returned to the client.');
-    page.once('dialog', (dialog) => dialog.accept());
-    await submitDetailForm(
+    const refundSubmission = submitDetailForm(
       page.getByRole('button', { name: 'Submit refund', exact: true }),
     );
+    const refundDialog = page.locator('#owner-confirm-dialog');
+    await refundDialog.waitFor({ state: 'visible' });
+    await refundDialog
+      .getByRole('button', { name: 'Continue', exact: true })
+      .click();
+    await refundSubmission;
     assert.equal((await repo.bookingById(bookingId)).paidCents, 2500);
     assert.equal(
       (await repo.payments(bookingId)).filter(

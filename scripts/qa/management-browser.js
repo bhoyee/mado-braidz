@@ -74,6 +74,11 @@ try {
       }),
       page = await context.newPage(),
       errors = [];
+    let nativeDialogs = 0;
+    page.on('dialog', async (dialog) => {
+      nativeDialogs++;
+      await dialog.dismiss();
+    });
     async function save(button) {
       await Promise.all([
         page.waitForEvent(
@@ -165,6 +170,104 @@ try {
     await page.waitForLoadState('networkidle');
     const publicPage = await fetch(origin + '/styles/studio-braids-' + width);
     assert.ok((await publicPage.text()).includes('/media/catalog/'));
+    await page.goto(origin + '/admin/gallery');
+    const initialStyle = (await repo.catalog()).styles.find(
+      (style) => style.slug === 'studio-braids-' + width,
+    );
+    const originalPhoto = initialStyle.photos[0];
+    let card = page.locator('[data-photo-id="' + originalPhoto.id + '"]');
+    await card.getByLabel('New photo', { exact: true }).setInputFiles({
+      name: 'replacement.jpg',
+      mimeType: 'image/jpeg',
+      buffer: image,
+    });
+    await save(
+      card.getByRole('button', { name: 'Replace photo', exact: true }),
+    );
+    const changed = (await repo.catalog()).styles.find(
+      (style) => style.id === initialStyle.id,
+    ).photos[0];
+    assert.equal(changed.id, originalPhoto.id);
+    assert.equal(changed.alt, originalPhoto.alt);
+    assert.equal(changed.sort, originalPhoto.sort);
+    assert.equal(changed.styleId, originalPhoto.styleId);
+    assert.notEqual(changed.path, originalPhoto.path);
+    card = page.locator('[data-photo-id="' + originalPhoto.id + '"]');
+    await card
+      .getByRole('button', { name: 'Remove photo', exact: true })
+      .click();
+    const confirmation = page.getByRole('dialog', {
+      name: 'Remove this photo?',
+      exact: true,
+    });
+    await confirmation.waitFor({ state: 'visible' });
+    assert.equal(nativeDialogs, 0);
+    assert.deepEqual(
+      (await new AxeBuilder({ page }).analyze()).violations.map((v) => v.id),
+      [],
+      'Removal dialog accessibility',
+    );
+    await page.keyboard.press('Escape');
+    await confirmation.waitFor({ state: 'hidden' });
+    assert.ok(
+      (await repo.catalog()).styles
+        .find((style) => style.id === initialStyle.id)
+        .photos.some((photo) => photo.id === originalPhoto.id),
+    );
+    await card
+      .getByRole('button', { name: 'Remove photo', exact: true })
+      .click();
+    await confirmation
+      .getByRole('button', { name: 'Cancel', exact: true })
+      .click();
+    await confirmation.waitFor({ state: 'hidden' });
+    await card
+      .getByRole('button', { name: 'Remove photo', exact: true })
+      .click();
+    await save(
+      confirmation.getByRole('button', { name: 'Remove photo', exact: true }),
+    );
+    const missing = page.locator(
+      '[data-missing-style="' + initialStyle.id + '"]',
+    );
+    assert.equal(
+      await missing
+        .getByRole('heading', { name: initialStyle.name, exact: true })
+        .count(),
+      1,
+    );
+    const withoutPhoto = (await repo.catalog()).styles.find(
+      (style) => style.id === initialStyle.id,
+    );
+    assert.equal(withoutPhoto.photos.length, 0);
+    assert.deepEqual(withoutPhoto.variants, initialStyle.variants);
+    await missing.locator('input[type="file"]').setInputFiles({
+      name: 'restored.jpg',
+      mimeType: 'image/jpeg',
+      buffer: image,
+    });
+    await save(missing.getByRole('button', { name: 'Add photo', exact: true }));
+    assert.equal(
+      (await repo.catalog()).styles.find(
+        (style) => style.id === initialStyle.id,
+      ).photos.length,
+      1,
+    );
+    await page.goto(editURL + '#style-photos');
+    const styleReplacement = page.locator('form[action$="/replace"]').first();
+    await styleReplacement
+      .getByLabel('New photo', { exact: true })
+      .setInputFiles({
+        name: 'style-replacement.jpg',
+        mimeType: 'image/jpeg',
+        buffer: image,
+      });
+    await save(
+      styleReplacement.getByRole('button', {
+        name: 'Replace photo',
+        exact: true,
+      }),
+    );
     await page.goto(origin + '/admin/gallery');
     await page.locator('[data-photo-move="1"]').first().click();
     await save(
