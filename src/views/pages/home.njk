@@ -56,9 +56,10 @@
   </div>
   <div class="mens-grid">{% for style in mensStyles %}
     <article class="mens-style">
-      {% if style.photo %}<a href="/styles/{{ style.slug }}" class="mens-photo">{{ photo(style.photo,style.name) }}</a>{% endif %}
-      <h3><a href="/styles/{{ style.slug }}">{{ style.name }}</a></h3>
-      <p>{{ style.shortDesc }}</p>
+      <a href="/styles/{{ style.slug }}" class="mens-photo{% if not style.photo %} mens-photo-empty{% endif %}">
+        {% if style.photo %}{{ photo(style.photo,style.name) }}{% endif %}
+        <h3>{{ style.name }}</h3>
+      </a>
       <div class="mens-style-bottom"><strong>{{ style.from | money }}</strong><a class="button compact" href="/book?style={{ style.slug }}">Book this style<span class="sr-only">: {{ style.name }}</span></a></div>
     </article>
   {% endfor %}</div>
