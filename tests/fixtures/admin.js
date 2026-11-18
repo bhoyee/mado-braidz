@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import { presentAppointment } from '../../src/services/adminAppointment.js';
 export function memoryAdminRepository(bookings, owner) {
   const rows = [owner];
   let tail = Promise.resolve();
@@ -46,6 +47,7 @@ export function memoryAdminRepository(bookings, owner) {
       order = 'latest',
       liveAt,
       balanceOnly = false,
+      upcomingAt,
     } = {}) =>
       bookings.rows
         .filter(
@@ -53,16 +55,39 @@ export function memoryAdminRepository(bookings, owner) {
             (!from || b.startAt >= from) &&
             (!to || b.startAt < to) &&
             (!status || b.status === status) &&
+            (!upcomingAt ||
+              b.status === 'confirmed' ||
+              (b.status === 'pending_payment' &&
+                b.holdExpiresAt > upcomingAt)) &&
             (!liveAt || b.holdExpiresAt > liveAt) &&
             (!balanceOnly ||
               (['confirmed', 'completed'].includes(b.status) &&
                 b.balanceCents > 0)) &&
             (!paymentStatus || b.paymentStatus === paymentStatus),
         )
-        .map((booking) => ({
-          booking,
-          client: bookings.clients[booking.clientId - 1],
-        }))
+        .map((booking) => {
+          const proof = bookings.proofRows
+            ?.filter(
+              (p) => p.bookingId === booking.id && p.status === 'pending',
+            )
+            .at(-1);
+          const payment = bookings.paymentRows
+            .filter((p) => p.bookingId === booking.id && p.type !== 'refund')
+            .at(-1);
+          return presentAppointment({
+            booking,
+            client: bookings.clients[booking.clientId - 1],
+            paymentMethod:
+              proof?.method ||
+              payment?.method ||
+              (booking.stripeCheckoutSessionId ? 'card' : null),
+            paymentProvider: proof
+              ? 'manual'
+              : payment?.provider ||
+                (booking.stripeCheckoutSessionId ? 'stripe' : null),
+            paymentReview: proof ? 1 : 0,
+          });
+        })
         .filter(({ booking, client }) =>
           [booking.ref, client.name, client.email, client.phoneE164].some(
             (value) => value.toLowerCase().includes(search.toLowerCase()),
@@ -73,7 +98,7 @@ export function memoryAdminRepository(bookings, owner) {
             ? a.booking.startAt - b.booking.startAt
             : b.booking.startAt - a.booking.startAt,
         )
-        .slice(offset, offset + limit),
+        .slice(offset, limit === null ? undefined : offset + limit),
     receipts: async ({ from, to, offset = 0, limit = 101 }) =>
       bookings.paymentRows
         .filter((p) => p.createdAt >= from && p.createdAt < to)
@@ -107,7 +132,10 @@ export function memoryAdminRepository(bookings, owner) {
           )
           .reduce((sum, b) => sum + b.balanceCents, 0),
         pending: bookings.rows.filter(
-          (b) => b.status === 'confirmed' && b.startAt >= today,
+          (b) =>
+            (b.status === 'confirmed' ||
+              (b.status === 'pending_payment' && b.holdExpiresAt > now)) &&
+            b.startAt >= today,
         ).length,
       };
     },

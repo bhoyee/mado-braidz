@@ -81,17 +81,26 @@ try {
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.waitForURL(origin + '/admin');
     assert.equal(await page.locator('.overview-metric').count(), 4);
-    for (const panel of await page.locator('.overview-panel').all())
-      assert.equal(await panel.locator('tbody tr').count(), 6);
+    assert.equal(await page.locator('.overview-panel').count(), 1);
+    assert.equal(await page.locator('.overview-panel tbody tr').count(), 16);
+    assert.equal(
+      await page
+        .locator('.overview-panel tbody tr')
+        .first()
+        .locator('a')
+        .getAttribute('href'),
+      '/admin/bookings/1',
+    );
+    assert.equal(
+      await page
+        .locator('.overview-panel .owner-table-wrap')
+        .evaluate((el) => el.scrollHeight > el.clientHeight),
+      true,
+    );
     assert.equal(
       await page
         .locator('.overview-panel')
-        .first()
-        .locator('tbody tr')
-        .first()
-        .locator('td')
-        .nth(1)
-        .getByText('UPCOMING-1', { exact: true })
+        .getByRole('columnheader', { name: 'Payment source' })
         .count(),
       1,
     );
@@ -138,7 +147,7 @@ try {
     console.log(
       'PASS ' +
         width +
-        'px: overview cards, nearest six visits/holds, receipt and balance tables, no overflow, axe 0',
+        'px: overview cards, all confirmed/pending appointments and scrollable table, receipt and balance tables, no overflow, axe 0',
     );
     await context.close();
   }

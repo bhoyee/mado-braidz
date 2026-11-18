@@ -246,19 +246,12 @@ export function adminRouter(
     asyncRoute(async (req, res) => {
       const now = DateTime.now().setZone(ZONE),
         today = now.startOf('day');
-      const [appointments, holds, metrics] = await Promise.all([
+      const [appointments, metrics] = await Promise.all([
         admins.list({
           from: today.toJSDate(),
-          status: 'confirmed',
+          upcomingAt: now.toJSDate(),
           order: 'nearest',
-          limit: 6,
-        }),
-        admins.list({
-          from: today.toJSDate(),
-          status: 'pending_payment',
-          liveAt: now.toJSDate(),
-          order: 'nearest',
-          limit: 6,
+          limit: null,
         }),
         admins.metrics(
           now.startOf('week').toJSDate(),
@@ -269,7 +262,6 @@ export function adminRouter(
       ]);
       res.render('admin/dashboard', {
         appointments,
-        holds,
         metrics,
         today: today.toISODate(),
       });
@@ -369,6 +361,7 @@ export function adminRouter(
         page: z.coerce.number().int().min(1).max(100000).default(1),
         order: z.enum(['latest', 'nearest']).default('latest'),
         live: z.enum(['true']).optional(),
+        upcoming: z.enum(['true']).optional(),
       })
       .parse(
         Object.fromEntries(
@@ -387,6 +380,7 @@ export function adminRouter(
         : undefined,
       offset: (input.page - 1) * 100,
       liveAt: input.live === 'true' ? new Date() : undefined,
+      upcomingAt: input.upcoming === 'true' ? new Date() : undefined,
     };
   }
   router.get(

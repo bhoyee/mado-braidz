@@ -1,4 +1,5 @@
-import { and, eq, gte, gt, lt, asc, desc, sql, inArray } from 'drizzle-orm';
+import { and, or, eq, gte, gt, lt, asc, desc, sql, inArray } from 'drizzle-orm';
+import { presentAppointment } from './adminAppointment.js';
 import * as s from '../db/schema.js';
 
 export function createAdminRepository(db) {
@@ -53,11 +54,22 @@ export function createAdminRepository(db) {
       order = 'latest',
       liveAt,
       balanceOnly = false,
+      upcomingAt,
     } = {}) {
       const filters = [];
       if (from) filters.push(gte(s.bookings.startAt, from));
       if (to) filters.push(lt(s.bookings.startAt, to));
       if (status) filters.push(eq(s.bookings.status, status));
+      if (upcomingAt)
+        filters.push(
+          or(
+            eq(s.bookings.status, 'confirmed'),
+            and(
+              eq(s.bookings.status, 'pending_payment'),
+              gt(s.bookings.holdExpiresAt, upcomingAt),
+            ),
+          ),
+        );
       if (liveAt) filters.push(gt(s.bookings.holdExpiresAt, liveAt));
       if (balanceOnly)
         filters.push(
@@ -75,10 +87,18 @@ export function createAdminRepository(db) {
           sql`(LOCATE(${search}, ${s.clients.name}) > 0 OR LOCATE(${search}, ${s.clients.email}) > 0 OR LOCATE(${search}, ${s.clients.phoneE164}) > 0 OR LOCATE(${search}, ${s.bookings.ref}) > 0 OR (${digits.length >= 4} AND LOCATE(${digits}, ${s.clients.phoneE164}) > 0))`,
         );
       }
-      return db
-        .select({ booking: s.bookings, client: s.clients })
+      let query = db
+        .select({
+          booking: s.bookings,
+          client: s.clients,
+          styleName: s.styles.name,
+          paymentReview: sql`EXISTS(SELECT 1 FROM payment_proofs pp WHERE pp.booking_id = ${s.bookings.id} AND pp.status = 'pending')`,
+          paymentMethod: sql`COALESCE((SELECT pp.method FROM payment_proofs pp WHERE pp.booking_id = ${s.bookings.id} AND pp.status = 'pending' ORDER BY pp.id DESC LIMIT 1), (SELECT p.method FROM payments p WHERE p.booking_id = ${s.bookings.id} AND p.type <> 'refund' ORDER BY p.id DESC LIMIT 1), CASE WHEN ${s.bookings.stripeCheckoutSessionId} IS NOT NULL THEN 'card' ELSE NULL END)`,
+          paymentProvider: sql`CASE WHEN EXISTS(SELECT 1 FROM payment_proofs pp WHERE pp.booking_id = ${s.bookings.id} AND pp.status = 'pending') THEN 'manual' ELSE COALESCE((SELECT p.provider FROM payments p WHERE p.booking_id = ${s.bookings.id} AND p.type <> 'refund' ORDER BY p.id DESC LIMIT 1), CASE WHEN ${s.bookings.stripeCheckoutSessionId} IS NOT NULL THEN 'stripe' ELSE NULL END) END`,
+        })
         .from(s.bookings)
         .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
+        .innerJoin(s.styles, eq(s.bookings.styleId, s.styles.id))
         .where(and(...filters))
         .orderBy(
           order === 'nearest'
@@ -86,8 +106,9 @@ export function createAdminRepository(db) {
             : desc(s.bookings.startAt),
           order === 'nearest' ? asc(s.bookings.id) : desc(s.bookings.id),
         )
-        .limit(limit)
-        .offset(offset);
+        .$dynamic();
+      if (limit !== null) query = query.limit(limit).offset(offset);
+      return (await query).map(presentAppointment);
     },
     async auditList(offset = 0) {
       return db
@@ -149,7 +170,13 @@ export function createAdminRepository(db) {
         .where(
           and(
             gte(s.bookings.startAt, today),
-            eq(s.bookings.status, 'confirmed'),
+            or(
+              eq(s.bookings.status, 'confirmed'),
+              and(
+                eq(s.bookings.status, 'pending_payment'),
+                gt(s.bookings.holdExpiresAt, now),
+              ),
+            ),
           ),
         );
       return {

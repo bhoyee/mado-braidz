@@ -3,6 +3,7 @@ import request from 'supertest';
 import argon2 from 'argon2';
 import { randomUUID } from 'node:crypto';
 import { DateTime } from 'luxon';
+import { presentAppointment } from '../src/services/adminAppointment.js';
 import { createApp } from '../src/app.js';
 import { parseEnv } from '../src/config/env.js';
 import {
@@ -399,7 +400,7 @@ describe('owner booking operations', () => {
   });
 });
 describe('owner portal routes', () => {
-  it('shows the nearest six visits and valid holds, with owner-only payment and balance reports', async () => {
+  it('shows all upcoming visits and active pending payments together, with owner-only financial reports', async () => {
     const { repo, admins, service } = await setup();
     await service.createHold(validHold);
     const base = { ...repo.rows[0] };
@@ -442,6 +443,10 @@ describe('owner portal routes', () => {
       balanceCents: 0,
     });
     const paidAt = new Date(Date.now() - 1000);
+    repo.proofRows.push(
+      { id: 1, bookingId: 101, status: 'pending', method: 'zelle' },
+      { id: 2, bookingId: 102, status: 'pending', method: 'cashapp' },
+    );
     repo.paymentRows.push(
       {
         id: 1,
@@ -482,13 +487,17 @@ describe('owner portal routes', () => {
     const overview = await agent.get('/admin').expect(200);
     for (const prefix of ['OV-VISIT-', 'OV-HOLD-']) {
       expect(overview.text).toContain(prefix + '6');
-      expect(overview.text).not.toContain(prefix + '7');
+      expect(overview.text).toContain(prefix + '10');
       expect(overview.text.indexOf(prefix + '1')).toBeLessThan(
         overview.text.indexOf(prefix + '2'),
       );
     }
     expect(overview.text).not.toContain('OV-EXPIRED-HOLD');
     expect(overview.text).not.toContain('OV-PAST');
+    expect(overview.text).not.toContain('Chairs on hold');
+    expect(overview.text).toContain('Zelle');
+    expect(overview.text).toContain('Cash App');
+    expect(overview.text).toContain('Awaiting payment approval');
     expect(overview.text).toContain('Upcoming appointments');
     expect(overview.text).toContain('/admin/balances');
     const receipts = await agent
@@ -586,5 +595,43 @@ describe('owner portal routes', () => {
       .set('Accept', 'application/json')
       .send({ action: 'refund', _csrf: csrf })
       .expect(401);
+  });
+});
+
+describe('appointment table presentation', () => {
+  it('uses the booked style, size and length instead of a reference or changed catalog name', () => {
+    const row = presentAppointment({
+      booking: {
+        priceSnapshot: JSON.stringify({
+          styleName: 'Knotless Braids',
+          size: 'small',
+          length: 'waist',
+        }),
+      },
+      styleName: 'Renamed style',
+      paymentMethod: 'card',
+      paymentProvider: 'stripe',
+    });
+    expect(row.styleName).toBe('Knotless Braids');
+    expect(row.styleOption).toBe('Small · Waist');
+    expect(row.paymentSource).toBe('Stripe / card');
+  });
+  it('distinguishes transfer review, in-person methods and an unrecorded payment', () => {
+    for (const [method, source] of [
+      ['cashapp', 'Cash App'],
+      ['zelle', 'Zelle'],
+      ['cash', 'Cash'],
+      ['card', 'Card (in person)'],
+      [null, 'Not recorded'],
+    ]) {
+      const row = presentAppointment({
+        booking: { priceSnapshot: {} },
+        paymentMethod: method,
+        paymentProvider: 'manual',
+        paymentReview: 1,
+      });
+      expect(row.paymentSource).toBe(source);
+      expect(row.paymentReview).toBe(true);
+    }
   });
 });
