@@ -100,6 +100,7 @@ export function createApp({
           frameSrc: [
             "'self'",
             'https://maps.google.com',
+            'https://www.google.com',
             'https://challenges.cloudflare.com',
           ],
           connectSrc: ["'self'", 'https://challenges.cloudflare.com'],

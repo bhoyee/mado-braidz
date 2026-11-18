@@ -402,7 +402,7 @@ export function decorateCatalog(data) {
       'https://www.google.com/maps/search/?api=1&query=' +
       encodeURIComponent(`${b.street}, ${b.city}, ${b.region} ${b.postalCode}`),
     mapEmbed:
-      'https://maps.google.com/maps?q=' +
+      'https://www.google.com/maps?q=' +
       encodeURIComponent(
         `${b.street}, ${b.city}, ${b.region} ${b.postalCode}`,
       ) +

@@ -286,6 +286,11 @@ describe('Milestone 2 public pages', () => {
     const response = await request(makeApp()).get('/contact');
     expect(response.text).not.toContain('<iframe');
     expect(response.text).toContain('data-load-map');
+    expect(response.text).toContain('data-map="https://www.google.com/maps?q=');
+    expect(response.headers['content-security-policy']).toContain(
+      'https://www.google.com',
+    );
+    expect(response.text).toContain('/img/studio/office-entrance-960.webp');
   });
   it('reports unsent messages rather than claiming success', async () => {
     const agent = request.agent(makeApp());

@@ -17,4 +17,8 @@
     <div class="button-row"><a href="/book" class="button">Book your chair</a><a href="/contact" class="button outline">Plan your visit</a></div>
   </div>
 </section>
+<section class="wrap section-tight entrance-grid" aria-labelledby="entrance-heading">
+  <div><p class="eyebrow">Find the studio</p><h2 id="entrance-heading">Your next look <em>starts here.</em></h2><p>Visit us at {{ business.street }}, {{ business.city }}, {{ business.region }} {{ business.postalCode }}. Look for the building number above the glass entrance.</p><a class="text-link" href="/contact">Hours &amp; directions</a></div>
+  {% include "partials/entrance.njk" %}
+</section>
 {% endblock %}

@@ -7,8 +7,7 @@ document.querySelectorAll('[data-load-map]').forEach((button) => {
     iframe.title = 'Map to Mado African Braidz';
     iframe.referrerPolicy = 'no-referrer';
     iframe.allowFullscreen = true;
-    panel.append(iframe);
-    button.remove();
+    panel.replaceChildren(iframe);
   });
 });
 document
