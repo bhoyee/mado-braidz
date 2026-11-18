@@ -71,14 +71,7 @@ export async function renderEmail(config, payload, detail, settings = {}) {
   const appUrl = config.APP_URL.replace(/\/$/, '');
   const { booking, client } = detail || {};
   const snapshot = booking?.priceSnapshot || {};
-  const address = [
-    business.street,
-    business.city,
-    business.region,
-    business.postalCode,
-  ]
-    .filter(Boolean)
-    .join(', ');
+  const address = `${business.street}, ${business.city}, ${business.region} ${business.postalCode}`;
   let actionUrl = appUrl + '/book',
     actionLabel = 'Explore styles & book',
     text = '';
@@ -149,7 +142,10 @@ export async function renderEmail(config, payload, detail, settings = {}) {
     street: business.street,
     locality: `${business.city}, ${business.region} ${business.postalCode}`,
     country: business.country === 'US' ? 'United States' : business.country,
-    businessName: business.name || 'Mado African Braids',
+    businessName:
+      business.name === 'Mado African Braidz'
+        ? 'Mado African Braids'
+        : business.name || 'Mado African Braids',
     phone:
       parsePhoneNumberFromString(
         business.phone || '',
@@ -157,9 +153,12 @@ export async function renderEmail(config, payload, detail, settings = {}) {
       )?.formatNational() || business.phone,
     phoneHref: business.phone,
     preferencesUrl,
+    marketing,
     footer: marketing
-      ? 'You received this because you opted in to salon news. Unsubscribe using Email preferences below.'
-      : 'Your deposit is applied to your total. Contact the studio if you need help with your visit.',
+      ? 'You received this because you opted in to salon news. You can unsubscribe below.'
+      : booking
+        ? 'Your deposit is applied to your total. Contact the studio if you need help with your visit.'
+        : 'Questions? Reply to this email or call the studio.',
   };
   const template = await readFile(
     new URL('../views/emails/layout.html.njk', import.meta.url),
@@ -168,7 +167,7 @@ export async function renderEmail(config, payload, detail, settings = {}) {
   const html = new nunjucks.Environment(null, {
     autoescape: true,
   }).renderString(template, vars);
-  const body = `${vars.subject}\n\n${vars.intro}\n\n${text}\n${actionLabel}: ${actionUrl}\n\n${vars.footer}\n${vars.businessName}\n${address}\n${vars.phone}\nEmail preferences: ${preferencesUrl}`;
+  const body = `${vars.subject}\n\n${vars.intro}\n\n${text}\n${actionLabel}: ${actionUrl}\n\n${vars.footer}\n${vars.businessName}\n${address}\n${vars.phone}${marketing ? '\nUnsubscribe: ' + preferencesUrl : ''}`;
   return {
     subject: vars.subject,
     html,

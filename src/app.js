@@ -134,6 +134,14 @@ export function createApp({
     }),
   );
   app.use(compression());
+  // Email clients embed this public logo from outside the website origin.
+  app.get('/img/email-logo.png', (_req, res) => {
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.sendFile(
+      fileURLToPath(new URL('../public/img/email-logo.png', import.meta.url)),
+      { maxAge: '7d' },
+    );
+  });
   // Browsers also request this conventional fallback independently of page links.
   app.get('/favicon.ico', (_req, res) => {
     res.set('Cache-Control', 'no-cache');

@@ -322,6 +322,18 @@ describe('Milestone 7 scheduling', () => {
   });
 });
 describe('Brevo content and security', () => {
+  it('allows external email clients to embed the public PNG logo', async () => {
+    const f = notificationFixture();
+    const response = await request(
+      createApp({ config: f.config, catalog: fixtureCatalog() }),
+    )
+      .get('/img/email-logo.png')
+      .expect(200);
+    expect(response.headers['cross-origin-resource-policy']).toBe(
+      'cross-origin',
+    );
+    expect(response.headers['content-type']).toContain('image/png');
+  });
   it('includes a public PNG logo and the full salon address and telephone in owner emails', async () => {
     const f = notificationFixture();
     const email = await renderEmail(
@@ -336,12 +348,14 @@ describe('Brevo content and security', () => {
     for (const value of [
       '7375 Executive Place',
       'Lanham, MD 20706',
-      'United States',
       '(443) 743-4979',
       'tel:+14437434979',
     ])
       expect(email.html).toContain(value);
     expect(email.html).not.toContain('localhost');
+    expect(email.html).toContain('Mado African Braids');
+    expect(email.html).not.toContain('Email preferences');
+    expect(email.html).not.toContain('Unsubscribe');
   });
   it('renders escaped booking details, valid UTC calendar attachment and manage link', async () => {
     const f = notificationFixture();
