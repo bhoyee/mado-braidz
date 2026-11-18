@@ -868,20 +868,21 @@ figcaption {
     max-width: 380px;
   }
 }
-/* Phones: keep the footage clear edge to edge, with the words on their own
-   dark surface below so they never obscure the client or her braids. */
+/* Phones: transparent copy over the footage, with a compact heading and
+   visible styles link. A light scrim and text shadow keep the words legible. */
 @media (max-width: 599px) {
   .hero {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    height: auto;
+    justify-content: flex-end;
+    height: clamp(480px, calc(100svh - 180px), 680px);
   }
   .hero-film {
-    position: relative;
-    order: -1;
+    position: absolute;
+    inset: 0;
     width: 100%;
-    height: min(44svh, 400px);
+    height: 100%;
   }
   .hero .hero-clip {
     object-position: center 8%;
@@ -889,29 +890,24 @@ figcaption {
     mask-image: none;
   }
   .hero-film::after {
-    background: none;
+    background: rgb(0 0 0 / 0.16);
   }
   .hero-copy {
     margin-top: 0;
-    /* Leaves room for the steps card that tucks over the hero's edge. */
-    padding: 20px var(--gutter) 84px;
+    background: transparent;
+    padding: 24px var(--gutter) 88px;
+    text-shadow:
+      0 2px 5px rgb(0 0 0 / 0.9),
+      0 0 20px rgb(0 0 0 / 0.7);
   }
   .hero h1 {
-    font-size: clamp(38px, 10.5vw, 56px);
+    font-size: clamp(34px, 9vw, 46px);
   }
   .hero-intro {
-    margin-top: 12px;
-  }
-}
-/* Short phones: a slightly shorter clip so the link clears the Book bar. */
-@media (max-width: 599px) and (max-height: 780px) {
-  .hero-film {
-    height: 38svh;
-  }
-}
-@media (max-width: 599px) and (max-height: 690px) {
-  .hero-film {
-    height: 32svh;
+    margin-top: 10px;
+    font-size: 16px;
+    line-height: 1.4;
+    color: var(--color-cream);
   }
 }
 /* Phones already have the pinned Book bar, so the hero keeps one link. */
