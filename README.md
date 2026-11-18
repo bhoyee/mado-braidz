@@ -292,6 +292,8 @@ Validation commands: `npm run test:batch:browser` checks phone/email versus refe
 
 For catalog and settings management, see [Milestone 6](docs/MILESTONE-6.md). The owner navigation now includes Styles & prices, Extras, Availability, Photos & Our Work, Clients, Settings and Page redirects. Apply `0006_icy_magneto.sql` with `npm run db:migrate`. New styles start as drafts; add prices or select consultation pricing, then publish. Public catalog changes appear immediately while existing booking prices stay unchanged.
 
+To change an image, use **New photo → Replace photo** on its photo card or style page. The existing caption, style link and order are kept. Styles without photos stay listed with an **Add photo** upload, so a removed photo never means recreating the style. Photo removal uses a styled Cancel/Remove confirmation.
+
 No new env variables are needed. Photos use the existing persistent `UPLOAD_DIR/catalog` directory and survive releases. The image route exposes only generated catalog WebP/AVIF files; proofs and inspiration images stay private. Balance-method settings affect remaining balances and do not disable initial deposit methods. Email settings save preferences for Milestone 7; they do not enable email delivery yet.
 
 `npm run test:db` includes booking and owner-catalog integration tests against disposable databases. `npm run test:management:browser` verifies real owner forms, image upload/order, public updates and accessibility at 390/1440 px in Chrome, using a separate disposable database and fake Stripe. It requires local MySQL credentials with permission to create/drop those test databases; it never edits the real salon catalog.

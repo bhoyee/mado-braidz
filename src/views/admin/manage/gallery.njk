@@ -1,1 +1,32 @@
-{% extends "layouts/admin.njk" %}{% from "admin/manage/macros.njk" import csrf,field,styleSelect,upload %}{% block content %}<header class="owner-page-head"><div><p class="eyebrow">The studio portfolio</p><h1>Photos & Our Work.</h1><p>Describe every photo and choose where it appears.</p></div></header>{{ upload(styles,csrfToken) }}<p class="owner-muted">Drag photos to reorder, or use Move earlier / Move later. Press Save photo order when ready.</p><button class="button outline" type="button" data-save-photo-order>Save photo order</button><div class="manage-gallery" data-photo-list>{% for photo in media %}<article class="owner-panel" draggable="true" data-photo-id="{{ photo.id }}"><div class="owner-actions"><button type="button" class="owner-text-link" data-photo-move="-1">Move earlier</button><button type="button" class="owner-text-link" data-photo-move="1">Move later</button></div><img class="manage-photo" src="{{ photo.path }}" alt="{{ photo.alt }}" width="320" height="400" loading="lazy"><form method="post" action="/admin/gallery/{{ photo.id }}" data-owner-form>{{ csrf(csrfToken) }}{{ field('alt','Photo description',photo.alt,'text',true) }}{{ styleSelect(styles,photo.styleId) }}<label class="owner-field"><span>Show in</span><select name="kind"><option value="style" {% if photo.kind=='style' %}selected{% endif %}>Style page</option><option value="gallery" {% if photo.kind=='gallery' %}selected{% endif %}>Our Work</option></select></label>{{ field('sort','Display order (lower appears first)',photo.sort,'number',true) }}<button class="button" type="submit">Save photo</button></form><form method="post" action="/admin/gallery/{{ photo.id }}/remove" data-owner-form data-confirm="Remove this photo from the website?"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button class="owner-text-link manage-remove" type="submit">Remove photo</button></form></article>{% else %}<p>No photos yet. Add your first finished look above.</p>{% endfor %}</div>{% endblock %}
+{% extends "layouts/admin.njk" %}
+{% from "admin/manage/macros.njk" import csrf,field,styleSelect,upload %}
+{% from "admin/manage/photo-controls.njk" import replacePhoto,addMissingPhoto %}
+{% block content %}
+<header class="owner-page-head"><div><p class="eyebrow">The studio portfolio</p><h1>Photos & Our Work.</h1><p>Replace a photo directly, or edit its description and placement below.</p></div></header>
+{% if stylesWithoutPhotos.length %}
+<section aria-labelledby="missing-photo-heading"><h2 id="missing-photo-heading">Styles waiting for a photo</h2><div class="manage-gallery manage-missing-list">{% for style in stylesWithoutPhotos %}{{ addMissingPhoto(style,csrfToken) }}{% endfor %}</div></section>
+{% endif %}
+{{ upload(styles,csrfToken) }}
+<p class="owner-muted">Drag photos to reorder, or use Move earlier / Move later. Press Save photo order when ready.</p>
+<button class="button outline" type="button" data-save-photo-order>Save photo order</button>
+<div class="manage-gallery" data-photo-list>
+{% for photo in media %}
+<article id="photo-{{ photo.id }}" class="owner-panel" draggable="true" data-photo-id="{{ photo.id }}">
+  <div class="owner-actions"><button type="button" class="owner-text-link" data-photo-move="-1">Move earlier</button><button type="button" class="owner-text-link" data-photo-move="1">Move later</button></div>
+  {% for style in styles %}{% if photo.styleId==style.id %}<h2>{{ style.name }}</h2>{% endif %}{% endfor %}
+  <img class="manage-photo" src="{{ photo.path }}" alt="{{ photo.alt }}" width="320" height="400" loading="lazy">
+  {{ replacePhoto(photo,csrfToken) }}
+  <details class="manage-details"><summary>Edit description & placement</summary>
+    <form method="post" action="/admin/gallery/{{ photo.id }}" data-owner-form>
+      {{ csrf(csrfToken) }}{{ field('alt','Photo description',photo.alt,'text',true) }}{{ styleSelect(styles,photo.styleId) }}
+      <label class="owner-field"><span>Show in</span><select name="kind"><option value="style" {% if photo.kind=='style' %}selected{% endif %}>Style page</option><option value="gallery" {% if photo.kind=='gallery' %}selected{% endif %}>Our Work</option></select></label>
+      {{ field('sort','Display order (lower appears first)',photo.sort,'number',true) }}<button class="button" type="submit">Save photo details</button>
+    </form>
+  </details>
+  <form method="post" action="/admin/gallery/{{ photo.id }}/remove" data-owner-form data-confirm="Remove this photo?" data-confirm-detail="Only this photo is removed. The style, prices and booking history stay saved." data-confirm-label="Remove photo">
+    {{ csrf(csrfToken) }}<button class="owner-text-link manage-remove" type="submit">Remove photo</button>
+  </form>
+</article>
+{% else %}<p>No photos yet. Choose a style above to add its photo.</p>{% endfor %}
+</div>
+{% endblock %}

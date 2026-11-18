@@ -1,6 +1,58 @@
 .owner-sidebar {
   overflow-y: auto;
 }
+.owner-confirm-dialog {
+  margin: auto;
+  width: min(92vw, 480px);
+  max-height: 90vh;
+}
+.owner-confirm-dialog .owner-actions {
+  margin-top: 1.5rem;
+  justify-content: flex-end;
+}
+.owner-confirm-dialog .button {
+  margin-top: 0;
+}
+.owner-app .owner-danger-button {
+  background: #b3261e;
+  border-color: #b3261e;
+  color: #fff;
+}
+.owner-app .owner-danger-button:hover {
+  background: #8c1e18;
+}
+.manage-replace-photo {
+  padding: 1rem 0;
+  border-top: 1px solid #e5dce9;
+}
+.manage-replace-photo .button {
+  margin-top: 0.5rem;
+}
+.manage-replace-photo .owner-muted {
+  font-size: 0.83rem;
+  margin: 0;
+}
+.manage-missing-list {
+  margin: 1rem 0 2rem;
+}
+.manage-missing-photo .eyebrow {
+  margin-bottom: 0.7rem;
+}
+.manage-missing-photo .owner-text-link {
+  display: inline-block;
+  margin-top: 1rem;
+}
+.manage-style-photo {
+  min-width: 0;
+}
+.manage-style-photo p {
+  font-size: 0.85rem;
+}
+@media (max-width: 760px) {
+  .manage-photos:has(.manage-style-photo) {
+    grid-template-columns: 1fr;
+  }
+}
 .owner-page-head {
   display: flex;
   align-items: flex-end;

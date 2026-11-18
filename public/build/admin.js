@@ -9,16 +9,41 @@ function report(message) {
   alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 const resetToken = document.querySelector('#reset-token');
+function confirmAction(form) {
+  const dialog = document.querySelector('#owner-confirm-dialog');
+  if (dialog.open) return Promise.resolve(false);
+  dialog.querySelector('#owner-confirm-title').textContent =
+    form.dataset.confirm;
+  dialog.querySelector('#owner-confirm-detail').textContent =
+    form.dataset.confirmDetail || 'Please confirm that you want to continue.';
+  dialog.querySelector('[data-confirm-submit]').textContent =
+    form.dataset.confirmLabel || 'Continue';
+  dialog.returnValue = 'cancel';
+  return new Promise((resolve) => {
+    dialog.addEventListener(
+      'close',
+      () => resolve(dialog.returnValue === 'confirm'),
+      { once: true },
+    );
+    dialog.showModal();
+  });
+}
 if (resetToken && /^[a-f0-9]{64}$/.test(location.hash.slice(1))) {
   resetToken.value = location.hash.slice(1);
   history.replaceState(null, '', location.pathname);
 }
 document.querySelectorAll('[data-owner-form]').forEach((form) => {
   let busy = false;
+  let confirming = false;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (busy) return;
-    if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) return;
+    if (busy || confirming) return;
+    if (form.dataset.confirm) {
+      confirming = true;
+      const accepted = await confirmAction(form);
+      confirming = false;
+      if (!accepted) return;
+    }
     const data = new FormData(form);
     if (event.submitter?.name)
       data.set(event.submitter.name, event.submitter.value);
@@ -96,8 +121,14 @@ if (photoList) {
   photoList.addEventListener('dragstart', (event) => {
     dragged = event.target.closest('[data-photo-id]');
   });
-  photoList.addEventListener('dragover', (event) => event.preventDefault());
+  photoList.addEventListener('dragend', () => {
+    dragged = null;
+  });
+  photoList.addEventListener('dragover', (event) => {
+    if (dragged) event.preventDefault();
+  });
   photoList.addEventListener('drop', (event) => {
+    if (!dragged) return;
     event.preventDefault();
     const target = event.target.closest('[data-photo-id]');
     if (dragged && target && dragged !== target)

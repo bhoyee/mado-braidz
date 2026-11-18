@@ -4,6 +4,9 @@ import mysql from 'mysql2/promise';
 import argon2 from 'argon2';
 import { randomBytes, randomUUID } from 'node:crypto';
 import request from 'supertest';
+import sharp from 'sharp';
+import { rm } from 'node:fs/promises';
+import { resolve, sep } from 'node:path';
 import { migrate } from 'drizzle-orm/mysql2/migrator';
 import { eq } from 'drizzle-orm';
 import { createDatabase } from '../src/db/index.js';
@@ -23,6 +26,7 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
   () => {
     let admin, db, pool, service, repository, bookings, app, agent, token;
     const database = 'mado_catalog_test_' + randomBytes(6).toString('hex');
+    const uploadDir = resolve('tmp', 'management-upload-' + database);
     const actor = { id: 1, role: 'owner', ip: '127.0.0.1' },
       password = 'Owner-management-test-password!';
     beforeAll(async () => {
@@ -72,7 +76,11 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       repository = createBookingRepository(db);
       bookings = createBookingService(repository, () => now, 'x'.repeat(32));
       app = createApp({
-        config: parseEnv({ ...paymentConfig, DATABASE_URL: url.toString() }),
+        config: parseEnv({
+          ...paymentConfig,
+          DATABASE_URL: url.toString(),
+          UPLOAD_DIR: uploadDir,
+        }),
         catalog: createCatalogService(db),
         bookingRepository: repository,
         adminRepository: createAdminRepository(db),
@@ -92,6 +100,12 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
     }, 30000);
     afterAll(async () => {
       await pool?.end();
+      if (
+        uploadDir.startsWith(
+          resolve('tmp') + sep + 'management-upload-mado_catalog_test_',
+        )
+      )
+        await rm(uploadDir, { recursive: true, force: true });
       if (admin) {
         if (!/^mado_catalog_test_[a-f0-9]{12}$/.test(database))
           throw Error('Unsafe database cleanup');
@@ -312,6 +326,101 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         .send({})
         .expect(409);
       expect((await repository.bookingById(hold.id)).paidCents).toBe(3000);
+    });
+    it('replaces only image bytes while retaining the photo ID, caption, style, order and size', async () => {
+      const id = await service.saveMedia(
+        null,
+        {
+          kind: 'style',
+          styleId: 1,
+          path: '/img/styles/old-photo.webp',
+          alt: 'Original caption',
+          sort: 17,
+          width: 960,
+          height: 1200,
+          variants: { origin: 'generated', size: 'medium', sizes: [] },
+        },
+        actor,
+      );
+      const before = await service.media(id);
+      const image = await sharp({
+        create: { width: 500, height: 700, channels: 3, background: '#73489a' },
+      })
+        .png()
+        .toBuffer();
+      await agent
+        .post('/admin/gallery/' + id + '/replace')
+        .set('Accept', 'application/json')
+        .set('x-csrf-token', token)
+        .field('alt', 'Do not change this caption')
+        .field('styleId', '9999')
+        .field('kind', 'gallery')
+        .field('sort', '0')
+        .attach('photo', image, 'replacement.png')
+        .expect(200);
+      const after = await service.media(id);
+      expect(after).toMatchObject({
+        id: before.id,
+        kind: before.kind,
+        styleId: before.styleId,
+        alt: before.alt,
+        sort: before.sort,
+      });
+      expect(after.path).not.toBe(before.path);
+      expect(after.path).toMatch(/^\/media\/catalog\//);
+      expect(after.variants.size).toBe('medium');
+      expect(after.variants.origin).toBe('supplied');
+      const invalid = await agent
+        .post('/admin/gallery/' + id + '/replace')
+        .set('Accept', 'application/json')
+        .set('x-csrf-token', token)
+        .attach('photo', Buffer.from('not an image'), 'bad.png');
+      expect(invalid.status).toBe(400);
+      expect((await service.media(id)).path).toBe(after.path);
+      const audit = await db
+        .select()
+        .from(s.auditLog)
+        .where(eq(s.auditLog.entityId, id));
+      expect(
+        audit.some((row) => {
+          const value =
+            typeof row.after === 'string' ? JSON.parse(row.after) : row.after;
+          return value?.path === after.path;
+        }),
+      ).toBe(true);
+      await service.removeMedia(id, actor);
+      const gallery = await agent.get('/admin/gallery');
+      expect(gallery.status).toBe(200);
+      expect(gallery.text).toContain('data-missing-style="1"');
+      expect(
+        (await repository.catalog()).styles.some((style) => style.id === 1),
+      ).toBe(true);
+    }, 30000);
+    it('rejects unauthorized replacement, missing uploads and private inspiration media', async () => {
+      const [privatePhoto] = await db
+        .insert(s.media)
+        .values({
+          kind: 'inspiration',
+          path: 'private-inspiration.webp',
+          alt: 'Private client photo',
+        })
+        .$returningId();
+      const denied = await agent
+        .post('/admin/gallery/' + privatePhoto.id + '/replace')
+        .set('Accept', 'application/json')
+        .set('x-csrf-token', token)
+        .attach('photo', Buffer.from('invalid'), 'photo.png');
+      expect(denied.status).toBe(400);
+      await agent
+        .post('/admin/gallery/1/replace')
+        .set('Accept', 'application/json')
+        .field('returnTo', 'gallery')
+        .expect(403);
+      expect(
+        (
+          await db.select().from(s.media).where(eq(s.media.id, privatePhoto.id))
+        )[0].path,
+      ).toBe('private-inspiration.webp');
     });
     it('denies management access to a non-owner account', async () => {
       await db

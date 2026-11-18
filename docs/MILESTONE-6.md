@@ -14,6 +14,8 @@ The owner can manage the catalog and studio settings at `/admin`. Access remains
 
 Catalog/settings reads are live, so saved changes appear on new public/booking requests within the required 60 seconds. Existing bookings retain their stored names, totals, extras and durations unless the owner explicitly changes that booking through bookingService.
 
+Photo editing follow-up: **New photo → Replace photo** is available on each photo card and on the style page. It swaps the image under the same media ID, retaining its style, caption, display order, placement and size association. Invalid uploads leave the existing photo intact. Styles without a photo remain visible under **Styles waiting for a photo**, with a direct Add photo upload; deleting a photo never requires recreating the style or its prices. Removal uses the styled confirmation dialog, with Cancel and Escape support.
+
 ## Installation and deployment
 
 No new environment variables or package dependencies are required. Existing `UPLOAD_DIR` must be persistent and writable. Apply additive migration `0006_icy_magneto.sql` before serving the new version:

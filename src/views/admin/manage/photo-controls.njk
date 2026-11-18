@@ -1,0 +1,21 @@
+{% macro replacePhoto(photo,token,returnTo='gallery') %}
+<form class="manage-replace-photo" method="post" action="/admin/gallery/{{ photo.id }}/replace" enctype="multipart/form-data" data-owner-form>
+  <input type="hidden" name="_csrf" value="{{ token }}"><input type="hidden" name="returnTo" value="{{ returnTo }}">
+  <label class="owner-field"><span>New photo</span><input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/avif" required></label>
+  <p class="owner-muted">Only the image changes. The style, description and display order stay the same.</p>
+  <button class="button" type="submit">Replace photo</button>
+</form>
+{% endmacro %}
+
+{% macro addMissingPhoto(style,token) %}
+<article class="owner-panel manage-missing-photo" data-missing-style="{{ style.id }}">
+  <p class="eyebrow">No style photo</p><h2>{{ style.name }}</h2>
+  <p class="owner-muted">Your style and prices are saved. Add a photo without recreating the style.</p>
+  <form method="post" action="/admin/gallery/upload" enctype="multipart/form-data" data-owner-form>
+    <input type="hidden" name="_csrf" value="{{ token }}"><input type="hidden" name="kind" value="style"><input type="hidden" name="styleId" value="{{ style.id }}"><input type="hidden" name="alt" value="{{ style.name }} hairstyle"><input type="hidden" name="sort" value="0"><input type="hidden" name="returnTo" value="gallery">
+    <label class="owner-field"><span>Photo for {{ style.name }}</span><input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/avif" required></label>
+    <button class="button" type="submit">Add photo</button>
+  </form>
+  <a class="owner-text-link" href="/admin/styles/{{ style.id }}#style-photos">View style &amp; prices</a>
+</article>
+{% endmacro %}
