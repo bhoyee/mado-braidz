@@ -32,6 +32,8 @@ const items = [
     readAt: null,
   },
 ];
+for (let index = 2; index <= 15; index++)
+  items.push({ ...items[0], id: index });
 const jobs = [],
   settings = {};
 const repo = {
@@ -70,6 +72,9 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 await mkdir('tmp/qa', { recursive: true });
 try {
   for (const width of [390, 1440]) {
+    items.forEach((item) => {
+      item.readAt = null;
+    });
     const context = await browser.newContext({
         viewport: { width, height: 1000 },
         ...(width === 390
@@ -92,6 +97,29 @@ try {
     await page
       .getByRole('heading', { name: 'Notifications.', exact: true })
       .waitFor();
+    await page.locator('[data-notification-count]:not([hidden])').waitFor();
+    const bell = page.getByRole('button', { name: /Notifications,.*unread/ });
+    await bell.click();
+    await page.locator('[data-notification-dropdown]:not([hidden])').waitFor();
+    await page.locator('[data-notification-preview] a').first().waitFor();
+    assert.equal(
+      await page
+        .getByRole('link', { name: 'View all notifications' })
+        .getAttribute('href'),
+      '/admin/notifications',
+    );
+    await page.screenshot({
+      path: 'tmp/qa/notification-dropdown-' + width + '.png',
+    });
+    await page.keyboard.press('Escape');
+    assert.equal(await bell.getAttribute('aria-expanded'), 'false');
+    assert.equal(
+      await page.locator('.owner-notifications').evaluate((list) => {
+        list.scrollTop = 100;
+        return list.scrollHeight > list.clientHeight && list.scrollTop > 0;
+      }),
+      true,
+    );
     const violations = (await new AxeBuilder({ page }).analyze()).violations;
     assert.equal(violations.length, 0, JSON.stringify(violations));
     const manifest = await (
@@ -154,13 +182,23 @@ try {
       }),
     );
     await page
-      .getByRole('button', { name: 'Enable push on this device', exact: true })
+      .getByRole('switch', {
+        name: 'Push notifications on this device',
+        exact: true,
+      })
       .click();
     await page
       .locator('[data-push-status]')
       .filter({ hasText: 'Push alerts enabled on this device.' })
       .waitFor();
     assert.equal(await page.evaluate(() => window.pushPermissionRequests), 1);
+    await page
+      .getByRole('switch', { name: 'Push notifications on this device' })
+      .uncheck();
+    await page
+      .locator('[data-push-status]')
+      .filter({ hasText: 'Push alerts disabled on this device.' })
+      .waitFor();
     await page.evaluate(() =>
       Object.defineProperty(Notification, 'permission', {
         configurable: true,
@@ -168,7 +206,10 @@ try {
       }),
     );
     await page
-      .getByRole('button', { name: 'Enable push on this device', exact: true })
+      .getByRole('switch', {
+        name: 'Push notifications on this device',
+        exact: true,
+      })
       .click();
     await page
       .locator('[data-push-status]')
@@ -198,6 +239,9 @@ try {
       .locator('[data-push-status]')
       .filter({ hasText: 'Test sent to this device.' })
       .waitFor();
+    await page.locator('[data-push-switch]').evaluate((input) => {
+      input.checked = false;
+    });
     await page.evaluate(() => {
       Object.defineProperty(Notification, 'permission', {
         configurable: true,
@@ -206,7 +250,10 @@ try {
       Notification.requestPermission = async () => 'denied';
     });
     await page
-      .getByRole('button', { name: 'Enable push on this device', exact: true })
+      .getByRole('switch', {
+        name: 'Push notifications on this device',
+        exact: true,
+      })
       .click();
     await page
       .locator('[data-push-status]')
@@ -287,8 +334,8 @@ try {
         const applePage = await apple.newPage();
         await applePage.goto(origin + '/admin/notifications');
         await applePage
-          .getByRole('button', {
-            name: 'Enable push on this device',
+          .getByRole('switch', {
+            name: 'Push notifications on this device',
             exact: true,
           })
           .click();

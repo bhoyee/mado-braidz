@@ -1,5 +1,29 @@
 const alertBox = document.querySelector('.owner-alert');
 const notificationBadge = document.querySelector('[data-notification-count]');
+const bell = document.querySelector('[data-notification-bell]');
+const dropdown = document.querySelector('[data-notification-dropdown]');
+const preview = document.querySelector('[data-notification-preview]');
+let pollNotifications = async () => {};
+if (bell) {
+  const close = () => {
+    dropdown.hidden = true;
+    bell.setAttribute('aria-expanded', 'false');
+  };
+  bell.addEventListener('click', () => {
+    dropdown.hidden = !dropdown.hidden;
+    bell.setAttribute('aria-expanded', String(!dropdown.hidden));
+    if (!dropdown.hidden) pollNotifications();
+  });
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.owner-notification-menu')) close();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !dropdown.hidden) {
+      close();
+      bell.focus();
+    }
+  });
+}
 if (notificationBadge) {
   const poll = async () => {
     if (document.hidden) return;
@@ -9,11 +33,57 @@ if (notificationBadge) {
       });
       if (!response.ok) return;
       const data = await response.json();
-      notificationBadge.textContent = data.unread ? `(${data.unread})` : '';
+      notificationBadge.textContent =
+        data.unread > 99 ? '99+' : String(data.unread || 0);
+      notificationBadge.hidden = !data.unread;
+      bell.setAttribute(
+        'aria-label',
+        `Notifications, ${data.unread || 0} unread`,
+      );
+      preview.replaceChildren();
+      for (const item of data.items.slice(0, 6)) {
+        const link = document.createElement('a');
+        link.className =
+          'owner-notification-preview' + (item.readAt ? '' : ' unread');
+        link.href = /^\/admin(?:\/|$)/.test(item.url || '')
+          ? item.url
+          : '/admin/notifications';
+        const title = document.createElement('strong');
+        title.textContent = item.title;
+        const body = document.createElement('span');
+        body.textContent = item.body;
+        const time = document.createElement('time');
+        time.dateTime = item.createdAt;
+        time.textContent = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        }).format(new Date(item.createdAt));
+        link.append(title, body, time);
+        link.addEventListener('click', () => {
+          if (item.readAt) return;
+          fetch('/admin/notifications/read', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')
+                .content,
+            },
+            body: JSON.stringify({ id: item.id }),
+            keepalive: true,
+          }).catch(() => {});
+        });
+        preview.append(link);
+      }
+      if (!data.items.length) preview.textContent = 'You are all caught up.';
     } catch {
       /* The next poll retries without interrupting owner work. */
     }
   };
+  pollNotifications = poll;
   poll();
   setInterval(poll, 30000);
 }
@@ -34,7 +104,7 @@ if (pushHelp) {
   pushHelp.textContent = appleMobile
     ? 'iPhone / iPad: use iOS or iPadOS 16.4 or later. Open this portal in Safari, tap Share > Add to Home Screen, then open its Home Screen icon to enable alerts.'
     : /Android/.test(navigator.userAgent)
-      ? 'Android phone / tablet: open this portal in an up-to-date browser, tap Enable push and allow notifications. No app installation is required.'
+      ? 'Android phone / tablet: open this portal in an up-to-date browser, turn on the push switch and allow notifications. No app installation is required.'
       : 'Enable alerts in a supported browser on this computer. Each device needs its own permission.';
 }
 const pushCsrf = () =>
@@ -53,14 +123,38 @@ const pushRequest = async (method, input) => {
 const worker = () =>
   navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin/' });
 if (notificationBadge && 'serviceWorker' in navigator) worker().catch(() => {});
+const pushSwitch = document.querySelector('[data-push-switch]');
+if (pushSwitch && 'serviceWorker' in navigator && 'Notification' in window) {
+  navigator.serviceWorker
+    .getRegistration('/admin/')
+    .then(async (registration) => {
+      const subscribed = !!(await registration?.pushManager.getSubscription());
+      if (!pushSwitch.disabled)
+        pushSwitch.checked =
+          Notification.permission === 'granted' && subscribed;
+    })
+    .catch(() => {});
+}
 document
-  .querySelector('[data-enable-push]')
-  ?.addEventListener('click', async (event) => {
+  .querySelector('[data-push-switch]')
+  ?.addEventListener('change', async (event) => {
     const button = event.currentTarget;
     const raw = button.dataset.vapidKey;
+    const enabling = button.checked;
     button.disabled = true;
     pushStatus.textContent = 'Checking notification permission…';
     try {
+      if (!enabling) {
+        const registration =
+          await navigator.serviceWorker.getRegistration('/admin/');
+        const subscription = await registration?.pushManager.getSubscription();
+        if (subscription) {
+          await pushRequest('DELETE', { endpoint: subscription.endpoint });
+          await subscription.unsubscribe();
+        }
+        pushStatus.textContent = 'Push alerts disabled on this device.';
+        return;
+      }
       if (appleMobile && !homeScreen)
         throw new Error(
           'On iPhone or iPad, open Safari > Share > Add to Home Screen. Open the new Home Screen icon, sign in and enable push there.',
@@ -81,7 +175,7 @@ document
         throw new Error(
           permission === 'denied'
             ? 'Notifications are blocked on this device. ' + permissionHelp
-            : 'Notification permission was not granted. Tap Enable push again and choose Allow. If no prompt appears: ' +
+            : 'Notification permission was not granted. Turn on the push switch again and choose Allow. If no prompt appears: ' +
                 permissionHelp,
         );
       pushStatus.textContent = 'Connecting this device…';
@@ -113,6 +207,7 @@ document
       const data = await pushRequest('POST', subscription.toJSON());
       pushStatus.textContent = data.message;
     } catch (error) {
+      button.checked = !enabling;
       pushStatus.textContent = error.message;
     } finally {
       button.disabled = false;
@@ -130,11 +225,14 @@ document
         !('Notification' in window) ||
         Notification.permission !== 'granted'
       )
-        throw new Error('Enable push on this device first. ' + permissionHelp);
+        throw new Error(
+          'Turn on push notifications on this device first. ' + permissionHelp,
+        );
       const registration =
         await navigator.serviceWorker.getRegistration('/admin/');
       const subscription = await registration?.pushManager.getSubscription();
-      if (!subscription) throw new Error('Enable push on this device first.');
+      if (!subscription)
+        throw new Error('Turn on push notifications on this device first.');
       const response = await fetch('/admin/api/push-test', {
         method: 'POST',
         headers: {
@@ -149,21 +247,6 @@ document
       pushStatus.textContent = error.message;
     } finally {
       button.disabled = false;
-    }
-  });
-document
-  .querySelector('[data-disable-push]')
-  ?.addEventListener('click', async () => {
-    try {
-      const registration = await worker();
-      const subscription = await registration.pushManager.getSubscription();
-      if (subscription) {
-        await pushRequest('DELETE', { endpoint: subscription.endpoint });
-        await subscription.unsubscribe();
-      }
-      pushStatus.textContent = 'Push alerts disabled on this device.';
-    } catch (error) {
-      pushStatus.textContent = error.message;
     }
   });
 document
