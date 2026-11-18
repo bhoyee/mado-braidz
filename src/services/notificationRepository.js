@@ -90,7 +90,13 @@ export function createNotificationRepository(db) {
               inArray(s.jobs.status, ['pending', 'failed']),
               lte(s.jobs.runAt, now),
               lt(s.jobs.attempts, 5),
-              gte(s.jobs.createdAt, cutoff),
+              or(
+                gte(s.jobs.createdAt, cutoff),
+                and(
+                  inArray(s.jobs.type, ['reminder', 'winback']),
+                  gte(s.jobs.runAt, cutoff),
+                ),
+              ),
             ),
           )
           .orderBy(s.jobs.runAt)

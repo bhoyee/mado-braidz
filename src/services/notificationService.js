@@ -87,6 +87,7 @@ export function createNotificationService(
       return false;
     if (job.type === 'winback')
       return (
+        booking.completedAt >= cutoff() &&
         marketingEligible(booking, client, state.bookings, clock()) &&
         state.settings.emails?.winback === true
       );

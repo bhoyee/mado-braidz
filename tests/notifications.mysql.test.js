@@ -58,6 +58,32 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       expect(a.id).toBe(b.id);
       await repo.saveLog(a.id, { providerId: 'brevo-one', status: 'sent' });
     });
+    it('keeps future reminders eligible across activation without releasing old confirmations', async () => {
+      const now = new Date(),
+        cutoff = new Date(+now - 60000),
+        createdAt = new Date(+now - 86400000);
+      await repo.queue({
+        type: 'reminder',
+        payload: {},
+        dedupeKey: 'activation-reminder',
+        runAt: now,
+        createdAt,
+        status: 'pending',
+      });
+      await repo.queue({
+        type: 'email',
+        payload: { template: 'booking-confirmation' },
+        dedupeKey: 'activation-old-confirmation',
+        runAt: now,
+        createdAt,
+        status: 'pending',
+      });
+      const due = await repo.due(now, cutoff);
+      expect(due.some((j) => j.dedupeKey === 'activation-reminder')).toBe(true);
+      expect(
+        due.some((j) => j.dedupeKey === 'activation-old-confirmation'),
+      ).toBe(false);
+    });
     it('handles out-of-order and replayed callbacks without downgrading a complaint', async () => {
       const event = {
         providerId: 'brevo-one',
