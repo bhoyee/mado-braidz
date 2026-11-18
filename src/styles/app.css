@@ -868,8 +868,8 @@ figcaption {
     max-width: 380px;
   }
 }
-/* Phones: the clip on top showing the full sign and her face, fading down
-   into the plum; the words sit below it, never on her face. */
+/* Phones: keep the footage clear edge to edge, with the words on their own
+   dark surface below so they never obscure the client or her braids. */
 @media (max-width: 599px) {
   .hero {
     display: flex;
@@ -885,16 +885,16 @@ figcaption {
   }
   .hero .hero-clip {
     object-position: center 8%;
-    -webkit-mask-image: linear-gradient(to bottom, #000 88%, transparent);
-    mask-image: linear-gradient(to bottom, #000 88%, transparent);
+    -webkit-mask-image: none;
+    mask-image: none;
   }
   .hero-film::after {
     background: none;
   }
   .hero-copy {
-    margin-top: -12px;
+    margin-top: 0;
     /* Leaves room for the steps card that tucks over the hero's edge. */
-    padding: 0 var(--gutter) 84px;
+    padding: 20px var(--gutter) 84px;
   }
   .hero h1 {
     font-size: clamp(38px, 10.5vw, 56px);
