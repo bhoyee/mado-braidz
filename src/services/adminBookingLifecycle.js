@@ -88,7 +88,7 @@ export function adminBookingLifecycle(
     for (const job of await tx.bookingJobs(row.id)) {
       if (
         ['email', 'reminder', 'winback'].includes(job.type) &&
-        job.status === 'pending'
+        ['pending', 'failed'].includes(job.status)
       )
         await tx.saveJob(job.id, { status: 'cancelled' });
     }
@@ -117,7 +117,13 @@ export function adminBookingLifecycle(
   async function queue(tx, row, template, now, input) {
     await tx.queueJob({
       type: 'email',
-      payload: { bookingId: row.id, template },
+      payload: {
+        bookingId: row.id,
+        template,
+        ...(template === 'refund-receipt'
+          ? { amountCents: input.amountCents }
+          : {}),
+      },
       dedupeKey: `admin:${template}:${row.id}:${input.requestKey}`,
       runAt: now.toJSDate(),
       status: 'pending',
@@ -362,6 +368,7 @@ export function adminBookingLifecycle(
               createdAt: now.toJSDate(),
             });
             await reconcile(tx, row, now);
+            await queue(tx, row, 'refund-receipt', now, input);
           } else {
             const batch = await tx.batchByIntent(
               original.stripePaymentIntentId,

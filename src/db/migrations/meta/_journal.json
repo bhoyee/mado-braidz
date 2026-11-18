@@ -50,6 +50,20 @@
       "when": 1794941221030,
       "tag": "0006_icy_magneto",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1794998302417,
+      "tag": "0007_young_proudstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1794998729035,
+      "tag": "0008_cynical_wrecker",
+      "breakpoints": true
     }
   ]
 }

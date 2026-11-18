@@ -1,4 +1,86 @@
 const alertBox = document.querySelector('.owner-alert');
+const notificationBadge = document.querySelector('[data-notification-count]');
+if (notificationBadge) {
+  const poll = async () => {
+    if (document.hidden) return;
+    try {
+      const response = await fetch('/admin/api/notifications?since=0', {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      notificationBadge.textContent = data.unread ? `(${data.unread})` : '';
+    } catch {
+      /* The next poll retries without interrupting owner work. */
+    }
+  };
+  poll();
+  setInterval(poll, 30000);
+}
+const pushStatus = document.querySelector('[data-push-status]');
+const pushCsrf = () =>
+  document.querySelector('meta[name="csrf-token"]').content;
+const pushRequest = async (method, input) => {
+  const response = await fetch('/admin/api/push-subscriptions', {
+    method,
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': pushCsrf() },
+    body: JSON.stringify(input),
+  });
+  const data = await response.json();
+  if (!response.ok)
+    throw new Error(data.message || 'Unable to update push alerts');
+  return data;
+};
+const worker = () =>
+  navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin/' });
+if (notificationBadge && 'serviceWorker' in navigator) worker().catch(() => {});
+document
+  .querySelector('[data-enable-push]')
+  ?.addEventListener('click', async (event) => {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window))
+        throw new Error(
+          'This browser does not support push alerts. On iPhone, add this portal to your Home Screen and open it there.',
+        );
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted')
+        throw new Error(
+          'Allow notifications in your browser settings to enable push.',
+        );
+      const registration = await worker();
+      await navigator.serviceWorker.ready;
+      const raw = event.currentTarget.dataset.vapidKey;
+      const bytes = Uint8Array.from(
+        atob(raw.replace(/-/g, '+').replace(/_/g, '/')),
+        (c) => c.charCodeAt(0),
+      );
+      const subscription =
+        (await registration.pushManager.getSubscription()) ||
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: bytes,
+        }));
+      const data = await pushRequest('POST', subscription.toJSON());
+      pushStatus.textContent = data.message;
+    } catch (error) {
+      pushStatus.textContent = error.message;
+    }
+  });
+document
+  .querySelector('[data-disable-push]')
+  ?.addEventListener('click', async () => {
+    try {
+      const registration = await worker();
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        await pushRequest('DELETE', { endpoint: subscription.endpoint });
+        await subscription.unsubscribe();
+      }
+      pushStatus.textContent = 'Push alerts disabled on this device.';
+    } catch (error) {
+      pushStatus.textContent = error.message;
+    }
+  });
 document
   .querySelector('nav[aria-label="Owner navigation"] a[aria-current]')
   ?.scrollIntoView({ block: 'nearest', inline: 'center' });

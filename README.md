@@ -315,3 +315,9 @@ Verify with `npm run lint`, `npm test`, `npm run test:db` and `npm run test:admi
 Men’s Invisible Locs ($120) and Freestyle Stitch Cornrows ($80) reserve four hours each, use a single standard service option and the existing $30 deposit. Both appear on the home page, under the Men’s Braids & Locs category and in booking. The supplied hairstyle photos appear on the home page and style pages; replace them through the owner’s Photos & Our Work screen. Men’s prices appear in their dedicated home section rather than being repeated in the home price menu.
 
 Fresh installs include these services in `npm run db:seed`. For an existing database, `npm run catalog:men` adds only missing men’s styles and their initial prices, and imports the supplied men’s photos once; it preserves existing services, owner edits and bookings. Production deployment runs this additive command after migrations. No new environment variables are needed.
+
+# Notifications and emails (Milestone 7)
+
+See [the notification setup and activation guide](docs/MILESTONE-7.md). Build compiles the branded MJML email layout. Run `npm run db:migrate` for the email delivery-key and suppression migrations. The existing five-minute jobs cron schedules and sends notifications; no separate worker is needed.
+
+New private environment variables: `POSTMARK_SERVER_TOKEN`, `POSTMARK_MESSAGE_STREAM` (default `outbound`), `POSTMARK_BROADCAST_STREAM` (default `broadcast`), `POSTMARK_WEBHOOK_SECRET`, `EMAIL_ENABLED` (default `false`), `EMAIL_REPLY_TO`, `NOTIFICATIONS_START_AT` (UTC activation time), and `VAPID_SUBJECT`. Existing `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, `EMAIL_FROM` and `ADMIN_ALERT_EMAILS` are used. Keep delivery disabled until the sending domain and owner inbox test are verified. Set the activation time before enabling delivery to avoid sending historical queued emails. Contact messages remain disabled until delivery is enabled.

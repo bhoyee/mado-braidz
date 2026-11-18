@@ -552,7 +552,7 @@ function paymentLifecycle(repository, clock) {
               'Refund amount mismatch.',
               400,
             );
-          if (object.amount_refunded > old)
+          if (object.amount_refunded > old) {
             await tx.insertPayment({
               bookingId: id,
               type: 'refund',
@@ -562,6 +562,18 @@ function paymentLifecycle(repository, clock) {
               stripePaymentIntentId: intent,
               note: `Stripe cumulative refund ${object.amount_refunded}`,
             });
+            await tx.queueJob({
+              type: 'email',
+              payload: {
+                bookingId: id,
+                template: 'refund-receipt',
+                amountCents: object.amount_refunded - old,
+              },
+              dedupeKey: `refund-receipt:${id}:${intent}:${object.amount_refunded}`,
+              runAt: now.toJSDate(),
+              status: 'pending',
+            });
+          }
           await reconcile(tx, booking, now);
         } else {
           attempt = await tx.attempt(attempt.id);
@@ -739,7 +751,7 @@ function paymentLifecycle(repository, clock) {
             'Refund needs reconciliation.',
             503,
           );
-        if (refund.status === 'succeeded' && old < cumulative)
+        if (refund.status === 'succeeded' && old < cumulative) {
           await tx.insertPayment({
             bookingId: booking.id,
             type: 'refund',
@@ -749,6 +761,18 @@ function paymentLifecycle(repository, clock) {
             stripePaymentIntentId: payload.paymentIntentId,
             stripeRefundId: refund.id,
           });
+          await tx.queueJob({
+            type: 'email',
+            payload: {
+              bookingId: booking.id,
+              template: 'refund-receipt',
+              amountCents: cumulative - old,
+            },
+            dedupeKey: `refund-receipt:${booking.id}:${payload.paymentIntentId}:${cumulative}`,
+            runAt: now.toJSDate(),
+            status: 'pending',
+          });
+        }
         await reconcile(tx, booking, now);
         await tx.saveJob(job.id, {
           status: refund.status === 'succeeded' ? 'done' : 'pending',
@@ -903,6 +927,7 @@ export function createBookingService(
           },
           price.addons,
         );
+        await tx.cancelClientWinbacks?.(clientId);
         if (owner) {
           if (owner.mode === 'manual') {
             if (

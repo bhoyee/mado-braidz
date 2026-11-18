@@ -21,12 +21,25 @@ export const envSchema = z
     MANUAL_REVIEW_HOURS: z.coerce.number().int().min(1).max(48).default(24),
     EMAIL_PROVIDER: z.enum(['resend', 'postmark', 'log']).default('log'),
     RESEND_API_KEY: optional,
+    POSTMARK_SERVER_TOKEN: optional,
+    POSTMARK_MESSAGE_STREAM: z.string().default('outbound'),
+    POSTMARK_BROADCAST_STREAM: z.string().default('broadcast'),
+    POSTMARK_WEBHOOK_SECRET: optional,
+    EMAIL_REPLY_TO: optional,
+    EMAIL_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    NOTIFICATIONS_START_AT: z
+      .union([z.iso.datetime(), z.literal('')])
+      .default(''),
     EMAIL_FROM: z
       .string()
       .default('Mado African Braidz <bookings@madoafricanbraidz.com>'),
     ADMIN_ALERT_EMAILS: optional,
     VAPID_PUBLIC_KEY: optional,
     VAPID_PRIVATE_KEY: optional,
+    VAPID_SUBJECT: z.string().default('mailto:bookings@madoafricanbraidz.com'),
     TURNSTILE_ENABLED: z
       .union([z.boolean(), z.enum(['true', 'false'])])
       .default(true)
@@ -46,6 +59,30 @@ export const envSchema = z
     LOG_DIR: z.string().default('logs'),
   })
   .superRefine((env, ctx) => {
+    if (
+      env.EMAIL_ENABLED &&
+      env.EMAIL_PROVIDER === 'postmark' &&
+      !env.POSTMARK_SERVER_TOKEN
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['POSTMARK_SERVER_TOKEN'],
+        message: 'Required for Postmark delivery',
+      });
+    if (env.EMAIL_ENABLED && env.NODE_ENV === 'production') {
+      if (env.EMAIL_PROVIDER === 'log')
+        ctx.addIssue({
+          code: 'custom',
+          path: ['EMAIL_PROVIDER'],
+          message: 'Use a real provider for production delivery',
+        });
+      if (!env.NOTIFICATIONS_START_AT)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['NOTIFICATIONS_START_AT'],
+          message: 'Set the activation time to avoid sending old queued emails',
+        });
+    }
     if (env.STRIPE_SECRET_KEY || env.STRIPE_PUBLISHABLE_KEY) {
       const secret = env.STRIPE_SECRET_KEY.match(/^sk_(test|live)_/);
       const publishable = env.STRIPE_PUBLISHABLE_KEY.match(/^pk_(test|live)_/);

@@ -357,12 +357,18 @@ export const jobs = mysqlTable(
 );
 export const emailLog = mysqlTable('email_log', {
   id: id(),
+  deliveryKey: str('delivery_key').unique(),
   bookingId: ref('booking_id').references(() => bookings.id),
   clientId: ref('client_id').references(() => clients.id),
   template: str('template').notNull(),
   toEmail: str('to_email').notNull(),
   providerId: str('provider_id'),
   status: str('status').notNull(),
+  createdAt: created(),
+});
+export const emailSuppressions = mysqlTable('email_suppressions', {
+  email: str('email').primaryKey(),
+  reason: str('reason').notNull(),
   createdAt: created(),
 });
 export const notifications = mysqlTable('notifications', {

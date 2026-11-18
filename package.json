@@ -31,7 +31,8 @@
     "test:stripe:batch": "node scripts/qa/stripe-batch-sandbox.js",
     "test:admin:browser": "node scripts/qa/admin-browser.js",
     "test:management:browser": "node scripts/qa/management-browser.js",
-    "catalog:men": "node scripts/add-men-styles.js"
+    "catalog:men": "node scripts/add-men-styles.js",
+    "test:notifications:browser": "node scripts/qa/notifications-browser.js"
   },
   "dependencies": {
     "@alpinejs/csp": "^3.17.5",
@@ -65,6 +66,7 @@
     "sanitize-html": "^2.18.2",
     "sharp": "^0.35.5",
     "stripe": "^23.1.0",
+    "web-push": "^4.0.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -77,6 +79,7 @@
     "eslint": "^9.39.5",
     "ffmpeg-static": "^5.3.0",
     "globals": "^17.14.0",
+    "mjml": "^5.4.1",
     "node": "^20.20.2",
     "prettier": "^3.10.1",
     "supertest": "^7.3.2",

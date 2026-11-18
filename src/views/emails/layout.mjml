@@ -1,0 +1,46 @@
+<mjml
+  ><mj-head
+    ><mj-title>{{ subject }}</mj-title
+    ><mj-preview>{{ intro }}</mj-preview
+    ><mj-attributes
+      ><mj-all font-family="Arial, sans-serif" color="#1c0f26" /><mj-text
+        font-size="16px"
+        line-height="1.6" /><mj-button
+        background-color="#7b3fc4"
+        color="#ffffff"
+        border-radius="8px"
+        font-weight="bold" /></mj-attributes></mj-head
+  ><mj-body background-color="#fbf7f2"
+    ><mj-section padding="32px 16px 12px"
+      ><mj-column
+        ><mj-image
+          src="{{ appUrl }}/img/logo.webp"
+          width="76px"
+          alt="Mado African Braids"
+        /><mj-text
+          align="center"
+          font-family="Georgia, serif"
+          font-size="28px"
+          font-weight="bold"
+          >{{ subject }}</mj-text
+        ></mj-column
+      ></mj-section
+    ><mj-section background-color="#ffffff" padding="20px"
+      ><mj-column
+        ><mj-text>{{ intro }}</mj-text
+        ><mj-text>{{ content | safe }}</mj-text
+        ><mj-button href="{{ actionUrl }}">{{ actionLabel }}</mj-button
+        ><mj-text font-size="13px">{{ footer }}</mj-text></mj-column
+      ></mj-section
+    ><mj-section padding="20px"
+      ><mj-column
+        ><mj-text align="center" font-size="12px"
+          >{{ businessName }} · {{ address }}<br />{{ phone }}<br /><a
+            href="{{ preferencesUrl }}"
+            >Email preferences</a
+          ></mj-text
+        ></mj-column
+      ></mj-section
+    ></mj-body
+  ></mjml
+>

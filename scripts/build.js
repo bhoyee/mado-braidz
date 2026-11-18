@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { buildSync } from 'esbuild';
+import './build-emails.js';
 mkdirSync('public/build', { recursive: true });
 execFileSync(
   process.execPath,

@@ -1,5 +1,5 @@
 import express from 'express';
-export function stripeWebhook(provider, payments, config) {
+export function stripeWebhook(provider, payments, config, notifications) {
   const router = express.Router();
   router.post(
     '/',
@@ -20,6 +20,10 @@ export function stripeWebhook(provider, payments, config) {
         await payments.handleEvent(event);
         res.json({ received: true });
       } catch (error) {
+        if (notifications)
+          await notifications.repository
+            .webhookFailure(event.id)
+            .catch(() => {});
         req.log.error(
           { eventId: event.id, code: error.code || error.cause?.code },
           'Stripe event needs retry',
