@@ -84,6 +84,17 @@ export function batchBookingLifecycle(
           stripeRefundId: refund.id,
         };
         await tx.insertPayment(payment);
+        await tx.queueJob({
+          type: 'email',
+          payload: {
+            bookingId: item.bookingId,
+            template: 'refund-receipt',
+            amountCents: amount,
+          },
+          dedupeKey: `refund-receipt:${item.bookingId}:${refund.id}`,
+          runAt: now.toJSDate(),
+          status: 'pending',
+        });
         ledger.get(item.bookingId).push(payment);
         remaining -= amount;
         if (!remaining) break;

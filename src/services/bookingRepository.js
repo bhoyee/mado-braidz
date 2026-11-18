@@ -9,6 +9,18 @@ function context(db, locking = false) {
     async updateClient(id, values) {
       await db.update(s.clients).set(values).where(eq(s.clients.id, id));
     },
+    async cancelClientWinbacks(id) {
+      await db
+        .update(s.jobs)
+        .set({ status: 'cancelled' })
+        .where(
+          and(
+            eq(s.jobs.type, 'winback'),
+            inArray(s.jobs.status, ['pending', 'failed']),
+            sql`JSON_EXTRACT(${s.jobs.payload}, '$.clientId') = ${id}`,
+          ),
+        );
+    },
     async replaceAddons(id, addons) {
       await db.delete(s.bookingAddons).where(eq(s.bookingAddons.bookingId, id));
       if (addons.length)

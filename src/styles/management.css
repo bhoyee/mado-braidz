@@ -272,3 +272,23 @@
     flex-basis: 100%;
   }
 }
+.owner-notification-bell {
+  display: block;
+  width: fit-content;
+  margin: 16px 24px 0 auto;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  color: var(--color-violet-deep);
+  font-weight: 700;
+}
+.owner-sidebar {
+  overflow-y: auto;
+}
+.owner-notification {
+  border-top: 1px solid var(--line);
+  padding: 20px 12px;
+}
+.owner-notification.unread {
+  border-left: 3px solid var(--color-violet);
+}

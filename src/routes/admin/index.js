@@ -18,6 +18,7 @@ import { holdSchema } from '../public/booking.js';
 import { daySlots, ZONE } from '../../services/availabilityService.js';
 import { priceBooking } from '../../services/pricingService.js';
 import { managementRouter } from './management.js';
+import { ownerNotifications } from './notifications.js';
 
 const id = z.coerce.number().int().positive().safe();
 const cents = z.coerce.number().int().min(1).max(99999999);
@@ -67,9 +68,15 @@ export function adminRouter(
   payments,
   _catalog,
   management,
+  notifications,
 ) {
   const router = Router();
-  const auth = createAdminAuthService(admins, config);
+  const auth = createAdminAuthService(
+    admins,
+    config,
+    undefined,
+    notifications ? (to, url) => notifications.queueReset(to, url) : null,
+  );
   const bookings = createBookingService(
     repository,
     undefined,
@@ -186,6 +193,7 @@ export function adminRouter(
     }),
   );
   const actor = (req, res) => ({ ...res.locals.admin, ip: req.ip });
+  if (notifications) router.use(ownerNotifications(notifications));
   if (management) router.use(managementRouter(management, config));
   const finish = (req, res, url, message) =>
     req.accepts(['html', 'json']) === 'json'

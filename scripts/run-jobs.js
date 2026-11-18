@@ -7,6 +7,8 @@ import {
   createPaymentService,
 } from '../src/services/paymentService.js';
 import { expireHolds } from '../src/jobs/expireHolds.js';
+import { createNotificationRepository } from '../src/services/notificationRepository.js';
+import { createNotificationService } from '../src/services/notificationService.js';
 const config = parseEnv(),
   { db, pool } = createDatabase(config.DATABASE_URL);
 const connection = await pool.getConnection();
@@ -24,6 +26,13 @@ try {
       createStripeProvider(config),
       config,
     ).runRefunds();
+    const notifications = await createNotificationService(
+      createNotificationRepository(db),
+      config,
+    ).run();
+    console.log(
+      `Email jobs: ${notifications.sent} sent, ${notifications.failed} need retry or review`,
+    );
     console.log(
       `Expired ${expired} unpaid holds; pending Stripe refunds checked`,
     );

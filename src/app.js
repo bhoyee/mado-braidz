@@ -17,6 +17,9 @@ import { adminRouter } from './routes/admin/index.js';
 import { createAdminRepository } from './services/adminRepository.js';
 import { createManagementService } from './services/managementService.js';
 import { contactRouter } from './routes/public/contact.js';
+import { createNotificationRepository } from './services/notificationRepository.js';
+import { createNotificationService } from './services/notificationService.js';
+import { emailPublicRoutes } from './routes/public/emailPreferences.js';
 import { DateTime } from 'luxon';
 import { randomBytes } from 'node:crypto';
 import express from 'express';
@@ -40,6 +43,7 @@ export function createApp({
   bookingRepository,
   adminRepository,
   managementService,
+  notificationService,
   stripeProvider,
   catalog,
   logger = createLogger(config),
@@ -54,6 +58,17 @@ export function createApp({
   bookingRepository ??= database ? createBookingRepository(database.db) : null;
   adminRepository ??= database ? createAdminRepository(database.db) : null;
   managementService ??= database ? createManagementService(database.db) : null;
+  notificationService ??= database
+    ? createNotificationService(
+        createNotificationRepository(database.db),
+        config,
+      )
+    : null;
+  app.locals.contactEnabled = Boolean(
+    notificationService &&
+    config.EMAIL_ENABLED &&
+    (config.ADMIN_ALERT_EMAILS || config.ADMIN_EMAIL),
+  );
   app.locals.ownerPortal = Boolean(adminRepository);
   const provider =
     stripeProvider === undefined
@@ -79,6 +94,7 @@ export function createApp({
           if (safe.url)
             safe.url = safe.url
               .replace(/(\/booking\/)[a-f0-9]{64}/g, '$1[redacted]')
+              .replace(/(\/unsubscribe\/)\d+\.[a-f0-9]{64}/g, '$1[redacted]')
               .replace(/(session_id=)[^&]+/g, '$1[redacted]');
           return safe;
         },
@@ -144,7 +160,11 @@ export function createApp({
         { maxAge: '7d' },
       ),
     );
-  app.use('/webhooks/stripe', stripeWebhook(provider, payments, config));
+  app.use(
+    '/webhooks/stripe',
+    stripeWebhook(provider, payments, config, notificationService),
+  );
+  if (notificationService) app.use(emailPublicRoutes(notificationService));
   app.use(express.json({ limit: '32kb' }));
   app.use(express.urlencoded({ extended: false, limit: '32kb' }));
   if (!sessionStore && config.NODE_ENV !== 'test') {
@@ -229,6 +249,7 @@ export function createApp({
         payments,
         catalog,
         managementService,
+        notificationService,
       ),
     );
   app.use('/admin', designRouter(catalog, limits.preview));
@@ -253,7 +274,7 @@ export function createApp({
     publicRouter(
       catalog,
       paymentPages(bookingRepository, config, payments, catalog),
-      contactRouter(config),
+      contactRouter(config, notificationService),
     ),
   );
   app.use((_req, res) =>

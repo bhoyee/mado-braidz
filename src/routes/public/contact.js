@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { verifyTurnstile } from '../../services/turnstileService.js';
 import { BookingError } from '../../services/bookingErrors.js';
 import { generateToken } from '../../middleware/csrf.js';
+import { randomUUID } from 'node:crypto';
 
 // Message delivery stays disabled until the email milestone. Verification is
 // already enforced on POST so enabling delivery later cannot bypass it.
-export function contactRouter(config) {
+export function contactRouter(config, notifications) {
   const router = Router();
   const render = (req, res, extra = {}) =>
     res.set('Cache-Control', 'no-store').render('pages/contact', {
@@ -29,6 +30,20 @@ export function contactRouter(config) {
         req.ip,
         'contact',
       );
+      if (res.app.locals.contactEnabled && notifications) {
+        const message = z
+          .object({
+            name: z.string().trim().min(2).max(100),
+            email: z.email().max(255),
+            message: z.string().trim().min(5).max(4000),
+          })
+          .parse(req.body);
+        await notifications.queueContact({
+          ...message,
+          requestKey: randomUUID(),
+        });
+        return render(req, res, { contactSent: true });
+      }
       return render(req, res.status(503), { contactUnavailable: true });
     } catch (error) {
       if (!(error instanceof BookingError) && !(error instanceof z.ZodError))
