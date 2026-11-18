@@ -117,6 +117,13 @@ export function createApp({
     }),
   );
   app.use(compression());
+  // Browsers also request this conventional fallback independently of page links.
+  app.get('/favicon.ico', (_req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(
+      fileURLToPath(new URL('../public/img/favicon-mado.ico', import.meta.url)),
+    );
+  });
   const releaseFile = new URL('../release.json', import.meta.url);
   const revision = existsSync(releaseFile)
     ? JSON.parse(readFileSync(releaseFile, 'utf8')).revision
