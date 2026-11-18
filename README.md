@@ -1,6 +1,6 @@
 # Mado African Braidz
 
-Milestones 1–5: Express 4, Nunjucks SSR, Tailwind CSS v4, Alpine.js, MySQL through Drizzle, public pages, booking, Stripe/manual payments and the owner admin portal. The app runs at **http://localhost:4780**; `/health` reports process health without querying MySQL.
+Milestones 1–6: Express 4, Nunjucks SSR, Tailwind CSS v4, Alpine.js, MySQL through Drizzle, public pages, booking, Stripe/manual payments and the owner admin portal with catalog/settings management. The app runs at **http://localhost:4780**; `/health` reports process health without querying MySQL.
 
 ## Requirements and Windows setup
 
@@ -289,6 +289,12 @@ Run `npm run db:migrate` for `0004_misty_ozymandias.sql` before starting/deployi
 Validation commands: `npm run test:batch:browser` checks phone/email versus reference lookup, individual/combined controls, deposits, balances, cancellation and accessibility in mobile/desktop Chrome using fake Stripe. `npm run test:stripe:batch` uses real **test-only** Stripe keys, creates a disposable local database, verifies a combined Checkout total, expires only its own unpaid session, and drops only its own database. It never submits a card or takes payment. Real hosted-card confirmation remains the separate `npm run test:stripe:e2e` acceptance check.
 
 ## Owner portal (Milestone 5)
+
+For catalog and settings management, see [Milestone 6](docs/MILESTONE-6.md). The owner navigation now includes Styles & prices, Extras, Availability, Photos & Our Work, Clients, Settings and Page redirects. Apply `0006_icy_magneto.sql` with `npm run db:migrate`. New styles start as drafts; add prices or select consultation pricing, then publish. Public catalog changes appear immediately while existing booking prices stay unchanged.
+
+No new env variables are needed. Photos use the existing persistent `UPLOAD_DIR/catalog` directory and survive releases. The image route exposes only generated catalog WebP/AVIF files; proofs and inspiration images stay private. Balance-method settings affect remaining balances and do not disable initial deposit methods. Email settings save preferences for Milestone 7; they do not enable email delivery yet.
+
+`npm run test:db` includes booking and owner-catalog integration tests against disposable databases. `npm run test:management:browser` verifies real owner forms, image upload/order, public updates and accessibility at 390/1440 px in Chrome, using a separate disposable database and fake Stripe. It requires local MySQL credentials with permission to create/drop those test databases; it never edits the real salon catalog.
 
 Run `npm run db:migrate` for additive migration `0005_broken_mandroid.sql`, then `npm run build` and `npm run dev`. Open **http://localhost:4780/admin**. Use the existing seeded `ADMIN_EMAIL` and `ADMIN_PASSWORD` from the ignored local `.env`; changing `.env` alone does not change an already-seeded password. There is one owner and no staff-management UI. Non-owner accounts are denied access.
 
