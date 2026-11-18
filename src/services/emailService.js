@@ -4,6 +4,8 @@ import nunjucks from 'nunjucks';
 import { DateTime } from 'luxon';
 import { emailTemplates } from './emailTemplates.js';
 import { accessToken, tokenHash } from './bookingService.js';
+import { seedData } from '../db/seed-data.js';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 export const escapeHtml = (value) =>
   String(value ?? '').replace(
     /[&<>"']/g,
@@ -65,7 +67,7 @@ export async function renderEmail(config, payload, detail, settings = {}) {
   const def = emailTemplates[payload.template];
   if (!def) throw new Error('Unknown email template');
   const custom = settings.emailTemplates?.[payload.template] || {};
-  const business = settings.business || {};
+  const business = { ...seedData.settings.business, ...settings.business };
   const appUrl = config.APP_URL.replace(/\/$/, '');
   const { booking, client } = detail || {};
   const snapshot = booking?.priceSnapshot || {};
@@ -144,8 +146,16 @@ export async function renderEmail(config, payload, detail, settings = {}) {
     actionLabel,
     appUrl,
     address,
+    street: business.street,
+    locality: `${business.city}, ${business.region} ${business.postalCode}`,
+    country: business.country === 'US' ? 'United States' : business.country,
     businessName: business.name || 'Mado African Braids',
-    phone: business.phone || '(443) 743-4979',
+    phone:
+      parsePhoneNumberFromString(
+        business.phone || '',
+        'US',
+      )?.formatNational() || business.phone,
+    phoneHref: business.phone,
     preferencesUrl,
     footer: marketing
       ? 'You received this because you opted in to salon news. Unsubscribe using Email preferences below.'

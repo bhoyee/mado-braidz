@@ -322,6 +322,27 @@ describe('Milestone 7 scheduling', () => {
   });
 });
 describe('Brevo content and security', () => {
+  it('includes a public PNG logo and the full salon address and telephone in owner emails', async () => {
+    const f = notificationFixture();
+    const email = await renderEmail(
+      { ...f.config, APP_URL: 'https://madoafricanbraidz.com' },
+      { template: 'owner-test' },
+      null,
+      {},
+    );
+    expect(email.html).toContain(
+      'https://madoafricanbraidz.com/img/email-logo.png',
+    );
+    for (const value of [
+      '7375 Executive Place',
+      'Lanham, MD 20706',
+      'United States',
+      '(443) 743-4979',
+      'tel:+14437434979',
+    ])
+      expect(email.html).toContain(value);
+    expect(email.html).not.toContain('localhost');
+  });
   it('renders escaped booking details, valid UTC calendar attachment and manage link', async () => {
     const f = notificationFixture();
     f.client.name = '<script>alert(1)</script>';
