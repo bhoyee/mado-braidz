@@ -8,6 +8,7 @@ Main domain: **https://madoafricanbraidz.com**. Local development stays on **htt
 - Node: CloudLinux **20**, Passenger startup file **`app.cjs`**. The CommonJS bridge loads `src/server.js` as an ES module.
 - Database: dedicated cPanel-prefixed `madoafri_mado`, with a separate application user restricted to that database. Never use local root credentials on the server.
 - Uploads: `/home/madoafri/mado-uploads`.
+- Owner-uploaded public catalog photos: `/home/madoafri/mado-uploads/catalog`. Keep this persistent along with private uploads; the app serves only constrained generated catalog image filenames. Milestone 6 adds migration `0006_icy_magneto.sql` for redirects. Routine deploys must not seed or overwrite owner catalog/settings changes. See [Milestone 6](MILESTONE-6.md).
 - Logs: `/home/madoafri/logs/mado`.
 - Deployment state/credentials: `/home/madoafri/mado-deploy`, private, outside `public_html`.
 - Backups: `/home/madoafri/mado-backups`, private, outside `public_html`.

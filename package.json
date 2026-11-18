@@ -29,7 +29,8 @@
     "test:manual:browser": "node scripts/qa/manual-payments-browser.js",
     "test:batch:browser": "node scripts/qa/batch-payments-browser.js",
     "test:stripe:batch": "node scripts/qa/stripe-batch-sandbox.js",
-    "test:admin:browser": "node scripts/qa/admin-browser.js"
+    "test:admin:browser": "node scripts/qa/admin-browser.js",
+    "test:management:browser": "node scripts/qa/management-browser.js"
   },
   "dependencies": {
     "@alpinejs/csp": "^3.17.5",

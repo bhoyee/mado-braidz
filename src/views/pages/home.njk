@@ -58,7 +58,7 @@
       <ul class="menu-notes-top">
         <li><strong>{{ booking.depositCents | money }} deposit</strong> holds your chair, taken off your total</li>
         {% for addon in addons %}<li><strong>{{ addon.name }} +{{ addon.priceCents | money }}</strong></li>{% endfor %}
-        <li><strong>Hair included</strong> with 50% human hair; upgrade to 100% human hair for {{ humanHairUpgrade.priceCents | money }} extra</li>
+        <li><strong>Hair included</strong> with 50% human hair{% if humanHairUpgrade %}; upgrade to 100% human hair for {{ humanHairUpgrade.priceCents | money }} extra{% endif %}</li>
       </ul>
     </div>
 

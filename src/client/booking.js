@@ -292,9 +292,9 @@ if (root) {
   const selection = () => ({
     styleId: Number(style.value),
     ...(variant.value ? { styleVariantId: Number(variant.value) } : {}),
-    addonIds: [...form.querySelectorAll('[name="addonIds"]:checked')].map((e) =>
-      Number(e.value),
-    ),
+    addonIds: [
+      ...form.querySelectorAll('[name="addonIds"]:checked:not(:disabled)'),
+    ].map((e) => Number(e.value)),
     paymentChoice: form.querySelector('[name="paymentChoice"]:checked').value,
   });
   function persist() {
@@ -358,6 +358,14 @@ if (root) {
       addonIds: selection().addonIds.join(','),
     });
   function chooseStyle(preferredSize = '', preferredVariant = '') {
+    for (const field of form.querySelectorAll('[data-addon-styles]')) {
+      const allowed =
+        field.dataset.addonAll !== 'false' ||
+        field.dataset.addonStyles.split(',').includes(style.value);
+      field.disabled = !allowed;
+      field.closest('label').hidden = !allowed;
+      if (!allowed) field.checked = false;
+    }
     const consult = style.selectedOptions[0]?.dataset.consultation === 'true';
     $('booking-variant-fields').hidden = consult;
     $('booking-consultation').hidden = !consult;

@@ -22,12 +22,12 @@ import {
   paymentPageUrl,
 } from '../../services/paymentAccess.js';
 
-export function manualMethods(config) {
+export function manualMethods(config, options = {}) {
   return [
-    ...(config.ZELLE_RECIPIENT
+    ...(config.ZELLE_RECIPIENT && options.zelle !== false
       ? [{ id: 'zelle', name: 'Zelle', recipient: config.ZELLE_RECIPIENT }]
       : []),
-    ...(config.CASHAPP_CASHTAG
+    ...(config.CASHAPP_CASHTAG && options.cashapp !== false
       ? [{ id: 'cashapp', name: 'Cash App', recipient: config.CASHAPP_CASHTAG }]
       : []),
   ];
@@ -70,7 +70,10 @@ export function paymentPortal(repository, config, payments, catalog) {
       .render('pages/pay', {
         title: 'Make a payment | Mado African Braidz',
         csrfToken: generateToken(req),
-        manualMethods: manualMethods(config),
+        manualMethods: manualMethods(
+          config,
+          res.locals.settings?.balanceOptions,
+        ),
         paymentName: config.MANUAL_PAYMENT_NAME,
         hideMobileBooking: true,
         ...extra,
@@ -123,6 +126,8 @@ export function paymentPortal(repository, config, payments, catalog) {
         const token = accessToken(booking.ref, config.SESSION_SECRET);
         if (tokenHash(token) !== booking.manageTokenHash) continue;
         found.push({
+          onlineAvailable:
+            initial || res.locals.settings?.balanceOptions?.online !== false,
           ref: booking.ref,
           styleName: price.styleName,
           time: booking.startAt.toLocaleString('en-US', {
@@ -140,14 +145,18 @@ export function paymentPortal(repository, config, payments, catalog) {
       }
       req.session.paySelection = {
         items: found
-          .filter((payment) => !payment.pendingReview)
+          .filter(
+            (payment) => !payment.pendingReview && payment.onlineAvailable,
+          )
           .map((payment) => ({
             ref: payment.ref,
             amountCents: payment.amountCents,
             kind: payment.kind,
           })),
         refs: found
-          .filter((payment) => !payment.pendingReview)
+          .filter(
+            (payment) => !payment.pendingReview && payment.onlineAvailable,
+          )
           .map((payment) => payment.ref),
         batchId: 'batch-' + randomBytes(16).toString('hex'),
       };
@@ -158,9 +167,13 @@ export function paymentPortal(repository, config, payments, catalog) {
           (total, payment) => total + payment.amountCents,
           0,
         ),
-        payableCount: found.filter((payment) => !payment.pendingReview).length,
+        payableCount: found.filter(
+          (payment) => !payment.pendingReview && payment.onlineAvailable,
+        ).length,
         payableTotalCents: found
-          .filter((payment) => !payment.pendingReview)
+          .filter(
+            (payment) => !payment.pendingReview && payment.onlineAvailable,
+          )
           .reduce((sum, payment) => sum + payment.amountCents, 0),
         lookupMessage: found.length ? '' : 'No pending payments found.',
       });
@@ -197,6 +210,15 @@ export function paymentPortal(repository, config, payments, catalog) {
       const tokens = Object.fromEntries(
         selected.refs.map((ref) => [ref, paymentToken(req, ref)]),
       );
+      if (
+        selected.items.some((item) => item.kind === 'balance') &&
+        (await catalog.load()).settings.balanceOptions?.online === false
+      )
+        throw new BookingError(
+          'METHOD_UNAVAILABLE',
+          'Please choose another balance payment method.',
+          409,
+        );
       req.session.paymentBatchAccess ||= {};
       req.session.paymentBatchAccess[selected.batchId] = Date.now() + 3600000;
       res.json(
@@ -330,7 +352,11 @@ export function paymentPortal(repository, config, payments, catalog) {
           .parse(req.params.ref);
         const booking = await payments.authorize(ref, paymentToken(req, ref));
         const method = z.enum(['zelle', 'cashapp']).parse(req.body.method);
-        if (!manualMethods(config).some((m) => m.id === method))
+        const options =
+          booking.status === 'pending_payment'
+            ? {}
+            : (await catalog.load()).settings.balanceOptions;
+        if (!manualMethods(config, options).some((m) => m.id === method))
           throw new BookingError(
             'METHOD_UNAVAILABLE',
             'This payment method is not available.',

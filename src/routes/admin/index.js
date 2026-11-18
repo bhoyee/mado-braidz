@@ -17,6 +17,7 @@ import { generateToken } from '../../middleware/csrf.js';
 import { holdSchema } from '../public/booking.js';
 import { daySlots, ZONE } from '../../services/availabilityService.js';
 import { priceBooking } from '../../services/pricingService.js';
+import { managementRouter } from './management.js';
 
 const id = z.coerce.number().int().positive().safe();
 const cents = z.coerce.number().int().min(1).max(99999999);
@@ -59,7 +60,14 @@ const localStart = (date, time) => {
     throw new BookingError('INVALID_START', 'Choose a valid date and time.');
   return parsed.toUTC().toISO();
 };
-export function adminRouter(admins, repository, config, payments, _catalog) {
+export function adminRouter(
+  admins,
+  repository,
+  config,
+  payments,
+  _catalog,
+  management,
+) {
   const router = Router();
   const auth = createAdminAuthService(admins, config);
   const bookings = createBookingService(
@@ -178,6 +186,7 @@ export function adminRouter(admins, repository, config, payments, _catalog) {
     }),
   );
   const actor = (req, res) => ({ ...res.locals.admin, ip: req.ip });
+  if (management) router.use(managementRouter(management, config));
   const finish = (req, res, url, message) =>
     req.accepts(['html', 'json']) === 'json'
       ? res.json({ url, message })
@@ -742,6 +751,45 @@ function blankOptional(body) {
 function auditChanges(entry) {
   const before = decode(entry.before) || {},
     after = decode(entry.after) || {};
+  if (entry.entity !== 'booking') {
+    const flatten = (value, prefix = '') =>
+      Object.fromEntries(
+        Object.entries(value).flatMap(([key, item]) => {
+          if (
+            /password|secret|token|key/i.test(key) ||
+            ['updatedAt', 'createdAt'].includes(key)
+          )
+            return [];
+          const path = prefix + key;
+          return item && typeof item === 'object' && !Array.isArray(item)
+            ? Object.entries(flatten(item, path + '.'))
+            : [[path, item]];
+        }),
+      );
+    const a = flatten(before),
+      b = flatten(after),
+      keys = [...new Set([...Object.keys(a), ...Object.keys(b)])];
+    const display = (value) =>
+      value == null
+        ? '—'
+        : typeof value === 'object'
+          ? JSON.stringify(value).slice(0, 300)
+          : typeof value === 'boolean'
+            ? value
+              ? 'Yes'
+              : 'No'
+            : String(value);
+    return keys
+      .filter((key) => JSON.stringify(a[key]) !== JSON.stringify(b[key]))
+      .map((key) => ({
+        label: key
+          .replace(/^value\./, '')
+          .replace(/([a-z])([A-Z])/g, '$1 $2')
+          .replaceAll('.', ' · '),
+        before: display(a[key]),
+        after: display(b[key]),
+      }));
+  }
   const fields = [
     ['Start time', before.startAt, after.startAt, 'date'],
     ['End time', before.endAt, after.endAt, 'date'],
