@@ -117,6 +117,53 @@ export function createNotificationService(
     repository,
     config,
     alertRecipients,
+    async testPush(adminId, endpoint) {
+      if (!config.VAPID_PUBLIC_KEY || !config.VAPID_PRIVATE_KEY)
+        return { status: 503, message: 'Push alerts are not configured yet.' };
+      const sub = (await repository.subscriptions(adminId)).find(
+        (s) => s.endpoint === endpoint,
+      );
+      if (!sub)
+        return { status: 409, message: 'Enable push on this device first.' };
+      try {
+        await push.sendNotification(
+          { endpoint: sub.endpoint, keys: sub.keys },
+          JSON.stringify({
+            title: 'Mado test alert',
+            body: 'Push alerts are working on this device.',
+            url: '/admin/notifications',
+            tag: 'mado-push-test',
+          }),
+          {
+            vapidDetails: {
+              subject: config.VAPID_SUBJECT,
+              publicKey: config.VAPID_PUBLIC_KEY,
+              privateKey: config.VAPID_PRIVATE_KEY,
+            },
+            TTL: 300,
+            timeout: 10000,
+          },
+        );
+        return {
+          status: 200,
+          message:
+            'Test sent to this device. Check your notifications. If nothing appears, check notification settings and Do Not Disturb.',
+        };
+      } catch (error) {
+        if ([404, 410].includes(error.statusCode)) {
+          await repository.deleteSubscription(endpoint, adminId);
+          return {
+            status: 409,
+            message:
+              'This device registration has expired. Enable push again, then retry.',
+          };
+        }
+        return {
+          status: 502,
+          message: 'Unable to send the test alert. Please try again shortly.',
+        };
+      }
+    },
     async schedule() {
       const now = clock(),
         state = await repository.context(now),

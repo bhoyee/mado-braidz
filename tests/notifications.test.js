@@ -165,6 +165,58 @@ export function notificationFixture() {
     service,
   };
 }
+describe('Owner push delivery check', () => {
+  const endpoint = 'https://fcm.googleapis.com/test-device';
+  function setup() {
+    const f = notificationFixture();
+    const sub = { endpoint, keys: { auth: 'auth', p256dh: 'key' } };
+    f.repo.subscriptions = vi.fn(async (adminId) =>
+      adminId === 1 ? [sub] : [],
+    );
+    f.repo.deleteSubscription = vi.fn();
+    const push = { sendNotification: vi.fn(async () => {}) };
+    const service = createNotificationService(
+      f.repo,
+      {
+        ...f.config,
+        VAPID_PUBLIC_KEY: 'public',
+        VAPID_PRIVATE_KEY: 'private',
+        VAPID_SUBJECT: 'mailto:owner@example.test',
+      },
+      { push },
+    );
+    return { ...f, service, push };
+  }
+  it('sends only to the requesting owner’s registered device', async () => {
+    const f = setup();
+    expect((await f.service.testPush(2, endpoint)).status).toBe(409);
+    expect(
+      (await f.service.testPush(1, 'https://fcm.googleapis.com/another-device'))
+        .status,
+    ).toBe(409);
+    expect(f.push.sendNotification).not.toHaveBeenCalled();
+    expect((await f.service.testPush(1, endpoint)).status).toBe(200);
+    const [target, payload] = f.push.sendNotification.mock.calls[0];
+    expect(target.endpoint).toBe(endpoint);
+    expect(JSON.parse(payload).title).toBe('Mado test alert');
+  });
+  it('removes expired subscriptions and asks the owner to enable again', async () => {
+    const f = setup();
+    f.push.sendNotification.mockRejectedValue({ statusCode: 410 });
+    expect((await f.service.testPush(1, endpoint)).status).toBe(409);
+    expect(f.repo.deleteSubscription).toHaveBeenCalledWith(endpoint, 1);
+  });
+  it('reports provider failure without exposing provider details', async () => {
+    const f = setup();
+    f.push.sendNotification.mockRejectedValue(
+      new Error('private provider details'),
+    );
+    const result = await f.service.testPush(1, endpoint);
+    expect(result.status).toBe(502);
+    expect(result.message).not.toContain('private provider details');
+    expect(f.repo.deleteSubscription).not.toHaveBeenCalled();
+  });
+});
 describe('Milestone 7 scheduling', () => {
   it.each(['2026-03-08T10:00:00', '2026-11-01T10:00:00'])(
     'uses Eastern local morning through DST at %s',

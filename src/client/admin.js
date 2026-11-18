@@ -119,6 +119,39 @@ document
     }
   });
 document
+  .querySelector('[data-test-push]')
+  ?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    pushStatus.textContent = 'Sending a test alert…';
+    try {
+      if (
+        !('serviceWorker' in navigator) ||
+        !('Notification' in window) ||
+        Notification.permission !== 'granted'
+      )
+        throw new Error('Enable push on this device first. ' + permissionHelp);
+      const registration =
+        await navigator.serviceWorker.getRegistration('/admin/');
+      const subscription = await registration?.pushManager.getSubscription();
+      if (!subscription) throw new Error('Enable push on this device first.');
+      const response = await fetch('/admin/api/push-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': pushCsrf(),
+        },
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      });
+      const data = await response.json();
+      pushStatus.textContent = data.message || 'Unable to send the test alert.';
+    } catch (error) {
+      pushStatus.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+document
   .querySelector('[data-disable-push]')
   ?.addEventListener('click', async () => {
     try {

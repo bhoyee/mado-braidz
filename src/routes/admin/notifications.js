@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { emailTemplates } from '../../services/emailTemplates.js';
+import rateLimit from 'express-rate-limit';
 const id = z.coerce.number().int().positive().safe();
 const endpoint = z
   .url()
@@ -95,6 +96,23 @@ export function ownerNotifications(service) {
         res.locals.admin.id,
       );
       res.json({ message: 'Push alerts disabled on this device.' });
+    }),
+  );
+  router.post(
+    '/api/push-test',
+    rateLimit({
+      windowMs: 60000,
+      limit: 3,
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      message: { message: 'Please wait a minute before sending another test.' },
+    }),
+    run(async (req, res) => {
+      const result = await service.testPush(
+        res.locals.admin.id,
+        endpoint.parse(req.body.endpoint),
+      );
+      res.status(result.status).json({ message: result.message });
     }),
   );
   router.get(

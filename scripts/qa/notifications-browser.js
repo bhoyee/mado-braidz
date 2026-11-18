@@ -176,6 +176,29 @@ try {
       .waitFor();
     assert.equal(await page.evaluate(() => window.pushPermissionRequests), 1);
     await page.evaluate(() => {
+      navigator.serviceWorker.getRegistration = async () => ({
+        pushManager: {
+          getSubscription: async () => ({
+            endpoint: 'https://fcm.googleapis.com/test-device',
+          }),
+        },
+      });
+    });
+    await page.route('**/admin/api/push-test', async (route) => {
+      assert.equal(
+        route.request().postDataJSON().endpoint,
+        'https://fcm.googleapis.com/test-device',
+      );
+      await route.fulfill({ json: { message: 'Test sent to this device.' } });
+    });
+    await page
+      .getByRole('button', { name: 'Send test alert', exact: true })
+      .click();
+    await page
+      .locator('[data-push-status]')
+      .filter({ hasText: 'Test sent to this device.' })
+      .waitFor();
+    await page.evaluate(() => {
       Object.defineProperty(Notification, 'permission', {
         configurable: true,
         get: () => 'denied',
