@@ -19,12 +19,10 @@ export const envSchema = z
     ZELLE_RECIPIENT: optional,
     CASHAPP_CASHTAG: optional,
     MANUAL_REVIEW_HOURS: z.coerce.number().int().min(1).max(48).default(24),
-    EMAIL_PROVIDER: z.enum(['resend', 'postmark', 'log']).default('log'),
+    EMAIL_PROVIDER: z.enum(['resend', 'brevo', 'log']).default('log'),
     RESEND_API_KEY: optional,
-    POSTMARK_SERVER_TOKEN: optional,
-    POSTMARK_MESSAGE_STREAM: z.string().default('outbound'),
-    POSTMARK_BROADCAST_STREAM: z.string().default('broadcast'),
-    POSTMARK_WEBHOOK_SECRET: optional,
+    BREVO_API_KEY: optional,
+    BREVO_WEBHOOK_SECRET: optional,
     EMAIL_REPLY_TO: optional,
     EMAIL_ENABLED: z
       .enum(['true', 'false'])
@@ -61,13 +59,13 @@ export const envSchema = z
   .superRefine((env, ctx) => {
     if (
       env.EMAIL_ENABLED &&
-      env.EMAIL_PROVIDER === 'postmark' &&
-      !env.POSTMARK_SERVER_TOKEN
+      env.EMAIL_PROVIDER === 'brevo' &&
+      !env.BREVO_API_KEY
     )
       ctx.addIssue({
         code: 'custom',
-        path: ['POSTMARK_SERVER_TOKEN'],
-        message: 'Required for Postmark delivery',
+        path: ['BREVO_API_KEY'],
+        message: 'Required for Brevo delivery',
       });
     if (env.EMAIL_ENABLED && env.NODE_ENV === 'production') {
       if (env.EMAIL_PROVIDER === 'log')

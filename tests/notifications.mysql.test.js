@@ -56,17 +56,17 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       const a = await repo.reserveLog(input),
         b = await repo.reserveLog(input);
       expect(a.id).toBe(b.id);
-      await repo.saveLog(a.id, { providerId: 'postmark-one', status: 'sent' });
+      await repo.saveLog(a.id, { providerId: 'brevo-one', status: 'sent' });
     });
     it('handles out-of-order and replayed callbacks without downgrading a complaint', async () => {
       const event = {
-        MessageID: 'postmark-one',
-        Recipient: 'client@example.test',
+        providerId: 'brevo-one',
+        recipient: 'client@example.test',
       };
-      await repo.delivery({ ...event, RecordType: 'Delivery' });
-      await repo.delivery({ ...event, RecordType: 'SpamComplaint' });
-      await repo.delivery({ ...event, RecordType: 'Delivery' });
-      await repo.delivery({ ...event, RecordType: 'SpamComplaint' });
+      await repo.delivery({ ...event, kind: 'delivered' });
+      await repo.delivery({ ...event, kind: 'complained', suppress: true });
+      await repo.delivery({ ...event, kind: 'delivered' });
+      await repo.delivery({ ...event, kind: 'complained', suppress: true });
       expect((await repo.log('job:1:client@example.test')).status).toBe(
         'complained',
       );
@@ -75,10 +75,10 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
     });
     it('ignores a callback whose recipient does not match its message', async () => {
       await repo.delivery({
-        MessageID: 'postmark-one',
-        Recipient: 'other@example.test',
-        RecordType: 'Bounce',
-        Inactive: true,
+        providerId: 'brevo-one',
+        recipient: 'other@example.test',
+        kind: 'bounced',
+        suppress: true,
       });
       expect(await repo.suppressed('other@example.test')).toBeFalsy();
     });

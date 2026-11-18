@@ -321,7 +321,7 @@ describe('Milestone 7 scheduling', () => {
     );
   });
 });
-describe('Postmark content and security', () => {
+describe('Brevo content and security', () => {
   it('renders escaped booking details, valid UTC calendar attachment and manage link', async () => {
     const f = notificationFixture();
     f.client.name = '<script>alert(1)</script>';
@@ -340,7 +340,7 @@ describe('Postmark content and security', () => {
       Buffer.from(message.attachments[0].Content, 'base64').toString(),
     ).toContain('DTSTART:20261120T150000Z');
   });
-  it('uses broadcast stream and one-click unsubscribe headers only for opted-in marketing', async () => {
+  it('tags consent-based marketing and includes signed unsubscribe links', async () => {
     const f = notificationFixture();
     const message = await renderEmail(
       f.config,
@@ -361,48 +361,60 @@ describe('Postmark content and security', () => {
     ).toBe(true);
     const fetcher = vi.fn(async () => ({
       ok: true,
-      json: async () => ({ MessageID: 'postmark-test', ErrorCode: 0 }),
+      json: async () => ({ messageId: '<brevo-test>' }),
     }));
     const sender = createEmailService(
       {
         ...f.config,
-        EMAIL_PROVIDER: 'postmark',
-        POSTMARK_SERVER_TOKEN: 'test-token',
+        EMAIL_PROVIDER: 'brevo',
+        BREVO_API_KEY: 'test-token',
       },
       fetcher,
     );
     await sender.send(f.client.email, message, 'test-delivery');
     const body = JSON.parse(fetcher.mock.calls[0][1].body);
-    expect(body.MessageStream).toBe('broadcast');
-    expect(body.TrackOpens).toBe(false);
-    expect(body.Metadata.deliveryKey).toBe('test-delivery');
+    expect(body.tags).toContain('mado-return-visit');
+    expect(body.sender.email).toBe('bookings@madoafricanbraidz.com');
+    expect(body.headers['X-Mailin-custom']).toBe('deliveryKey:test-delivery');
   });
   it('protects delivery webhooks and supports signed one-click unsubscribe without a session', async () => {
     const f = notificationFixture();
-    f.config.POSTMARK_WEBHOOK_SECRET = 'test-webhook-secret';
+    f.config.BREVO_WEBHOOK_SECRET = 'test-webhook-secret';
     const app = createApp({
       config: f.config,
       catalog: fixtureCatalog(),
       notificationService: f.service,
     });
     await request(app)
-      .post('/webhooks/postmark')
+      .post('/webhooks/brevo')
       .send({
-        RecordType: 'Delivery',
-        MessageID: 'test',
-        Recipient: f.client.email,
+        event: 'delivered',
+        'message-id': 'test',
+        email: f.client.email,
       })
       .expect(401);
     await request(app)
-      .post('/webhooks/postmark')
-      .auth('postmark', 'test-webhook-secret')
+      .post('/webhooks/brevo')
+      .set('X-Mado-Webhook-Secret', 'test-webhook-secret')
       .send({
-        RecordType: 'Delivery',
-        MessageID: 'test',
-        Recipient: f.client.email,
+        event: 'delivered',
+        'message-id': 'test',
+        email: f.client.email,
       })
       .expect(200);
     expect(f.repo.delivery).toHaveBeenCalledTimes(1);
+    await request(app)
+      .post('/webhooks/brevo')
+      .set('X-Mado-Webhook-Secret', 'test-webhook-secret')
+      .send({
+        event: 'blocked',
+        'message-id': 'blocked-test',
+        email: f.client.email,
+      })
+      .expect(200);
+    expect(f.repo.delivery).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'blocked', suppress: false }),
+    );
     const token = unsubscribeToken(f.client, f.config.SESSION_SECRET);
     await request(app)
       .get('/unsubscribe/' + token)

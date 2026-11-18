@@ -141,75 +141,56 @@ export function createNotificationRepository(db) {
     },
     async delivery(event) {
       await db.transaction(async (tx) => {
-        if (event.RecordType === 'SubscriptionChange') {
-          if (!event.SuppressSending) return;
-          const recipient = (event.Recipient || '').toLowerCase();
-          if (!recipient) return;
-          await tx
-            .update(s.clients)
-            .set({ marketingConsent: false, unsubscribedAt: new Date() })
-            .where(eq(s.clients.email, recipient));
-          if (['HardBounce', 'SpamComplaint'].includes(event.SuppressionReason))
-            await tx
-              .insert(s.emailSuppressions)
-              .values({ email: recipient, reason: event.SuppressionReason })
-              .onDuplicateKeyUpdate({
-                set: { reason: event.SuppressionReason },
-              });
-          if (!event.MessageID) return;
-        }
         const [row] = await tx
           .select()
           .from(s.emailLog)
           .where(
             or(
-              eq(s.emailLog.providerId, event.MessageID || '-'),
-              eq(s.emailLog.deliveryKey, event.Metadata?.deliveryKey || '-'),
+              eq(s.emailLog.providerId, event.providerId),
+              eq(s.emailLog.deliveryKey, event.deliveryKey || '-'),
             ),
           )
           .for('update');
-        if (
-          !row ||
-          row.toEmail.toLowerCase() !==
-            (event.Recipient || event.Email || '').toLowerCase()
-        )
+        if (!row || row.toEmail.toLowerCase() !== event.recipient.toLowerCase())
           return;
-        const status = {
-          Delivery: 'delivered',
-          Bounce: 'bounced',
-          SpamComplaint: 'complained',
-          SubscriptionChange: 'unsubscribed',
-        }[event.RecordType];
         const rank = {
+          pending: 0,
           sending: 0,
+          deferred: 1,
           sent: 1,
           delivered: 2,
+          blocked: 3,
           bounced: 3,
           unsubscribed: 4,
           complained: 5,
         };
-        if (status && (rank[status] || 0) > (rank[row.status] || 0))
+        if ((rank[event.kind] || 0) > (rank[row.status] || 0))
           await tx
             .update(s.emailLog)
-            .set({ status, providerId: event.MessageID })
+            .set({ status: event.kind, providerId: event.providerId })
             .where(eq(s.emailLog.id, row.id));
-        if (
-          event.RecordType === 'SpamComplaint' ||
-          (event.RecordType === 'Bounce' && event.Inactive === true)
-        )
+        if (event.suppress)
           await tx
             .insert(s.emailSuppressions)
-            .values({ email: row.toEmail.toLowerCase(), reason: status })
-            .onDuplicateKeyUpdate({ set: { reason: status } });
-        if (
-          event.RecordType === 'SpamComplaint' ||
-          (event.RecordType === 'SubscriptionChange' &&
-            event.SuppressSending === true)
-        )
+            .values({ email: row.toEmail.toLowerCase(), reason: event.kind })
+            .onDuplicateKeyUpdate({ set: { reason: event.kind } });
+        if (['complained', 'unsubscribed'].includes(event.kind)) {
           await tx
             .update(s.clients)
-            .set({ unsubscribedAt: new Date(), marketingConsent: false })
+            .set({ marketingConsent: false, unsubscribedAt: new Date() })
             .where(eq(s.clients.email, row.toEmail));
+          if (row.clientId)
+            await tx
+              .update(s.jobs)
+              .set({ status: 'cancelled' })
+              .where(
+                and(
+                  eq(s.jobs.type, 'winback'),
+                  inArray(s.jobs.status, ['pending', 'failed']),
+                  sql`JSON_EXTRACT(${s.jobs.payload}, '$.clientId') = ${row.clientId}`,
+                ),
+              );
+        }
       });
     },
     async unsubscribe(id) {

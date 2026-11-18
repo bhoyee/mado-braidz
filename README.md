@@ -44,7 +44,7 @@ Visit http://localhost:4780 and http://localhost:4780/health. `npm start` runs w
 | CRON_SECRET                                                      | Future cron authentication secret                                                              |
 | LOG_DIR                                                          | Pino rotating log directory, defaults to `logs`; use an absolute persistent path in production |
 
-Production validates HTTPS and payment/Turnstile/cron secrets. Future provider integrations remain outside this milestone; Postmark delivery configuration must be added with its implementation. Local unused provider keys can remain empty. Windows UPLOAD_DIR example is `C:/mado-uploads`; use `/home/<user>/mado-uploads` on cPanel. Logs rotate daily and retain 14 files. Session cookies are httpOnly/SameSite=Lax and secure in production; proxy trust is one hop.
+Production validates HTTPS and payment/Turnstile/cron secrets. Milestone 7 adds Brevo delivery; see the notification activation guide below. Local unused provider keys can remain empty. Windows UPLOAD_DIR example is `C:/mado-uploads`; use `/home/<user>/mado-uploads` on cPanel. Logs rotate daily and retain 14 files. Session cookies are httpOnly/SameSite=Lax and secure in production; proxy trust is one hop.
 
 ## Database and seed
 
@@ -320,4 +320,4 @@ Fresh installs include these services in `npm run db:seed`. For an existing data
 
 See [the notification setup and activation guide](docs/MILESTONE-7.md). Build compiles the branded MJML email layout. Run `npm run db:migrate` for the email delivery-key and suppression migrations. The existing five-minute jobs cron schedules and sends notifications; no separate worker is needed.
 
-New private environment variables: `POSTMARK_SERVER_TOKEN`, `POSTMARK_MESSAGE_STREAM` (default `outbound`), `POSTMARK_BROADCAST_STREAM` (default `broadcast`), `POSTMARK_WEBHOOK_SECRET`, `EMAIL_ENABLED` (default `false`), `EMAIL_REPLY_TO`, `NOTIFICATIONS_START_AT` (UTC activation time), and `VAPID_SUBJECT`. Existing `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, `EMAIL_FROM` and `ADMIN_ALERT_EMAILS` are used. Keep delivery disabled until the sending domain and owner inbox test are verified. Set the activation time before enabling delivery to avoid sending historical queued emails. Contact messages remain disabled until delivery is enabled.
+New private environment variables: `BREVO_API_KEY`, `BREVO_WEBHOOK_SECRET`, `EMAIL_ENABLED` (default `false`), `EMAIL_REPLY_TO`, `NOTIFICATIONS_START_AT` (UTC activation time), and `VAPID_SUBJECT`. Existing `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, `EMAIL_FROM` and `ADMIN_ALERT_EMAILS` are used. Keep delivery disabled until the sending domain and owner inbox test are verified. Set the activation time before enabling delivery to avoid sending historical queued emails. Contact messages remain disabled until delivery is enabled.

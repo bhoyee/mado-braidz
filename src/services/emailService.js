@@ -197,61 +197,71 @@ export function createEmailService(config, fetcher = fetch) {
         return `preview-${name}`;
       }
       if (!config.EMAIL_ENABLED) throw new Error('Email delivery disabled');
-      if (config.EMAIL_PROVIDER !== 'postmark')
-        throw new Error('This milestone uses Postmark');
+      if (config.EMAIL_PROVIDER !== 'brevo')
+        throw new Error('Configure Brevo for email delivery');
+      const match = config.EMAIL_FROM.match(/^\s*(.*?)\s*<([^<>]+)>\s*$/);
+      const sender = match
+        ? { name: match[1].trim(), email: match[2].trim() }
+        : { email: config.EMAIL_FROM.trim() };
       let response;
       try {
-        response = await fetcher('https://api.postmarkapp.com/email', {
+        response = await fetcher('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
           signal: AbortSignal.timeout(15000),
           headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
-            'X-Postmark-Server-Token': config.POSTMARK_SERVER_TOKEN,
+            'api-key': config.BREVO_API_KEY,
           },
           body: JSON.stringify({
-            From: config.EMAIL_FROM,
-            To: to,
-            Subject: email.subject,
-            HtmlBody: email.html,
-            TextBody: email.text,
-            ReplyTo: email.replyTo || config.EMAIL_REPLY_TO || undefined,
-            MessageStream: email.marketing
-              ? config.POSTMARK_BROADCAST_STREAM
-              : config.POSTMARK_MESSAGE_STREAM,
-            TrackOpens: false,
-            TrackLinks: 'None',
-            Headers: email.headers,
-            Attachments: email.attachments,
-            Metadata: { deliveryKey: key },
+            sender,
+            to: [{ email: to }],
+            subject: email.subject,
+            htmlContent: email.html,
+            textContent: email.text,
+            replyTo:
+              email.replyTo || config.EMAIL_REPLY_TO
+                ? { email: email.replyTo || config.EMAIL_REPLY_TO }
+                : undefined,
+            attachment: email.attachments?.map((item) => ({
+              name: item.Name,
+              content: item.Content,
+            })),
+            tags: [email.marketing ? 'mado-return-visit' : 'mado-appointment'],
+            headers: {
+              ...Object.fromEntries(
+                (email.headers || []).map((item) => [item.Name, item.Value]),
+              ),
+              IdempotencyKey: key,
+              'X-Mailin-custom': 'deliveryKey:' + key,
+            },
           }),
         });
       } catch {
         const error = new Error(
-          'Delivery outcome is unknown; verify in Postmark before retrying',
+          'Delivery outcome is unknown; verify in Brevo before retrying',
         );
         error.uncertain = true;
         throw error;
       }
       if (!response.ok)
-        throw new Error(`Postmark rejected email (${response.status})`);
+        throw new Error('Brevo rejected email (' + response.status + ')');
       let result;
       try {
         result = await response.json();
       } catch {
         const error = new Error(
-          'Postmark response was incomplete; verify delivery before retrying',
+          'Brevo response was incomplete; verify delivery before retrying',
         );
         error.uncertain = true;
         throw error;
       }
-      if (result.ErrorCode) throw new Error('Postmark did not accept email');
-      if (!result.MessageID) {
-        const error = new Error('Postmark acceptance needs verification');
+      if (!result.messageId) {
+        const error = new Error('Brevo acceptance needs verification');
         error.uncertain = true;
         throw error;
       }
-      return result.MessageID;
+      return result.messageId.replace(/^<|>$/g, '');
     },
   };
 }
