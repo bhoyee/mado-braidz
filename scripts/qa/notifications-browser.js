@@ -120,6 +120,20 @@ try {
       }),
       true,
     );
+    await page.evaluate(() => document.fonts.ready);
+    assert.equal(
+      await page.locator('.owner-notifications-title').evaluate((header) => {
+        const heading = header.querySelector('h2').getBoundingClientRect();
+        const button = header.querySelector('button').getBoundingClientRect();
+        return (
+          Math.abs(
+            heading.top + heading.height / 2 - button.top - button.height / 2,
+          ) < 3
+        );
+      }),
+      true,
+      'Recent updates and read-all button must share the same center line',
+    );
     const violations = (await new AxeBuilder({ page }).analyze()).violations;
     assert.equal(violations.length, 0, JSON.stringify(violations));
     const manifest = await (

@@ -458,8 +458,10 @@
 .owner-notification form {
   justify-self: end;
 }
-.owner-notification .button,
-.owner-notifications-title .button {
+.owner-app .owner-notification .button,
+.owner-app .owner-notifications-title .button {
+  margin: 0;
+  width: auto;
   white-space: nowrap;
   padding: 10px 14px;
   font-size: 13px;
@@ -483,9 +485,10 @@
     gap: 8px;
   }
   .owner-notifications-title h2 {
-    font-size: 22px;
+    font-size: clamp(16px, 4.8vw, 22px);
+    white-space: nowrap;
   }
-  .owner-notifications-title .button {
+  .owner-app .owner-notifications-title .button {
     padding: 10px;
     font-size: 12px;
   }
