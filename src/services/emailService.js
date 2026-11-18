@@ -223,10 +223,12 @@ export function createEmailService(config, fetcher = fetch) {
               email.replyTo || config.EMAIL_REPLY_TO
                 ? { email: email.replyTo || config.EMAIL_REPLY_TO }
                 : undefined,
-            attachment: email.attachments?.map((item) => ({
-              name: item.Name,
-              content: item.Content,
-            })),
+            attachment: email.attachments?.length
+              ? email.attachments.map((item) => ({
+                  name: item.Name,
+                  content: item.Content,
+                }))
+              : undefined,
             tags: [email.marketing ? 'mado-return-visit' : 'mado-appointment'],
             headers: {
               ...Object.fromEntries(

@@ -374,6 +374,7 @@ describe('Brevo content and security', () => {
     await sender.send(f.client.email, message, 'test-delivery');
     const body = JSON.parse(fetcher.mock.calls[0][1].body);
     expect(body.tags).toContain('mado-return-visit');
+    expect(body).not.toHaveProperty('attachment');
     expect(body.sender.email).toBe('bookings@madoafricanbraidz.com');
     expect(body.headers['X-Mailin-custom']).toBe('deliveryKey:test-delivery');
   });
