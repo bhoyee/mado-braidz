@@ -8,6 +8,16 @@ import {
   validUnsubscribe,
 } from './emailService.js';
 const ZONE = 'America/New_York';
+const acceptedStatuses = new Set([
+  'sent',
+  'delivered',
+  'deferred',
+  'blocked',
+  'bounced',
+  'complained',
+  'unsubscribed',
+  'preview',
+]);
 const decode = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
 export function reminderTimes(booking, hours = 48) {
   const start = DateTime.fromJSDate(new Date(booking.startAt), { zone: ZONE });
@@ -329,18 +339,7 @@ export function createNotificationService(
               if (await repository.suppressed(recipient)) continue;
               const key = `job:${job.id}:${createHash('sha256').update(recipient.toLowerCase()).digest('hex')}`;
               let log = await repository.log(key);
-              if (
-                log &&
-                [
-                  'sent',
-                  'delivered',
-                  'bounced',
-                  'complained',
-                  'unsubscribed',
-                  'preview',
-                ].includes(log.status)
-              )
-                continue;
+              if (log && acceptedStatuses.has(log.status)) continue;
               if (log && ['sending', 'unknown'].includes(log.status)) {
                 const error = new Error(
                   'Previous delivery needs verification before retry',
@@ -362,12 +361,7 @@ export function createNotificationService(
                 const latest = await repository.log(key);
                 await repository.saveLog(log.id, {
                   providerId,
-                  ...([
-                    'delivered',
-                    'bounced',
-                    'complained',
-                    'unsubscribed',
-                  ].includes(latest.status)
+                  ...(acceptedStatuses.has(latest.status)
                     ? {}
                     : {
                         status:
@@ -377,14 +371,7 @@ export function createNotificationService(
                 sent++;
               } catch (error) {
                 const delivered = await repository.log(key);
-                if (
-                  [
-                    'delivered',
-                    'bounced',
-                    'complained',
-                    'unsubscribed',
-                  ].includes(delivered?.status)
-                ) {
+                if (acceptedStatuses.has(delivered?.status)) {
                   sent++;
                   continue;
                 }
