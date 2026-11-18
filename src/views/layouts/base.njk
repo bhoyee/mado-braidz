@@ -7,7 +7,7 @@
   <title>{{ title }}</title>
   <meta name="description" content="{{ description or 'Braids, twists and locs in Lanham, Maryland. Explore styles, lengths and clear prices at Mado African Braidz.' }}">
   {% if isDesign %}<meta name="robots" content="noindex,nofollow">{% endif %}
-  <link rel="icon" href="/img/braid-ring.svg" type="image/svg+xml">
+  <link rel="icon" href="/img/favicon-mado.ico" sizes="16x16 32x32 48x48"><link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-mado-32.png"><link rel="icon" type="image/png" sizes="48x48" href="/img/favicon-mado-48.png"><link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon-mado.png">
   <link rel="preload" href="/fonts/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
   {% if currentPath == "/" %}<link rel="preload" href="{{ media('studio-knotless.webp') }}" as="image" fetchpriority="high">{% endif %}
@@ -37,7 +37,7 @@
   <div class="wrap navbar">
     <a class="brand" href="/">
       <img src="/img/logo.webp" width="64" height="64" alt="" decoding="async">
-      <span class="brand-text"><span class="brand-name">Mado</span><span class="brand-sub">African Braidz</span></span>
+      <span class="brand-text"><span class="brand-name">Mado</span><span class="brand-sub">African Braid</span></span>
     </a>
     <nav class="main-nav" aria-label="Main navigation">
       {% for url, name in [['/styles','Styles &amp; Prices'],['/our-work','Our Work'],['/about','Our Story'],['/contact','Visit Us']] %}
@@ -69,7 +69,7 @@
     <div class="footer-brand">
       <a class="brand brand-light" href="/">
         <img src="/img/logo.webp" width="64" height="64" alt="" loading="lazy">
-        <span class="brand-text"><span class="brand-name">Mado</span><span class="brand-sub">African Braidz</span></span>
+        <span class="brand-text"><span class="brand-name">Mado</span><span class="brand-sub">African Braid</span></span>
       </a>
       <p>Knotless braids, twists and locs, braided by hand in {{ business.city }}, Maryland.</p>
       {% if social.length %}
