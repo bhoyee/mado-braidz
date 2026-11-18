@@ -72,6 +72,12 @@ try {
   for (const width of [390, 1440]) {
     const context = await browser.newContext({
         viewport: { width, height: 1000 },
+        ...(width === 390
+          ? {
+              userAgent:
+                'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36',
+            }
+          : {}),
       }),
       page = await context.newPage();
     const errors = [];
@@ -169,6 +175,25 @@ try {
       .filter({ hasText: 'Push alerts enabled on this device.' })
       .waitFor();
     assert.equal(await page.evaluate(() => window.pushPermissionRequests), 1);
+    await page.evaluate(() => {
+      Object.defineProperty(Notification, 'permission', {
+        configurable: true,
+        get: () => 'denied',
+      });
+      Notification.requestPermission = async () => 'denied';
+    });
+    await page
+      .getByRole('button', { name: 'Enable push on this device', exact: true })
+      .click();
+    await page
+      .locator('[data-push-status]')
+      .filter({ hasText: 'Notifications are blocked on this device.' })
+      .waitFor();
+    if (width === 390)
+      assert.match(
+        await page.locator('[data-push-status]').innerText(),
+        /Android Settings/,
+      );
     await page.goto(origin + '/admin/email-templates');
     await page.locator('details').first().locator('summary').click();
     await page
@@ -230,6 +255,30 @@ try {
     console.log(
       `PASS ${width}px: owner auth, notifications/read state, template edits, owner-only test, contact, PWA/service worker, axe 0`,
     );
+    if (width === 1440) {
+      for (const device of ['iPhone', 'iPad']) {
+        const apple = await browser.newContext({
+          storageState: await context.storageState(),
+          userAgent: `Mozilla/5.0 (${device}; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile Safari/604.1`,
+        });
+        const applePage = await apple.newPage();
+        await applePage.goto(origin + '/admin/notifications');
+        await applePage
+          .getByRole('button', {
+            name: 'Enable push on this device',
+            exact: true,
+          })
+          .click();
+        await applePage
+          .locator('[data-push-status]')
+          .filter({ hasText: 'Add to Home Screen' })
+          .waitFor();
+        await apple.close();
+      }
+      console.log(
+        'PASS iPhone / iPad: Home Screen setup guidance before permission request',
+      );
+    }
     await context.close();
   }
 } finally {

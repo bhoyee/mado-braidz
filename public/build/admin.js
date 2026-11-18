@@ -18,6 +18,25 @@ if (notificationBadge) {
   setInterval(poll, 30000);
 }
 const pushStatus = document.querySelector('[data-push-status]');
+const appleMobile =
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const homeScreen =
+  window.matchMedia('(display-mode: standalone)').matches ||
+  navigator.standalone;
+const pushHelp = document.querySelector('[data-push-help]');
+const permissionHelp = appleMobile
+  ? 'Open Settings on your iPhone or iPad, select Notifications, then Mado Owner Studio and allow notifications. Reopen the Home Screen app and try again.'
+  : /Android/.test(navigator.userAgent)
+    ? "In your browser, open this site's permissions and allow Notifications. Also check Android Settings > Apps > your browser > Notifications. Then reload this page and try again."
+    : "Open this site's permissions in your browser and allow Notifications. Also check your computer's notification settings, then try again.";
+if (pushHelp) {
+  pushHelp.textContent = appleMobile
+    ? 'iPhone / iPad: use iOS or iPadOS 16.4 or later. Open this portal in Safari, tap Share > Add to Home Screen, then open its Home Screen icon to enable alerts.'
+    : /Android/.test(navigator.userAgent)
+      ? 'Android phone / tablet: open this portal in an up-to-date browser, tap Enable push and allow notifications. No app installation is required.'
+      : 'Enable alerts in a supported browser on this computer. Each device needs its own permission.';
+}
 const pushCsrf = () =>
   document.querySelector('meta[name="csrf-token"]').content;
 const pushRequest = async (method, input) => {
@@ -42,13 +61,17 @@ document
     button.disabled = true;
     pushStatus.textContent = 'Checking notification permission…';
     try {
+      if (appleMobile && !homeScreen)
+        throw new Error(
+          'On iPhone or iPad, open Safari > Share > Add to Home Screen. Open the new Home Screen icon, sign in and enable push there.',
+        );
       if (
         !('serviceWorker' in navigator) ||
         !('PushManager' in window) ||
         !('Notification' in window)
       )
         throw new Error(
-          'This browser does not support push alerts. On iPhone, add this portal to your Home Screen and open it there.',
+          'Push is unavailable in this browser. Update your browser or use a supported browser. On iPhone or iPad, use the Home Screen app on iOS / iPadOS 16.4 or later. Email and portal updates remain available.',
         );
       const permission =
         Notification.permission === 'granted'
@@ -56,7 +79,10 @@ document
           : await Notification.requestPermission();
       if (permission !== 'granted')
         throw new Error(
-          'Notifications were not allowed. In Chrome, open this site’s settings → Notifications → Allow, then try again.',
+          permission === 'denied'
+            ? 'Notifications are blocked on this device. ' + permissionHelp
+            : 'Notification permission was not granted. Tap Enable push again and choose Allow. If no prompt appears: ' +
+                permissionHelp,
         );
       pushStatus.textContent = 'Connecting this device…';
       await worker();
