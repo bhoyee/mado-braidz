@@ -107,6 +107,77 @@ export function createManagementService(db, clock = () => new Date()) {
   }
   return {
     all,
+    async media(id) {
+      const row = exists(
+        (
+          await db
+            .select()
+            .from(s.media)
+            .where(
+              and(
+                eq(s.media.id, id),
+                inArray(s.media.kind, ['style', 'gallery']),
+              ),
+            )
+        )[0],
+      );
+      return {
+        ...row,
+        variants:
+          typeof row.variants === 'string'
+            ? JSON.parse(row.variants)
+            : row.variants,
+      };
+    },
+    async replaceMediaImage(id, image, actor) {
+      return db.transaction(async (tx) => {
+        const before = exists(
+          (
+            await tx
+              .select()
+              .from(s.media)
+              .where(
+                and(
+                  eq(s.media.id, id),
+                  inArray(s.media.kind, ['style', 'gallery']),
+                ),
+              )
+              .for('update')
+          )[0],
+        );
+        const previous =
+          typeof before.variants === 'string'
+            ? JSON.parse(before.variants)
+            : before.variants;
+        const patch = {
+          path: image.path,
+          width: image.width,
+          height: image.height,
+          variants: {
+            ...image.variants,
+            ...(previous?.size ? { size: previous.size } : {}),
+          },
+        };
+        await tx.update(s.media).set(patch).where(eq(s.media.id, id));
+        const after = { ...before, ...patch };
+        await audit(tx, actor, 'media', id, before, after);
+        if (before.styleId && before.kind === 'style') {
+          await tx
+            .update(s.styles)
+            .set({ updatedAt: new Date() })
+            .where(eq(s.styles.id, before.styleId));
+          await audit(
+            tx,
+            actor,
+            'style',
+            before.styleId,
+            { photoId: id, path: before.path },
+            { photoId: id, path: patch.path },
+          );
+        }
+        return after;
+      });
+    },
     async lastEdit(id) {
       return (
         await db

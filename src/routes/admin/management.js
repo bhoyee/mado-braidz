@@ -27,6 +27,13 @@ export function managementRouter(service, config) {
       : res.redirect(303, url);
   const render = async (req, res, page, extra = {}) => {
     const data = await service.all();
+    if (page === 'gallery')
+      data.stylesWithoutPhotos = data.styles.filter(
+        (style) =>
+          !data.media.some(
+            (photo) => photo.kind === 'style' && photo.styleId === style.id,
+          ),
+      );
     data.settings.business.social ??= publicSettings.social;
     data.settings.emails ??= {
       reminderHours: 48,
@@ -166,6 +173,7 @@ export function managementRouter(service, config) {
           kind: z.enum(['style', 'gallery']),
           styleId: text(20),
           sort: z.coerce.number().int().min(0).max(9999).default(0),
+          returnTo: z.enum(['style', 'gallery']).default('style'),
         })
         .parse(req.body);
       const styleId = optionalId(input.styleId);
@@ -175,6 +183,7 @@ export function managementRouter(service, config) {
         req.file?.buffer,
         config.UPLOAD_DIR,
       );
+      let mediaId;
       try {
         const values = {
           path: photo.path,
@@ -182,7 +191,7 @@ export function managementRouter(service, config) {
           height: photo.height,
           variants: photo.variants,
         };
-        await service.saveMedia(
+        mediaId = await service.saveMedia(
           null,
           {
             ...values,
@@ -200,9 +209,39 @@ export function managementRouter(service, config) {
       finish(
         req,
         res,
-        styleId && input.kind === 'style'
+        styleId && input.kind === 'style' && input.returnTo === 'style'
           ? '/admin/styles/' + styleId
-          : '/admin/gallery',
+          : '/admin/gallery#photo-' + mediaId,
+      );
+    }),
+  );
+  router.post(
+    '/gallery/:id/replace',
+    upload,
+    run(async (req, res) => {
+      const id = entityId.parse(req.params.id);
+      const returnTo = z
+        .enum(['gallery', 'style'])
+        .default('gallery')
+        .parse(req.body.returnTo);
+      await service.media(id);
+      const photo = await prepareCatalogImage(
+        req.file?.buffer,
+        config.UPLOAD_DIR,
+      );
+      let updated;
+      try {
+        updated = await service.replaceMediaImage(id, photo, actor(req, res));
+      } catch (error) {
+        await photo.cleanup();
+        throw error;
+      }
+      finish(
+        req,
+        res,
+        returnTo === 'style' && updated.styleId
+          ? '/admin/styles/' + updated.styleId + '#style-photos'
+          : '/admin/gallery#photo-' + id,
       );
     }),
   );
