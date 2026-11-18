@@ -37,19 +37,43 @@ if (notificationBadge && 'serviceWorker' in navigator) worker().catch(() => {});
 document
   .querySelector('[data-enable-push]')
   ?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const raw = button.dataset.vapidKey;
+    button.disabled = true;
+    pushStatus.textContent = 'Checking notification permission…';
     try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window))
+      if (
+        !('serviceWorker' in navigator) ||
+        !('PushManager' in window) ||
+        !('Notification' in window)
+      )
         throw new Error(
           'This browser does not support push alerts. On iPhone, add this portal to your Home Screen and open it there.',
         );
-      const permission = await Notification.requestPermission();
+      const permission =
+        Notification.permission === 'granted'
+          ? 'granted'
+          : await Notification.requestPermission();
       if (permission !== 'granted')
         throw new Error(
-          'Allow notifications in your browser settings to enable push.',
+          'Notifications were not allowed. In Chrome, open this site’s settings → Notifications → Allow, then try again.',
         );
-      const registration = await worker();
-      await navigator.serviceWorker.ready;
-      const raw = event.currentTarget.dataset.vapidKey;
+      pushStatus.textContent = 'Connecting this device…';
+      await worker();
+      const registration = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  'Connection timed out. Reload this page and try again.',
+                ),
+              ),
+            15000,
+          ),
+        ),
+      ]);
       const bytes = Uint8Array.from(
         atob(raw.replace(/-/g, '+').replace(/_/g, '/')),
         (c) => c.charCodeAt(0),
@@ -64,6 +88,8 @@ document
       pushStatus.textContent = data.message;
     } catch (error) {
       pushStatus.textContent = error.message;
+    } finally {
+      button.disabled = false;
     }
   });
 document

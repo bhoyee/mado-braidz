@@ -52,6 +52,7 @@ const config = parseEnv({
   EMAIL_PROVIDER: 'log',
   ADMIN_EMAIL: 'owner@example.test',
   TURNSTILE_ENABLED: 'false',
+  VAPID_PUBLIC_KEY: 'B' + 'A'.repeat(86),
 });
 const service = createNotificationService(repo, config);
 const app = createApp({
@@ -98,8 +99,13 @@ try {
       (await page.request.get(origin + '/admin/sw.js')).status(),
       200,
     );
-    await page.getByRole('button', { name: 'Mark all as read' }).click();
-    await page.waitForURL(origin + '/admin/notifications');
+    await Promise.all([
+      page.waitForEvent('framenavigated', {
+        predicate: (frame) => frame === page.mainFrame(),
+      }),
+      page.getByRole('button', { name: 'Mark all as read' }).click(),
+    ]);
+    await page.waitForLoadState('networkidle');
     await page
       .locator('.owner-badge')
       .filter({ hasText: '0 unread' })
@@ -108,6 +114,61 @@ try {
       path: `tmp/qa/notifications-${width}.png`,
       animations: 'disabled',
     });
+    await page.evaluate(() => {
+      window.pushPermissionRequests = 0;
+      Object.defineProperty(Notification, 'permission', {
+        configurable: true,
+        get: () => 'default',
+      });
+      Notification.requestPermission = async () => {
+        window.pushPermissionRequests++;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return 'granted';
+      };
+      const registration = {
+        pushManager: {
+          getSubscription: async () => null,
+          subscribe: async () => ({
+            toJSON: () => ({
+              endpoint: 'https://fcm.googleapis.com/test',
+              keys: {},
+            }),
+          }),
+        },
+      };
+      navigator.serviceWorker.register = async () => registration;
+      Object.defineProperty(navigator.serviceWorker, 'ready', {
+        configurable: true,
+        value: Promise.resolve(registration),
+      });
+    });
+    await page.route('**/admin/api/push-subscriptions', (route) =>
+      route.fulfill({
+        json: { message: 'Push alerts enabled on this device.' },
+      }),
+    );
+    await page
+      .getByRole('button', { name: 'Enable push on this device', exact: true })
+      .click();
+    await page
+      .locator('[data-push-status]')
+      .filter({ hasText: 'Push alerts enabled on this device.' })
+      .waitFor();
+    assert.equal(await page.evaluate(() => window.pushPermissionRequests), 1);
+    await page.evaluate(() =>
+      Object.defineProperty(Notification, 'permission', {
+        configurable: true,
+        get: () => 'granted',
+      }),
+    );
+    await page
+      .getByRole('button', { name: 'Enable push on this device', exact: true })
+      .click();
+    await page
+      .locator('[data-push-status]')
+      .filter({ hasText: 'Push alerts enabled on this device.' })
+      .waitFor();
+    assert.equal(await page.evaluate(() => window.pushPermissionRequests), 1);
     await page.goto(origin + '/admin/email-templates');
     await page.locator('details').first().locator('summary').click();
     await page
