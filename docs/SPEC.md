@@ -732,6 +732,32 @@ One item to confirm: the flyer lists Senegalese Twist as "Medium $180, Waist Len
       "slug": "crochet-braids",
       "category": "other",
       "priceOnConsultation": true
+    },
+    {
+      "name": "Men’s Invisible Locs",
+      "slug": "mens-invisible-locs",
+      "category": "mens",
+      "note": "A clean, understated loc look with neat sections and a finish tailored to you.",
+      "variants": [
+        [
+          null,
+          null,
+          12000
+        ]
+      ]
+    },
+    {
+      "name": "Freestyle Stitch Cornrows",
+      "slug": "freestyle-stitch-cornrows",
+      "category": "mens",
+      "note": "Defined stitch braids with a freestyle cornrow pattern designed around your look.",
+      "variants": [
+        [
+          null,
+          null,
+          8000
+        ]
+      ]
     }
   ]
 }

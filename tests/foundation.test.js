@@ -88,8 +88,8 @@ describe('foundation', () => {
   });
   it('loads every flyer price and consultation style', () => {
     const rows = catalogRows();
-    expect(rows).toHaveLength(13);
-    expect(rows.flatMap((s) => s.variants)).toHaveLength(30);
+    expect(rows).toHaveLength(15);
+    expect(rows.flatMap((s) => s.variants)).toHaveLength(32);
     expect(
       rows
         .find((s) => s.slug === 'knotless-braids')

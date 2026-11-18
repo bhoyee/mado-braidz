@@ -6,13 +6,13 @@
   <div class="wrap style-detail">
     <div class="style-detail-copy">
       <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/styles">Styles</a><span aria-hidden="true">/</span><span aria-current="page">{{ style.name }}</span></nav>
-      <p class="eyebrow">{{ style.category }} · {{ style.durationMin / 60 }} hours</p>
+      <p class="eyebrow">{{ style.categoryName }} · {{ style.durationMin / 60 }} hours</p>
       <h1>{{ style.name }}</h1>
       <p class="intro">{{ style.shortDesc or 'Made for your chosen length and your everyday life. Talk to Mado about the finish you have in mind.' }}</p>
       <p class="style-price">{% if selectedGroup %}<span>{{ selectedGroup.name }} · from</span> {{ selectedGroup.from | money }}{% elif style.from %}<span>From</span> {{ style.from | money }}{% else %}Price on consultation{% endif %}</p>
       <p class="small-muted">{{ booking.depositCents | money }} deposit, applied toward your total.</p>
       <div class="button-row">
-        <a href="#size-guide" class="button">{% if style.groups.length %}Choose size &amp; length{% else %}Ask for a quote{% endif %}</a>
+        <a href="{% if style.flatPrice %}/book?style={{ style.slug }}{% else %}#size-guide{% endif %}" class="button">{% if style.flatPrice %}Book this style{% else %}{% if style.groups.length %}Choose size &amp; length{% else %}Ask for a quote{% endif %}{% endif %}</a>
         <a href="tel:{{ business.phone }}" class="button outline">Call {{ phoneDisplay }}</a>
       </div>
     </div>
@@ -24,6 +24,9 @@
 </section>
 
 <section class="wrap section style-configurator" id="size-guide" aria-labelledby="size-heading">
+  {% if style.flatPrice %}
+  <p class="eyebrow">Your appointment</p><h2>One look. <em>One clear price.</em></h2><p class="size-intro">{{ style.from | money }} for your style, with {{ style.durationMin / 60 }} hours reserved. Your {{ booking.depositCents | money }} deposit comes off the total.</p><a class="button" href="/book?style={{ style.slug }}">Book this style</a>
+  {% else %}
   {% if style.groups.length and not style.lengthless %}
   {# Length guide: opens in place; the image only loads once it is opened. #}
   <details class="length-guide">
@@ -64,6 +67,7 @@
   </section>
   {% else %}
   <div class="consultation-panel"><h3>Let’s find your look together.</h3><p>{% if style.from %}From {{ style.from | money }}. {% endif %}Your final price depends on the finish and length. Call Mado for a consultation before booking.</p><a class="button" href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></div>
+  {% endif %}
   {% endif %}
 </section>
 

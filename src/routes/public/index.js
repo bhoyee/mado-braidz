@@ -265,6 +265,13 @@ export function decorateCatalog(data) {
     );
     return {
       ...style,
+      categoryName:
+        data.categories.find((category) => category.slug === style.category)
+          ?.name || style.category,
+      flatPrice:
+        style.variants.length === 1 &&
+        !style.variants[0].size &&
+        !style.variants[0].length,
       from,
       // Price grid for the home menu: lengths down the side, sizes across.
       matrix: groups.length
@@ -374,6 +381,7 @@ export function decorateCatalog(data) {
   return {
     ...data,
     styles,
+    mensStyles: styles.filter((style) => style.category === 'mens'),
     heroStyle:
       styles.find((style) => style.slug === 'knotless-braids') || styles[0],
     consultStyles: styles.filter((style) => !style.groups.length),

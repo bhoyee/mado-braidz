@@ -12,7 +12,10 @@ export function fixtureCatalog(overrides = {}) {
     (slug, id) => ({
       id: id + 1,
       slug,
-      name: slug[0].toUpperCase() + slug.slice(1),
+      name:
+        slug === 'mens'
+          ? 'Men’s Braids & Locs'
+          : slug[0].toUpperCase() + slug.slice(1),
     }),
   );
   const data = {

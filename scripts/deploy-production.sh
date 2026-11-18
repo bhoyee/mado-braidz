@@ -24,6 +24,7 @@ npm ci --omit=dev --no-audit --no-fund
 printf '{"revision":"%s"}\n' "$revision" > release.json
 "$base/backup-database.sh"
 npm run db:migrate
+  npm run catalog:men
 
 # Keep the registered app root, private env, uploads, logs and cron paths stable.
 # Each release owns its Linux dependencies; the previous release stays available.

@@ -14,10 +14,36 @@ const config = parseEnv({
 });
 const makeApp = (catalog = fixtureCatalog()) => createApp({ config, catalog });
 describe('Milestone 2 public pages', () => {
+  it('shows both fixed-price men’s services on home, in the category and in booking', async () => {
+    const app = makeApp();
+    const home = await request(app).get('/').expect(200);
+    expect(home.text).toContain('id="mens-heading"');
+    for (const [slug, price] of [
+      ['mens-invisible-locs', '$120'],
+      ['freestyle-stitch-cornrows', '$80'],
+    ]) {
+      expect(home.text).toContain(`/book?style=${slug}`);
+      const detail = await request(app).get(`/styles/${slug}`).expect(200);
+      expect(detail.text).toContain(price);
+      expect(detail.text).toContain('4 hours reserved');
+      expect(detail.text).not.toContain('Choose your <em>size.');
+    }
+    const category = await request(app)
+      .get('/styles?category=mens')
+      .expect(200);
+    expect(category.text).toContain('Men’s Braids &amp; Locs');
+    expect(category.text).toContain('$120');
+    expect(category.text).toContain('$80');
+    expect(category.text).not.toContain('id="knotless-braids"');
+  });
   it('gives all 13 styles a photo and discloses the 9 generated references', async () => {
     const data = decorateCatalog(await fixtureCatalog().load());
-    expect(data.styles.every((style) => Boolean(style.photo))).toBe(true);
-    expect(data.styles.filter((style) => style.photo.generated)).toHaveLength(
+    expect(
+      data.styles
+        .filter((style) => style.category !== 'mens')
+        .every((style) => Boolean(style.photo)),
+    ).toBe(true);
+    expect(data.styles.filter((style) => style.photo?.generated)).toHaveLength(
       9,
     );
     const generated = await request(makeApp())
@@ -32,7 +58,7 @@ describe('Milestone 2 public pages', () => {
   it('serves both responsive sizes for each style reference', async () => {
     const data = decorateCatalog(await fixtureCatalog().load());
     for (const style of data.styles)
-      for (const size of style.photo.variants.sizes) {
+      for (const size of style.photo?.variants.sizes || []) {
         await request(makeApp()).get(size.path).expect(200);
         if (size.avif) await request(makeApp()).get(size.avif).expect(200);
       }

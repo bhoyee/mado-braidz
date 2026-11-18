@@ -1039,6 +1039,44 @@ figcaption {
 /* ---------- Style cards ----------
    The whole card is one link. Name and price sit on the photo over a soft
    dark fade at the bottom; the photo eases in slightly on hover. */
+.mens-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+.mens-style {
+  padding: 28px;
+  background: var(--color-linen);
+  border-top: 2px solid var(--color-violet);
+}
+.mens-style h3 {
+  margin: 14px 0;
+  font-size: clamp(26px, 3vw, 36px);
+}
+.mens-style-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+.mens-style-bottom > strong {
+  font-family: var(--font-display);
+  font-size: 36px;
+  color: var(--color-violet-deep);
+}
+.mens-photo {
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.mens-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .style-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

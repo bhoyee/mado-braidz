@@ -44,7 +44,14 @@ try {
     for (const [sort, slug] of categories.entries())
       await tx
         .insert(s.styleCategories)
-        .values({ slug, name: slug[0].toUpperCase() + slug.slice(1), sort })
+        .values({
+          slug,
+          name:
+            slug === 'mens'
+              ? 'Men’s Braids & Locs'
+              : slug[0].toUpperCase() + slug.slice(1),
+          sort,
+        })
         .onDuplicateKeyUpdate({ set: { slug } });
     for (const style of catalogRows()) {
       const [category] = await tx
