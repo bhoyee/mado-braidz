@@ -43,6 +43,13 @@
       "when": 1794897919089,
       "tag": "0005_broken_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1794941221030,
+      "tag": "0006_icy_magneto",
+      "breakpoints": true
     }
   ]
 }

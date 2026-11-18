@@ -1,0 +1,421 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import multer from 'multer';
+import {
+  entityId,
+  checked,
+  dollars,
+} from '../../services/managementValidation.js';
+import { prepareCatalogImage } from '../../services/catalogImages.js';
+import { publicSettings } from '../../db/public-defaults.js';
+import { ManagementError } from '../../services/managementErrors.js';
+
+const optionalId = (v) => (v ? entityId.parse(v) : null);
+const text = (max) => z.string().trim().max(max).default('');
+const socials = z.union([
+  z.literal(''),
+  z.url().refine((v) => v.startsWith('https://'), 'Use an HTTPS link'),
+]);
+export function managementRouter(service, config) {
+  const router = Router();
+  const run = (handler) => (req, res, next) =>
+    Promise.resolve(handler(req, res)).catch(next);
+  const actor = (req, res) => ({ ...res.locals.admin, ip: req.ip });
+  const finish = (req, res, url) =>
+    req.accepts(['html', 'json']) === 'json'
+      ? res.json({ url, message: 'Saved.' })
+      : res.redirect(303, url);
+  const render = async (req, res, page, extra = {}) => {
+    const data = await service.all();
+    data.settings.business.social ??= publicSettings.social;
+    data.settings.emails ??= {
+      reminderHours: 48,
+      morningReminder: true,
+      winback: true,
+      adminAlertEmails: [],
+    };
+    res.render('admin/manage/' + page, { ...data, ...extra });
+  };
+  router.get(
+    '/styles',
+    run((req, res) => render(req, res, 'styles')),
+  );
+  router.get(
+    '/styles/new',
+    run((req, res) =>
+      render(req, res, 'style', {
+        item: { active: false, durationMin: 240 },
+        itemVariants: [],
+      }),
+    ),
+  );
+  router.get(
+    '/styles/:id',
+    run(async (req, res) => {
+      const data = await service.all(),
+        id = entityId.parse(req.params.id),
+        item = data.styles.find((r) => r.id === id);
+      if (!item)
+        return res
+          .status(404)
+          .render('admin/error', { error: 'Style not found.' });
+      res.render('admin/manage/style', {
+        ...data,
+        item,
+        itemVariants: data.variants.filter((r) => r.styleId === id),
+        lastEdit: await service.lastEdit(id),
+      });
+    }),
+  );
+  router.post(
+    '/styles/save',
+    run(async (req, res) => {
+      const id = await service.saveStyle(
+        optionalId(req.body.id),
+        req.body,
+        actor(req, res),
+      );
+      finish(req, res, '/admin/styles/' + id);
+    }),
+  );
+  router.post(
+    '/styles/:id/variants',
+    run(async (req, res) => {
+      const styleId = entityId.parse(req.params.id);
+      await service.saveVariant(
+        styleId,
+        optionalId(req.body.id),
+        req.body,
+        actor(req, res),
+      );
+      finish(req, res, '/admin/styles/' + styleId);
+    }),
+  );
+  router.get(
+    '/addons',
+    run((req, res) => render(req, res, 'addons')),
+  );
+  router.post(
+    '/addons',
+    run(async (req, res) => {
+      await service.saveAddon(
+        optionalId(req.body.id),
+        req.body,
+        actor(req, res),
+      );
+      finish(req, res, '/admin/addons');
+    }),
+  );
+  router.get(
+    '/availability',
+    run((req, res) => render(req, res, 'availability')),
+  );
+  router.post(
+    '/availability',
+    run(async (req, res) => {
+      await service.saveAvailability(req.body, actor(req, res));
+      finish(req, res, '/admin/availability');
+    }),
+  );
+  router.post(
+    '/availability/blocks',
+    run(async (req, res) => {
+      await service.addBlocks(req.body, actor(req, res));
+      finish(req, res, '/admin/availability');
+    }),
+  );
+  router.post(
+    '/availability/blocks/:id/remove',
+    run(async (req, res) => {
+      await service.removeBlock(
+        entityId.parse(req.params.id),
+        checked.parse(req.body.series),
+        actor(req, res),
+      );
+      finish(req, res, '/admin/availability');
+    }),
+  );
+  router.get(
+    '/gallery',
+    run((req, res) => render(req, res, 'gallery')),
+  );
+  router.post(
+    '/gallery/reorder',
+    run(async (req, res) => {
+      const ids = z.array(entityId).max(500).parse(req.body.ids);
+      await service.reorderMedia(ids, actor(req, res));
+      finish(req, res, '/admin/gallery');
+    }),
+  );
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 8 * 1024 * 1024,
+      files: 1,
+      fields: 10,
+      fieldSize: 2000,
+    },
+  }).single('photo');
+  router.post(
+    '/gallery/upload',
+    upload,
+    run(async (req, res) => {
+      const input = z
+        .object({
+          alt: z.string().trim().min(3).max(500),
+          kind: z.enum(['style', 'gallery']),
+          styleId: text(20),
+          sort: z.coerce.number().int().min(0).max(9999).default(0),
+        })
+        .parse(req.body);
+      const styleId = optionalId(input.styleId);
+      if (input.kind === 'style' && !styleId)
+        throw new ManagementError('Choose the style for this photo');
+      const photo = await prepareCatalogImage(
+        req.file?.buffer,
+        config.UPLOAD_DIR,
+      );
+      try {
+        const values = {
+          path: photo.path,
+          width: photo.width,
+          height: photo.height,
+          variants: photo.variants,
+        };
+        await service.saveMedia(
+          null,
+          {
+            ...values,
+            alt: input.alt,
+            kind: input.kind,
+            styleId,
+            sort: input.sort,
+          },
+          actor(req, res),
+        );
+      } catch (error) {
+        await photo.cleanup();
+        throw error;
+      }
+      finish(
+        req,
+        res,
+        styleId && input.kind === 'style'
+          ? '/admin/styles/' + styleId
+          : '/admin/gallery',
+      );
+    }),
+  );
+  router.post(
+    '/gallery/:id',
+    run(async (req, res) => {
+      const v = z
+        .object({
+          alt: z.string().trim().min(3).max(500),
+          sort: z.coerce.number().int().min(0).max(9999),
+          styleId: text(20),
+          kind: z.enum(['style', 'gallery']),
+        })
+        .parse(req.body);
+      const styleId = optionalId(v.styleId);
+      if (v.kind === 'style' && !styleId)
+        throw new ManagementError('Choose a style');
+      await service.saveMedia(
+        entityId.parse(req.params.id),
+        { ...v, styleId },
+        actor(req, res),
+      );
+      finish(req, res, '/admin/gallery');
+    }),
+  );
+  router.post(
+    '/gallery/:id/remove',
+    run(async (req, res) => {
+      await service.removeMedia(entityId.parse(req.params.id), actor(req, res));
+      finish(req, res, '/admin/gallery');
+    }),
+  );
+  router.get(
+    '/redirects',
+    run((req, res) => render(req, res, 'redirects')),
+  );
+  router.post(
+    '/redirects',
+    run(async (req, res) => {
+      await service.saveRedirect(
+        optionalId(req.body.id),
+        req.body,
+        actor(req, res),
+      );
+      finish(req, res, '/admin/redirects');
+    }),
+  );
+  router.post(
+    '/redirects/:id/remove',
+    run(async (req, res) => {
+      await service.removeRedirect(
+        entityId.parse(req.params.id),
+        actor(req, res),
+      );
+      finish(req, res, '/admin/redirects');
+    }),
+  );
+  router.get(
+    '/clients',
+    run(async (req, res) => {
+      const search = text(120).parse(req.query.search),
+        page = z.coerce
+          .number()
+          .int()
+          .min(1)
+          .max(100000)
+          .default(1)
+          .parse(req.query.page);
+      const rows = await service.clients(search, (page - 1) * 50);
+      res.render('admin/manage/clients', {
+        rows: rows.slice(0, 50),
+        hasNext: rows.length > 50,
+        page,
+        search,
+      });
+    }),
+  );
+  router.get(
+    '/clients/:id',
+    run(async (req, res) =>
+      res.render(
+        'admin/manage/client',
+        await service.client(entityId.parse(req.params.id)),
+      ),
+    ),
+  );
+  router.post(
+    '/clients/:id',
+    run(async (req, res) => {
+      const id = entityId.parse(req.params.id);
+      await service.saveClient(
+        id,
+        text(5000).parse(req.body.notes),
+        actor(req, res),
+      );
+      finish(req, res, '/admin/clients/' + id);
+    }),
+  );
+  router.get(
+    '/settings',
+    run((req, res) =>
+      render(req, res, 'settings', {
+        stripeMode: config.STRIPE_SECRET_KEY?.startsWith('sk_live_')
+          ? 'Live'
+          : 'Test',
+      }),
+    ),
+  );
+  router.post(
+    '/settings',
+    run(async (req, res) => {
+      const v = z
+        .object({
+          name: z.string().trim().min(2).max(120),
+          street: text(200),
+          city: text(100),
+          region: text(50),
+          postalCode: text(20),
+          phone: z
+            .string()
+            .regex(/^\+1\d{10}$/, 'Use a US number such as +14437434979'),
+          instagram: socials,
+          tiktok: socials,
+          facebook: socials,
+          google: socials,
+          deposit: dollars.refine(
+            (value) => value >= 50,
+            'Deposit must be at least $0.50',
+          ),
+          holdMinutes: z.coerce.number().int().min(30).max(120),
+          rescheduleHours: z.coerce.number().int().min(0).max(168),
+          freeReschedules: z.coerce.number().int().min(0).max(10),
+          depositRefundable: checked,
+          policyText: text(5000),
+          reminderHours: z.coerce.number().int().min(1).max(168),
+          morningReminder: checked,
+          winback: checked,
+          adminAlertEmails: text(1000),
+          balanceOnline: checked,
+          balanceCash: checked,
+          balanceZelle: checked,
+          balanceCashapp: checked,
+          balanceTerminal: checked,
+        })
+        .parse(req.body);
+      const emails = v.adminAlertEmails
+        .split(/[\s,;]+/)
+        .filter(Boolean)
+        .map((e) => z.email().parse(e));
+      await service.saveSettings(
+        {
+          business: {
+            name: v.name,
+            street: v.street,
+            city: v.city,
+            region: v.region,
+            postalCode: v.postalCode,
+            phone: v.phone,
+            social: {
+              instagram: v.instagram,
+              tiktok: v.tiktok,
+              facebook: v.facebook,
+              google: v.google,
+            },
+          },
+          booking: {
+            depositCents: v.deposit,
+            holdMinutes: v.holdMinutes,
+          },
+          policy: {
+            rescheduleHours: v.rescheduleHours,
+            freeReschedules: v.freeReschedules,
+            depositRefundable: v.depositRefundable,
+            text: v.policyText,
+          },
+          emails: {
+            reminderHours: v.reminderHours,
+            morningReminder: v.morningReminder,
+            winback: v.winback,
+            adminAlertEmails: emails,
+          },
+          balanceOptions: {
+            online: v.balanceOnline,
+            cash: v.balanceCash,
+            zelle: v.balanceZelle,
+            cashapp: v.balanceCashapp,
+            terminal: v.balanceTerminal,
+          },
+        },
+        actor(req, res),
+      );
+      finish(req, res, '/admin/settings');
+    }),
+  );
+  router.use((error, req, res, _next) => {
+    req.log?.error({ err: error }, 'Owner management request failed');
+    const message =
+      error instanceof z.ZodError
+        ? error.issues
+            .slice(0, 3)
+            .map((i) => i.message)
+            .join(' · ')
+        : (error.code || error.cause?.code) === 'ER_DUP_ENTRY'
+          ? 'That name, link or size combination already exists.'
+          : error.code === 'LIMIT_FILE_SIZE'
+            ? 'Choose an image under 8 MB.'
+            : error instanceof ManagementError
+              ? error.message
+              : 'Unable to save. Please refresh and try again.';
+    const status = error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    if (req.accepts(['html', 'json']) === 'json')
+      return res.status(status).json({ message });
+    res.status(status).render('admin/error', { error: message });
+  });
+  return router;
+}

@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { marked } from 'marked';
 import sanitizeHtml from 'sanitize-html';
+import { DateTime } from 'luxon';
 import { generateToken } from '../../middleware/csrf.js';
 export const areas = {
   bowie: {
@@ -86,20 +87,27 @@ export function safePhoto(photo) {
   const sizes = (variants?.sizes || []).filter(
     (item) =>
       typeof item.path === 'string' &&
-      /^\/img\/(?:styles|gallery)\/[a-z0-9-]+\.webp$/.test(item.path) &&
+      /^\/(?:img\/(?:styles|gallery)|media\/catalog)\/[a-z0-9-]+\.webp$/.test(
+        item.path,
+      ) &&
       Number.isInteger(item.width),
   );
+  const uniqueSizes = [
+    ...new Map(sizes.map((item) => [item.width, item])).values(),
+  ];
   return {
     ...photo,
     generated: variants?.origin === 'generated',
     origin: variants?.origin || 'supplied',
     variants,
-    srcset: sizes.map((item) => `${item.path} ${item.width}w`).join(', '),
-    avifSrcset: sizes
+    srcset: uniqueSizes.map((item) => `${item.path} ${item.width}w`).join(', '),
+    avifSrcset: uniqueSizes
       .filter(
         (item) =>
           typeof item.avif === 'string' &&
-          /^\/img\/styles\/[a-z0-9-]+\.avif$/.test(item.avif),
+          /^\/(?:img\/(?:styles|gallery)|media\/catalog)\/[a-z0-9-]+\.avif$/.test(
+            item.avif,
+          ),
       )
       .map((item) => `${item.avif} ${item.width}w`)
       .join(', '),
@@ -216,7 +224,11 @@ export function workItems(suppliedStyles, gallery) {
     ...gallery.map((item) => ({
       type: 'photo',
       photo: item,
-      label: galleryLabel(item),
+      label:
+        item.styleName ||
+        (item.path.startsWith('/media/catalog/')
+          ? item.alt
+          : galleryLabel(item)),
     })),
   ];
   const films = WORK_FILMS.map((film) => ({ type: 'film', ...film }));
@@ -296,6 +308,58 @@ export function decorateCatalog(data) {
   });
   const b = data.settings.business;
   const pages = { ...(data.settings.seo?.pages || {}) };
+  let openingHours = data.settings.hours;
+  if (openingHours?.customHours) {
+    const today = DateTime.now().setZone('America/New_York');
+    const current = openingHours.weekly[today.toFormat('cccc').toLowerCase()];
+    const format = (value) =>
+      DateTime.fromISO(today.toISODate() + 'T' + value, {
+        zone: 'America/New_York',
+      }).toFormat('h:mm a');
+    openingHours = {
+      ...openingHours,
+      daysLabel: today.toFormat('cccc'),
+      timeLabel: current.closed
+        ? 'Closed'
+        : format(current.open) + '–' + format(current.close),
+      sundayLabel: 'Eastern time',
+    };
+  }
+  if (pages.faq)
+    pages.faq = pages.faq.map((item) => {
+      const initial = publicSettings.seo.pages.faq.find(
+        (row) => row.question === item.question,
+      );
+      if (!initial || initial.answer !== item.answer) return item;
+      const booking = data.settings.booking,
+        policy = data.settings.policy;
+      if (item.question === 'How does the deposit work?')
+        return {
+          ...item,
+          answer: `Your ${money(booking.depositCents)} deposit reserves your chair and is applied toward your total. ${policy.depositRefundable ? 'Refunds follow the studio policy.' : 'The deposit is non-refundable.'} Pay the remaining balance online or at your appointment.`,
+        };
+      if (item.question === 'Can I reschedule?')
+        return {
+          ...item,
+          answer: `The policy allows ${policy.freeReschedules} free reschedule(s) with at least ${policy.rescheduleHours} hours of notice. Call the studio to arrange a change.`,
+        };
+      if (item.question === 'Do I need to bring my own hair?') {
+        const upgrade = data.addons.find(
+          (a) => a.slug === 'human-hair-upgrade',
+        );
+        return {
+          ...item,
+          answer:
+            'Hair with 50% human hair is included.' +
+            (upgrade
+              ? ' Choose the 100% human hair upgrade for ' +
+                money(upgrade.priceCents) +
+                '.'
+              : ''),
+        };
+      }
+      return item;
+    });
   // Upgrade only the original scaffold copy; preserve owner-written content.
   if (
     !pages.home ||
@@ -323,7 +387,7 @@ export function decorateCatalog(data) {
     ),
     booking: data.settings.booking,
     pages,
-    hours: data.settings.hours,
+    hours: openingHours,
     policy: data.settings.policy,
     phoneDisplay: b.phone === '+14437434979' ? '(443) 743-4979' : b.phone,
     directions:
@@ -335,7 +399,13 @@ export function decorateCatalog(data) {
         `${b.street}, ${b.city}, ${b.region} ${b.postalCode}`,
       ) +
       '&output=embed',
-    gallery: data.gallery.map(safePhoto).filter(Boolean),
+    gallery: data.gallery
+      .map((photo) => ({
+        ...photo,
+        styleName: styles.find((style) => style.id === photo.styleId)?.name,
+      }))
+      .map(safePhoto)
+      .filter(Boolean),
     year: new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       timeZone: b.timezone,
@@ -349,6 +419,11 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
       Object.assign(res.locals, decorateCatalog(await catalog.load()), {
         currentPath: req.path,
       });
+      const redirect = (res.locals.redirects || []).find(
+        (r) => r.source === req.path,
+      );
+      if (redirect && ['GET', 'HEAD'].includes(req.method))
+        return res.redirect(301, redirect.target);
       next();
     } catch (error) {
       next(error);
@@ -362,6 +437,52 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
         ...extra,
       });
   if (paymentRoutes) router.use(paymentRoutes);
+  router.get('/sitemap.xml', (_req, res) => {
+    const escape = (value) =>
+      String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    const root = res.locals.business.url.replace(/\/$/, '');
+    const urls = [
+      '/',
+      '/styles',
+      '/our-work',
+      '/about',
+      '/contact',
+      '/policies',
+      '/privacy',
+      '/terms',
+    ]
+      .map((path) => ({ path }))
+      .concat(
+        res.locals.styles.map((style) => ({
+          path: '/styles/' + style.slug,
+          updatedAt: style.updatedAt,
+        })),
+      );
+    res
+      .type('application/xml')
+      .send(
+        '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+          urls
+            .map(
+              (row) =>
+                '<url><loc>' +
+                escape(root + row.path) +
+                '</loc>' +
+                (row.updatedAt
+                  ? '<lastmod>' +
+                    new Date(row.updatedAt).toISOString() +
+                    '</lastmod>'
+                  : '') +
+                '</url>',
+            )
+            .join('') +
+          '</urlset>',
+      );
+  });
   if (contactRoutes) router.use(contactRoutes);
   router.get('/', render('home', 'African hair braiding in Lanham, MD'));
   router.get('/styles', (req, res) => {

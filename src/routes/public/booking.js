@@ -233,6 +233,15 @@ export function bookingRouter(repository, config, payments) {
       `/bookings/:ref/${action}`,
       run(async (req, res) => {
         const ref = refSchema.parse(req.params.ref);
+        if (
+          action === 'balance' &&
+          (await repository.catalog()).settings.balanceOptions?.online === false
+        )
+          throw new BookingError(
+            'METHOD_UNAVAILABLE',
+            'Please choose another balance payment method.',
+            409,
+          );
         empty.parse(req.body || {});
         const token =
           action === 'cancel'

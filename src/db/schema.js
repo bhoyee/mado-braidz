@@ -56,6 +56,12 @@ export const styleCategories = mysqlTable('style_categories', {
   slug: str('slug').notNull().unique(),
   sort: int('sort').notNull().default(0),
 });
+export const redirects = mysqlTable('redirects', {
+  id: id(),
+  source: str('source', 512).notNull().unique(),
+  target: str('target', 512).notNull(),
+  updatedAt: dt('updated_at').notNull(),
+});
 export const styles = mysqlTable('styles', {
   id: id(),
   categoryId: ref('category_id')

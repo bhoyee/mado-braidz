@@ -22,7 +22,7 @@
   </div>
 {% if initialPayment and not pendingProof and paymentsEnabled %}<form class="visit-card-payment" data-initial-checkout data-ref="{{ appointment.ref }}" data-csrf="{{ csrfToken }}"><button class="button" type="submit">Pay {{ price.dueTodayCents | money }} securely by card</button><p class="field-error" role="alert" hidden></p></form>{% endif %}
 {% if canSubmitProof and manualMethods.length %}<div>{{ proofForm(appointment.ref, csrfToken, manualMethods, paymentName, price.dueTodayCents if initialPayment else appointment.balanceCents) }}</div>{% endif %}
-  <div class="visit-support"><div><h2>A change of plans?</h2><p>Call the studio for appointment changes. Please give at least 48 hours’ notice for rescheduling.</p><a class="text-link" href="/policies">Appointment policies</a></div><a class="button outline" href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></div>
+  {% if appointment.balanceCents > 0 %}<section class="owner-panel"><h2>Pay at the studio</h2><p>{% if balanceOptions.cash != false %}Cash{% endif %}{% if balanceOptions.terminal != false %}{% if balanceOptions.cash != false %} or {% endif %}card at the studio{% endif %}{% if balanceOptions.cash == false and balanceOptions.terminal == false %}Please use one of the online methods above or contact the studio.{% else %} accepted for your remaining balance.{% endif %}</p></section>{% endif %}<div class="visit-support"><div><h2>A change of plans?</h2><p>Call the studio for appointment changes. Please give at least {{ policy.rescheduleHours }} hours of notice for rescheduling.</p><a class="text-link" href="/policies">Appointment policies</a></div><a class="button outline" href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></div>
 </section>
 
 

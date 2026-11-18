@@ -1,4 +1,7 @@
 const alertBox = document.querySelector('.owner-alert');
+document
+  .querySelector('nav[aria-label="Owner navigation"] a[aria-current]')
+  ?.scrollIntoView({ block: 'nearest', inline: 'center' });
 function report(message) {
   alertBox.classList.remove('owner-alert-success');
   alertBox.textContent = message;
@@ -21,6 +24,7 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
       data.set(event.submitter.name, event.submitter.value);
     const body = Object.fromEntries(data);
     if (data.has('addonIds')) body.addonIds = data.getAll('addonIds');
+    if (data.has('styleIds')) body.styleIds = data.getAll('styleIds');
     for (const input of form.querySelectorAll('[data-money]')) {
       if (input.disabled || input.value === '' || input.closest('[hidden]'))
         continue;
@@ -43,11 +47,22 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
         form.getAttribute('action') || location.href,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify(body),
+          headers:
+            form.enctype === 'multipart/form-data'
+              ? {
+                  Accept: 'application/json',
+                  'x-csrf-token': document.querySelector(
+                    'meta[name="csrf-token"]',
+                  ).content,
+                }
+              : {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json',
+                },
+          body:
+            form.enctype === 'multipart/form-data'
+              ? data
+              : JSON.stringify(body),
         },
       );
       if (!response.headers.get('content-type')?.includes('application/json'))
@@ -75,6 +90,60 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
   });
 });
 const savedMessage = sessionStorage.getItem('owner-message');
+const photoList = document.querySelector('[data-photo-list]');
+if (photoList) {
+  let dragged;
+  photoList.addEventListener('dragstart', (event) => {
+    dragged = event.target.closest('[data-photo-id]');
+  });
+  photoList.addEventListener('dragover', (event) => event.preventDefault());
+  photoList.addEventListener('drop', (event) => {
+    event.preventDefault();
+    const target = event.target.closest('[data-photo-id]');
+    if (dragged && target && dragged !== target)
+      photoList.insertBefore(dragged, target);
+    dragged = null;
+  });
+  photoList.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-photo-move]');
+    if (!button) return;
+    const card = button.closest('[data-photo-id]');
+    if (button.dataset.photoMove === '-1' && card.previousElementSibling)
+      photoList.insertBefore(card, card.previousElementSibling);
+    if (button.dataset.photoMove === '1' && card.nextElementSibling)
+      photoList.insertBefore(card.nextElementSibling, card);
+  });
+  document
+    .querySelector('[data-save-photo-order]')
+    .addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const response = await fetch('/admin/gallery/reorder', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'x-csrf-token': document.querySelector('meta[name="csrf-token"]')
+              .content,
+          },
+          body: JSON.stringify({
+            ids: [...photoList.querySelectorAll('[data-photo-id]')].map(
+              (card) => Number(card.dataset.photoId),
+            ),
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok)
+          throw Error(result.message || 'Unable to save photo order');
+        sessionStorage.setItem('owner-message', 'Photo order saved.');
+        location.reload();
+      } catch (error) {
+        report(error.message);
+        button.disabled = false;
+      }
+    });
+}
 if (savedMessage) {
   sessionStorage.removeItem('owner-message');
   alertBox.textContent = savedMessage;
@@ -131,6 +200,14 @@ if (editor) {
     }
   }
   function filterVariants(changed = false) {
+    for (const field of fields.querySelectorAll('[data-addon-styles]')) {
+      const allowed =
+        field.dataset.addonAll !== 'false' ||
+        field.dataset.addonStyles.split(',').includes(style.value);
+      field.disabled = !allowed;
+      field.closest('label').hidden = !allowed;
+      if (!allowed) field.checked = false;
+    }
     const options = [...variant.options];
     const matching = options.filter(
       (option) => option.dataset.style === style.value,

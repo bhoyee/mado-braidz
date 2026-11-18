@@ -7,7 +7,7 @@ import {
 import { stripeWebhook } from './routes/webhooks/stripe.js';
 import { bookingRouter } from './routes/public/booking.js';
 import { createBookingRepository } from './services/bookingRepository.js';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { statSync, existsSync, readFileSync } from 'node:fs';
 import { createDatabase } from './db/index.js';
 import { createCatalogService } from './services/catalogService.js';
@@ -15,6 +15,7 @@ import { publicRouter, money } from './routes/public/index.js';
 import { designRouter } from './routes/admin/design.js';
 import { adminRouter } from './routes/admin/index.js';
 import { createAdminRepository } from './services/adminRepository.js';
+import { createManagementService } from './services/managementService.js';
 import { contactRouter } from './routes/public/contact.js';
 import { DateTime } from 'luxon';
 import { randomBytes } from 'node:crypto';
@@ -38,6 +39,7 @@ export function createApp({
   sessionStore,
   bookingRepository,
   adminRepository,
+  managementService,
   stripeProvider,
   catalog,
   logger = createLogger(config),
@@ -51,6 +53,7 @@ export function createApp({
   );
   bookingRepository ??= database ? createBookingRepository(database.db) : null;
   adminRepository ??= database ? createAdminRepository(database.db) : null;
+  managementService ??= database ? createManagementService(database.db) : null;
   app.locals.ownerPortal = Boolean(adminRepository);
   const provider =
     stripeProvider === undefined
@@ -217,9 +220,26 @@ export function createApp({
         config,
         payments,
         catalog,
+        managementService,
       ),
     );
   app.use('/admin', designRouter(catalog, limits.preview));
+  app.get('/media/catalog/:file', (req, res) => {
+    if (!/^[a-f0-9-]{36}-(480|960|1600)\.(webp|avif)$/.test(req.params.file))
+      return res.sendStatus(404);
+    res.sendFile(
+      req.params.file,
+      {
+        root: resolve(config.UPLOAD_DIR, 'catalog'),
+        maxAge: '1y',
+        immutable: true,
+        dotfiles: 'deny',
+      },
+      (error) => {
+        if (error && !res.headersSent) res.sendStatus(404);
+      },
+    );
+  });
   app.use('/api', bookingRouter(bookingRepository, config, payments));
   app.use(
     publicRouter(

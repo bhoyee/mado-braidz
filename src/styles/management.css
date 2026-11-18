@@ -1,0 +1,222 @@
+.owner-sidebar {
+  overflow-y: auto;
+}
+.owner-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.8rem;
+}
+.owner-page-head h1 {
+  font:
+    500 clamp(2rem, 3.6vw, 3.4rem)/1.05 Fraunces,
+    serif;
+  letter-spacing: -0.025em;
+  margin: 0.45rem 0 0.7rem;
+}
+.owner-page-head p:not(.eyebrow) {
+  color: #685d6d;
+  font-size: 0.95rem;
+  margin-top: 0.7rem;
+}
+.owner-app .owner-check {
+  margin: 0;
+}
+.owner-app input[type='checkbox'] {
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+}
+.owner-form-grid > .owner-field {
+  margin-bottom: 0;
+}
+.owner-form-grid {
+  margin-bottom: 1.1rem;
+}
+.owner-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.4rem;
+}
+.owner-field {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0 0 1.1rem;
+  min-width: 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+.owner-field input,
+.owner-field select,
+.owner-field textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #cbbfd1;
+  border-radius: 6px;
+  background: #fffcf8;
+  color: #1c0f26;
+  font: inherit;
+  font-weight: 400;
+}
+.owner-field textarea {
+  resize: vertical;
+}
+.owner-field input:focus,
+.owner-field textarea:focus,
+.owner-field select:focus {
+  outline: 2px solid #7b3fc4;
+  outline-offset: 2px;
+}
+.manage-style-grid,
+.manage-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+.manage-style h2 {
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
+  margin: 0.7rem 0;
+}
+.manage-style h2 a {
+  text-decoration: none;
+}
+.manage-style p {
+  font-size: 0.9rem;
+}
+.manage-details {
+  border-top: 1px solid #ded3e3;
+  padding: 1rem 0;
+}
+.manage-details summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0.6rem 0;
+  font-weight: 650;
+}
+.manage-details summary strong {
+  color: #5f2d9e;
+  margin-left: 0.7rem;
+}
+.manage-details form {
+  padding: 1rem 0;
+}
+.manage-checks {
+  display: flex;
+  gap: 0.8rem 1.5rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+.manage-hours {
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  border-bottom: 1px solid #e5dce9;
+  margin-bottom: 1rem;
+}
+.manage-hours .owner-check {
+  margin-bottom: 1rem;
+}
+.manage-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e5dce9;
+  padding: 1.2rem 0;
+  text-decoration: none;
+}
+.manage-list-row p {
+  margin: 0.4rem 0;
+  font-size: 0.9rem;
+}
+.manage-photos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.manage-photos img,
+.manage-photo {
+  width: 100%;
+  aspect-ratio: 4/5;
+  height: auto;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.manage-photos span {
+  display: block;
+  font-size: 0.8rem;
+  margin-top: 0.4rem;
+}
+.manage-photo {
+  max-height: 360px;
+  margin-bottom: 1.2rem;
+}
+.manage-remove {
+  margin-top: 1rem;
+  color: #b3261e;
+}
+.manage-save-bar,
+.manage-search {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+.manage-search .owner-field {
+  flex: 1;
+  margin: 0;
+}
+.manage-client-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem 3rem;
+}
+.manage-client-facts div {
+  display: grid;
+  gap: 0.5rem;
+}
+.manage-client-facts span {
+  font-size: 0.85rem;
+  color: #66556d;
+}
+.manage-client-facts strong {
+  font-size: 1.6rem;
+}
+@media (max-width: 760px) {
+  .owner-page-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .owner-form-grid,
+  .manage-style-grid,
+  .manage-gallery {
+    grid-template-columns: 1fr;
+  }
+  .manage-hours {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+  }
+  .manage-hours > strong {
+    grid-column: 1/-1;
+  }
+  .manage-hours .owner-check {
+    grid-column: 1/-1;
+  }
+  .manage-photos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .manage-list-row,
+  .manage-save-bar,
+  .manage-search {
+    flex-wrap: wrap;
+  }
+  .manage-search .owner-field {
+    flex-basis: 100%;
+  }
+}

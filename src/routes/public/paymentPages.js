@@ -28,6 +28,7 @@ export function paymentPages(repository, config, payments, catalog) {
         : row.priceSnapshot;
     const proofs = await repository.proofs(row.id);
     const pendingProof = proofs.find((p) => p.status === 'pending');
+    const options = (await catalog.load()).settings.balanceOptions || {};
     res
       .set({
         'Cache-Control': 'no-store',
@@ -40,7 +41,11 @@ export function paymentPages(repository, config, payments, catalog) {
         appointment: row,
         price,
         pendingProof,
-        manualMethods: manualMethods(config),
+        manualMethods: manualMethods(
+          config,
+          row.status === 'pending_payment' ? {} : options,
+        ),
+        balanceOptions: options,
         paymentName: config.MANUAL_PAYMENT_NAME,
         canSubmitProof:
           !pendingProof &&
@@ -58,6 +63,7 @@ export function paymentPages(repository, config, payments, catalog) {
         }),
         csrfToken: generateToken(req),
         canPayBalance:
+          options.online !== false &&
           !pendingProof &&
           ['confirmed', 'completed'].includes(row.status) &&
           payableBalance(row) &&
