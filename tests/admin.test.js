@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import argon2 from 'argon2';
 import { randomUUID } from 'node:crypto';
+import { DateTime } from 'luxon';
 import { createApp } from '../src/app.js';
 import { parseEnv } from '../src/config/env.js';
 import {
@@ -398,6 +399,116 @@ describe('owner booking operations', () => {
   });
 });
 describe('owner portal routes', () => {
+  it('shows the nearest six visits and valid holds, with owner-only payment and balance reports', async () => {
+    const { repo, admins, service } = await setup();
+    await service.createHold(validHold);
+    const base = { ...repo.rows[0] };
+    const today = DateTime.now().setZone('America/New_York').startOf('day');
+    repo.rows.splice(0);
+    for (let n = 10; n >= 1; n--) {
+      repo.rows.push({
+        ...base,
+        id: n,
+        ref: 'OV-VISIT-' + n,
+        status: 'confirmed',
+        startAt: today.plus({ days: n }).toJSDate(),
+        balanceCents: 15000,
+        subtotalCents: 18000,
+        paidCents: 3000,
+      });
+      repo.rows.push({
+        ...base,
+        id: 100 + n,
+        ref: 'OV-HOLD-' + n,
+        status: 'pending_payment',
+        startAt: today.plus({ days: n }).toJSDate(),
+        holdExpiresAt: new Date(Date.now() + 3600000),
+      });
+    }
+    repo.rows.push({
+      ...base,
+      id: 200,
+      ref: 'OV-EXPIRED-HOLD',
+      status: 'pending_payment',
+      startAt: today.toJSDate(),
+      holdExpiresAt: new Date(0),
+    });
+    repo.rows.push({
+      ...base,
+      id: 201,
+      ref: 'OV-PAST',
+      status: 'confirmed',
+      startAt: today.minus({ days: 1 }).toJSDate(),
+      balanceCents: 0,
+    });
+    const paidAt = new Date(Date.now() - 1000);
+    repo.paymentRows.push(
+      {
+        id: 1,
+        bookingId: 1,
+        type: 'deposit',
+        method: 'card',
+        amountCents: 6000,
+        createdAt: paidAt,
+      },
+      {
+        id: 2,
+        bookingId: 1,
+        type: 'refund',
+        method: 'card',
+        amountCents: 1000,
+        createdAt: paidAt,
+      },
+    );
+    const app = createApp({
+      config,
+      bookingRepository: repo,
+      adminRepository: admins,
+      catalog: fixtureCatalog(),
+      stripeProvider: fakeStripe(),
+    });
+    const agent = request.agent(app);
+    await agent.get('/admin/payments?period=week').expect(303);
+    await agent.get('/admin/balances').expect(303);
+    const login = await agent.get('/admin/login');
+    await agent
+      .post('/admin/login')
+      .send({
+        email: owner.email,
+        password,
+        _csrf: login.text.match(/name="_csrf" value="([^"]+)"/)[1],
+      })
+      .expect(303);
+    const overview = await agent.get('/admin').expect(200);
+    for (const prefix of ['OV-VISIT-', 'OV-HOLD-']) {
+      expect(overview.text).toContain(prefix + '6');
+      expect(overview.text).not.toContain(prefix + '7');
+      expect(overview.text.indexOf(prefix + '1')).toBeLessThan(
+        overview.text.indexOf(prefix + '2'),
+      );
+    }
+    expect(overview.text).not.toContain('OV-EXPIRED-HOLD');
+    expect(overview.text).not.toContain('OV-PAST');
+    expect(overview.text).toContain('Upcoming appointments');
+    expect(overview.text).toContain('/admin/balances');
+    const receipts = await agent
+      .get('/admin/payments?period=month')
+      .expect(200);
+    expect(receipts.text).toContain('<h2>$50</h2>');
+    expect(receipts.text).toContain('Refund');
+    expect(receipts.text).toContain(validHold.email);
+    const balances = await agent.get('/admin/balances').expect(200);
+    expect(balances.text).toContain('OV-VISIT-10');
+    expect(balances.text).not.toContain('OV-HOLD-');
+    const all = await agent
+      .get(
+        '/admin/bookings?status=confirmed&order=nearest&from=' +
+          today.toISODate(),
+      )
+      .expect(200);
+    expect(all.text).toContain('OV-VISIT-10');
+    await agent.get('/admin/payments?period=invalid').expect(400);
+  });
   it('requires session login, rejects Basic auth, renders owner screens and protects mutations with CSRF', async () => {
     const { repo, admins } = await setup();
     const service = createBookingService(

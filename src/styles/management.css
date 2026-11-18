@@ -1,6 +1,92 @@
 .owner-sidebar {
   overflow-y: auto;
 }
+.overview-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0 0 28px;
+}
+.overview-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 24px;
+  border: 1px solid #e2d9e8;
+  border-top: 3px solid var(--color-violet);
+  border-radius: 12px;
+  background: var(--color-cream);
+  color: var(--color-night);
+  text-decoration: none;
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+.overview-metric:hover {
+  border-color: var(--color-violet);
+  box-shadow: 0 6px 20px #1c0f2610;
+}
+.overview-metric-label {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.overview-metric strong {
+  font:
+    700 clamp(28px, 2.8vw, 40px)/1.1 Figtree,
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+.overview-metric-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--color-violet-deep);
+}
+.overview-metric-foot span {
+  font-size: 18px;
+}
+.overview-metric-balance {
+  background: var(--color-mist);
+}
+.overview-panel .owner-section-heading {
+  align-items: center;
+  margin-bottom: 20px;
+}
+.owner-app .overview-panel .eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+}
+.owner-app .overview-panel h2 {
+  margin: 0;
+}
+.overview-panel .owner-section-heading .owner-muted {
+  margin: 8px 0 0;
+}
+@media (max-width: 1100px) {
+  .overview-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 500px) {
+  .overview-metrics {
+    gap: 10px;
+  }
+  .overview-metric {
+    padding: 16px;
+    gap: 16px;
+  }
+  .overview-metric-label {
+    font-size: 12px;
+  }
+  .overview-metric-foot {
+    font-size: 11px;
+  }
+}
 .owner-confirm-dialog {
   margin: auto;
   width: min(92vw, 480px);

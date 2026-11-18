@@ -249,32 +249,112 @@ export function adminRouter(
       const [appointments, holds, metrics] = await Promise.all([
         admins.list({
           from: today.toJSDate(),
-          to: today.plus({ days: 2 }).toJSDate(),
-          limit: 500,
+          status: 'confirmed',
+          order: 'nearest',
+          limit: 6,
         }),
         admins.list({
-          from: now.toJSDate(),
+          from: today.toJSDate(),
           status: 'pending_payment',
-          limit: 100,
+          liveAt: now.toJSDate(),
+          order: 'nearest',
+          limit: 6,
         }),
         admins.metrics(
           now.startOf('week').toJSDate(),
           now.startOf('month').toJSDate(),
           now.toJSDate(),
-          new Date(req.session.owner.since),
+          today.toJSDate(),
         ),
       ]);
       res.render('admin/dashboard', {
-        appointments: appointments.filter(
-          ({ booking: b }) =>
-            ['confirmed', 'pending_payment'].includes(b.status) &&
-            (b.status !== 'pending_payment' ||
-              b.holdExpiresAt > now.toJSDate()),
-        ),
-        holds: holds.filter(
-          ({ booking: b }) => b.holdExpiresAt > now.toJSDate(),
-        ),
+        appointments,
+        holds,
         metrics,
+        today: today.toISODate(),
+      });
+    }),
+  );
+  router.get(
+    '/payments',
+    asyncRoute(async (req, res) => {
+      const period = z
+        .enum(['week', 'month'])
+        .default('week')
+        .parse(req.query.period);
+      const page = z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(100000)
+        .default(1)
+        .parse(req.query.page);
+      const now = DateTime.now().setZone(ZONE),
+        from = now.startOf(period);
+      const [rows, metrics] = await Promise.all([
+        admins.receipts({
+          from: from.toJSDate(),
+          to: now.toJSDate(),
+          offset: (page - 1) * 100,
+          limit: 101,
+        }),
+        admins.metrics(
+          now.startOf('week').toJSDate(),
+          now.startOf('month').toJSDate(),
+          now.toJSDate(),
+          now.startOf('day').toJSDate(),
+        ),
+      ]);
+      res.render('admin/financial', {
+        mode: 'receipts',
+        title: period === 'week' ? 'Received this week' : 'Received this month',
+        period,
+        rows: rows.slice(0, 100),
+        total: metrics[period],
+        page,
+        hasNext: rows.length > 100,
+        range:
+          from.toFormat('LLL d, yyyy') + ' – ' + now.toFormat('LLL d, yyyy'),
+        previous: '?period=' + period + '&page=' + (page - 1),
+        next: '?period=' + period + '&page=' + (page + 1),
+      });
+    }),
+  );
+  router.get(
+    '/balances',
+    asyncRoute(async (req, res) => {
+      const page = z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(100000)
+        .default(1)
+        .parse(req.query.page);
+      const now = DateTime.now().setZone(ZONE);
+      const [rows, metrics] = await Promise.all([
+        admins.list({
+          balanceOnly: true,
+          order: 'nearest',
+          offset: (page - 1) * 100,
+          limit: 101,
+        }),
+        admins.metrics(
+          now.startOf('week').toJSDate(),
+          now.startOf('month').toJSDate(),
+          now.toJSDate(),
+          now.startOf('day').toJSDate(),
+        ),
+      ]);
+      res.render('admin/financial', {
+        mode: 'balances',
+        title: 'Balances outstanding',
+        rows: rows.slice(0, 100),
+        total: metrics.owed,
+        page,
+        hasNext: rows.length > 100,
+        range: 'Confirmed and completed appointments with a balance to pay',
+        previous: '?page=' + (page - 1),
+        next: '?page=' + (page + 1),
       });
     }),
   );
@@ -287,6 +367,8 @@ export function adminRouter(
         status: status.optional(),
         paymentStatus: paymentStatus.optional(),
         page: z.coerce.number().int().min(1).max(100000).default(1),
+        order: z.enum(['latest', 'nearest']).default('latest'),
+        live: z.enum(['true']).optional(),
       })
       .parse(
         Object.fromEntries(
@@ -304,6 +386,7 @@ export function adminRouter(
             .toJSDate()
         : undefined,
       offset: (input.page - 1) * 100,
+      liveAt: input.live === 'true' ? new Date() : undefined,
     };
   }
   router.get(

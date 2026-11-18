@@ -43,6 +43,9 @@ export function memoryAdminRepository(bookings, owner) {
       search = '',
       limit = 100,
       offset = 0,
+      order = 'latest',
+      liveAt,
+      balanceOnly = false,
     } = {}) =>
       bookings.rows
         .filter(
@@ -50,6 +53,10 @@ export function memoryAdminRepository(bookings, owner) {
             (!from || b.startAt >= from) &&
             (!to || b.startAt < to) &&
             (!status || b.status === status) &&
+            (!liveAt || b.holdExpiresAt > liveAt) &&
+            (!balanceOnly ||
+              (['confirmed', 'completed'].includes(b.status) &&
+                b.balanceCents > 0)) &&
             (!paymentStatus || b.paymentStatus === paymentStatus),
         )
         .map((booking) => ({
@@ -61,14 +68,49 @@ export function memoryAdminRepository(bookings, owner) {
             (value) => value.toLowerCase().includes(search.toLowerCase()),
           ),
         )
-        .sort((a, b) => b.booking.startAt - a.booking.startAt)
+        .sort((a, b) =>
+          order === 'nearest'
+            ? a.booking.startAt - b.booking.startAt
+            : b.booking.startAt - a.booking.startAt,
+        )
         .slice(offset, offset + limit),
-    metrics: async () => ({
-      week: 0,
-      month: 0,
-      owed: bookings.rows.reduce((sum, b) => sum + b.balanceCents, 0),
-      fresh: 1,
-    }),
+    receipts: async ({ from, to, offset = 0, limit = 101 }) =>
+      bookings.paymentRows
+        .filter((p) => p.createdAt >= from && p.createdAt < to)
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(offset, offset + limit)
+        .map((payment) => {
+          const booking = bookings.rows.find((b) => b.id === payment.bookingId);
+          return {
+            payment,
+            booking,
+            client: bookings.clients[booking.clientId - 1],
+          };
+        }),
+    metrics: async (startWeek, startMonth, now, today) => {
+      const total = (from) =>
+        bookings.paymentRows
+          .filter((p) => p.createdAt >= from && p.createdAt < now)
+          .reduce(
+            (sum, p) =>
+              sum + (p.type === 'refund' ? -p.amountCents : p.amountCents),
+            0,
+          );
+      return {
+        week: total(startWeek),
+        month: total(startMonth),
+        owed: bookings.rows
+          .filter(
+            (b) =>
+              ['confirmed', 'completed'].includes(b.status) &&
+              b.balanceCents > 0,
+          )
+          .reduce((sum, b) => sum + b.balanceCents, 0),
+        pending: bookings.rows.filter(
+          (b) => b.status === 'confirmed' && b.startAt >= today,
+        ).length,
+      };
+    },
     detail: async (id) => {
       const booking = await bookings.bookingById(id);
       if (!booking) return null;

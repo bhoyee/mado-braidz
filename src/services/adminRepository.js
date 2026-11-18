@@ -1,4 +1,4 @@
-import { and, eq, gte, lt, desc, sql, inArray } from 'drizzle-orm';
+import { and, eq, gte, gt, lt, asc, desc, sql, inArray } from 'drizzle-orm';
 import * as s from '../db/schema.js';
 
 export function createAdminRepository(db) {
@@ -50,11 +50,20 @@ export function createAdminRepository(db) {
       search = '',
       limit = 100,
       offset = 0,
+      order = 'latest',
+      liveAt,
+      balanceOnly = false,
     } = {}) {
       const filters = [];
       if (from) filters.push(gte(s.bookings.startAt, from));
       if (to) filters.push(lt(s.bookings.startAt, to));
       if (status) filters.push(eq(s.bookings.status, status));
+      if (liveAt) filters.push(gt(s.bookings.holdExpiresAt, liveAt));
+      if (balanceOnly)
+        filters.push(
+          inArray(s.bookings.status, ['confirmed', 'completed']),
+          gt(s.bookings.balanceCents, 0),
+        );
       if (paymentStatus)
         filters.push(eq(s.bookings.paymentStatus, paymentStatus));
       if (search) {
@@ -71,7 +80,12 @@ export function createAdminRepository(db) {
         .from(s.bookings)
         .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
         .where(and(...filters))
-        .orderBy(desc(s.bookings.startAt), desc(s.bookings.id))
+        .orderBy(
+          order === 'nearest'
+            ? asc(s.bookings.startAt)
+            : desc(s.bookings.startAt),
+          order === 'nearest' ? asc(s.bookings.id) : desc(s.bookings.id),
+        )
         .limit(limit)
         .offset(offset);
     },
@@ -84,7 +98,20 @@ export function createAdminRepository(db) {
         .limit(101)
         .offset(offset);
     },
-    async metrics(startWeek, startMonth, now, since) {
+    async receipts({ from, to, limit = 101, offset = 0 }) {
+      return db
+        .select({ payment: s.payments, booking: s.bookings, client: s.clients })
+        .from(s.payments)
+        .innerJoin(s.bookings, eq(s.payments.bookingId, s.bookings.id))
+        .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
+        .where(
+          and(gte(s.payments.createdAt, from), lt(s.payments.createdAt, to)),
+        )
+        .orderBy(desc(s.payments.createdAt), desc(s.payments.id))
+        .limit(limit)
+        .offset(offset);
+    },
+    async metrics(startWeek, startMonth, now, today) {
       const [weekly] = await db
         .select({
           total: sql`COALESCE(SUM(CASE WHEN type = 'refund' THEN -amount_cents ELSE amount_cents END), 0)`,
@@ -110,16 +137,26 @@ export function createAdminRepository(db) {
       const [owed] = await db
         .select({ total: sql`COALESCE(SUM(balance_cents), 0)` })
         .from(s.bookings)
-        .where(inArray(s.bookings.status, ['confirmed', 'completed']));
-      const [fresh] = await db
+        .where(
+          and(
+            inArray(s.bookings.status, ['confirmed', 'completed']),
+            gt(s.bookings.balanceCents, 0),
+          ),
+        );
+      const [pending] = await db
         .select({ count: sql`COUNT(*)` })
         .from(s.bookings)
-        .where(gte(s.bookings.createdAt, since));
+        .where(
+          and(
+            gte(s.bookings.startAt, today),
+            eq(s.bookings.status, 'confirmed'),
+          ),
+        );
       return {
         week: Number(weekly.total),
         month: Number(monthly.total),
         owed: Number(owed.total),
-        fresh: Number(fresh.count),
+        pending: Number(pending.count),
       };
     },
     async detail(id) {
