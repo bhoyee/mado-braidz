@@ -160,7 +160,7 @@ export function futureStart() {
   return DateTime.now()
     .setZone('America/New_York')
     .plus({ days: 3 })
-    .set({ hour: 9, minute: 0, second: 0, millisecond: 0 })
+    .set({ hour: 10, minute: 0, second: 0, millisecond: 0 })
     .toUTC()
     .toISO();
 }
