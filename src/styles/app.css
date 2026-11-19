@@ -1980,6 +1980,47 @@ figcaption {
 .mobile-book {
   display: none;
 }
+.whatsapp-chat {
+  position: fixed;
+  right: 22px;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  min-height: 54px;
+  border-radius: 32px;
+  background: #176b3a;
+  color: #fff;
+  box-shadow: 0 4px 18px #0002;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.whatsapp-chat small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.whatsapp-chat:hover {
+  background: #12572f;
+}
+@media (max-width: 760px) {
+  .whatsapp-chat {
+    right: 16px;
+    padding: 12px;
+  }
+  .whatsapp-chat > span {
+    display: none;
+  }
+  body:has(.mobile-book) .whatsapp-chat,
+  body:has(.booking-form) .whatsapp-chat {
+    bottom: calc(100px + env(safe-area-inset-bottom));
+  }
+}
 @media (max-width: 760px) {
   body:has(.mobile-book) {
     padding-bottom: 84px;

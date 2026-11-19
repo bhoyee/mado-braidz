@@ -49,6 +49,9 @@ export function createApp({
   logger = createLogger(config),
 } = {}) {
   const app = express();
+  app.locals.whatsappUrl = config.WHATSAPP_NUMBER
+    ? `https://wa.me/${config.WHATSAPP_NUMBER.replace(/\D/g, '')}?text=${encodeURIComponent('Hi Mado, I have a question about booking a hairstyle.')}`
+    : '';
   app.set('trust proxy', 1);
   app.set('env', config.NODE_ENV);
   let database;

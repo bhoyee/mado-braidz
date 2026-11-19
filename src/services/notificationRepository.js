@@ -86,7 +86,13 @@ export function createNotificationRepository(db) {
           .from(s.jobs)
           .where(
             and(
-              inArray(s.jobs.type, ['email', 'reminder', 'winback', 'push']),
+              inArray(s.jobs.type, [
+                'email',
+                'reminder',
+                'winback',
+                'push',
+                'whatsapp',
+              ]),
               inArray(s.jobs.status, ['pending', 'failed']),
               lte(s.jobs.runAt, now),
               lt(s.jobs.attempts, 5),

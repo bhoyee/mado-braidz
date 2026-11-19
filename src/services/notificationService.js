@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon';
 import * as webpush from 'web-push';
+import { createWhatsAppService } from './whatsappService.js';
 import { createHash } from 'node:crypto';
 import {
   createEmailService,
@@ -52,6 +53,7 @@ export function createNotificationService(
     email = createEmailService(config),
     clock = () => new Date(),
     push = webpush,
+    whatsapp = createWhatsAppService(config),
   } = {},
 ) {
   const cutoff = () => new Date(config.NOTIFICATIONS_START_AT || 0);
@@ -276,6 +278,18 @@ export function createNotificationService(
       for (const notification of freshNotifications.filter(
         (n) => n.createdAt >= cutoff(),
       )) {
+        if (
+          config.WHATSAPP_ALERTS_ENABLED &&
+          ['booking_confirmed', 'payment_review'].includes(notification.type) &&
+          notification.createdAt >= new Date(config.WHATSAPP_ALERTS_START_AT)
+        )
+          await queue(
+            'owner-whatsapp',
+            { notificationId: notification.id },
+            `whatsapp:${notification.id}`,
+            now,
+            'whatsapp',
+          );
         await queue(
           'push',
           { notificationId: notification.id },
@@ -321,15 +335,34 @@ export function createNotificationService(
         failed = 0;
       const jobs = await repository.due(clock(), cutoff());
       for (const job of jobs) {
-        if (job.type !== 'push' && !config.EMAIL_ENABLED) continue;
+        if (job.type === 'whatsapp' && !config.WHATSAPP_ALERTS_ENABLED)
+          continue;
+        if (!['push', 'whatsapp'].includes(job.type) && !config.EMAIL_ENABLED)
+          continue;
         const state = await repository.context(clock());
         if (!(await eligible(job, state))) {
           await repository.saveJob(job.id, { status: 'cancelled' });
           continue;
         }
         const p = decode(job.payload);
+        let whatsappProviderId;
         try {
-          if (job.type === 'push') {
+          if (job.type === 'whatsapp') {
+            const notification = await repository.notification(
+              p.notificationId,
+            );
+            if (
+              !notification ||
+              notification.createdAt < new Date(config.WHATSAPP_ALERTS_START_AT)
+            ) {
+              await repository.saveJob(job.id, { status: 'cancelled' });
+              continue;
+            }
+            // A process interruption must not automatically send the same alert twice.
+            await repository.saveJob(job.id, { status: 'sending' });
+            whatsappProviderId = await whatsapp.sendOwnerAlert(notification);
+            sent++;
+          } else if (job.type === 'push') {
             if (!config.VAPID_PRIVATE_KEY || !config.VAPID_PUBLIC_KEY) continue;
             const n = await repository.notification(p.notificationId);
             if (n)
@@ -431,29 +464,44 @@ export function createNotificationService(
             }
           }
           await repository.saveJob(job.id, {
+            ...(whatsappProviderId
+              ? { payload: { ...p, providerMessageId: whatsappProviderId } }
+              : {}),
             status: 'done',
             attempts: job.attempts + 1,
             lastError: null,
           });
         } catch (error) {
+          const failure = whatsappProviderId
+            ? Object.assign(
+                new Error(
+                  'WhatsApp accepted the alert; verify provider records before retrying.',
+                ),
+                { uncertain: true },
+              )
+            : error;
           failed++;
-          const attempts = error.uncertain ? 5 : job.attempts + 1;
+          const attempts = failure.uncertain ? 5 : job.attempts + 1;
           await repository.saveJob(job.id, {
             status: 'failed',
             attempts,
-            lastError: error.message.slice(0, 300),
+            lastError: failure.message.slice(0, 300),
             runAt: new Date(
               +clock() + Math.min(24 * 60, 5 * 2 ** attempts) * 60000,
             ),
           });
           if (
-            (attempts === 3 || error.uncertain) &&
+            (attempts === 3 || failure.uncertain) &&
             p.template !== 'admin-alert'
           )
             await repository.notify({
-              type: 'email_failure',
-              title: 'Email delivery needs attention',
-              body: `Job ${job.id}: check the email log before retrying.`,
+              type:
+                job.type === 'whatsapp' ? 'whatsapp_failure' : 'email_failure',
+              title:
+                job.type === 'whatsapp'
+                  ? 'WhatsApp delivery needs attention'
+                  : 'Email delivery needs attention',
+              body: `Job ${job.id}: check provider records before retrying.`,
               url: '/admin/notifications',
             });
         }

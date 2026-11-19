@@ -18,6 +18,35 @@ export const envSchema = z
     MANUAL_PAYMENT_NAME: z.string().default('Magdaline Arrey'),
     ZELLE_RECIPIENT: optional,
     CASHAPP_CASHTAG: optional,
+    WHATSAPP_NUMBER: z
+      .union([z.literal(''), z.string().regex(/^\+?[1-9]\d{6,14}$/)])
+      .default(''),
+    WHATSAPP_OWNER_NUMBER: z
+      .union([z.literal(''), z.string().regex(/^\+?[1-9]\d{6,14}$/)])
+      .default(''),
+    WHATSAPP_ALERTS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    WHATSAPP_ALERTS_START_AT: z
+      .union([z.iso.datetime(), z.literal('')])
+      .default(''),
+    WHATSAPP_PHONE_NUMBER_ID: z
+      .union([z.literal(''), z.string().regex(/^\d+$/)])
+      .default(''),
+    WHATSAPP_ACCESS_TOKEN: optional,
+    WHATSAPP_API_VERSION: z
+      .string()
+      .regex(/^v\d+\.0$/)
+      .default('v27.0'),
+    WHATSAPP_TEMPLATE_NAME: z
+      .string()
+      .regex(/^[a-z0-9_]+$/)
+      .default('mado_owner_alert'),
+    WHATSAPP_TEMPLATE_LANGUAGE: z
+      .string()
+      .regex(/^[a-z]{2}(?:_[A-Z]{2})?$/)
+      .default('en_US'),
     MANUAL_REVIEW_HOURS: z.coerce.number().int().min(1).max(48).default(24),
     EMAIL_PROVIDER: z.enum(['resend', 'brevo', 'log']).default('log'),
     RESEND_API_KEY: optional,
@@ -57,6 +86,20 @@ export const envSchema = z
     LOG_DIR: z.string().default('logs'),
   })
   .superRefine((env, ctx) => {
+    if (env.WHATSAPP_ALERTS_ENABLED) {
+      for (const key of [
+        'WHATSAPP_OWNER_NUMBER',
+        'WHATSAPP_PHONE_NUMBER_ID',
+        'WHATSAPP_ACCESS_TOKEN',
+        'WHATSAPP_ALERTS_START_AT',
+      ])
+        if (!env[key])
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: 'Required for automated WhatsApp alerts',
+          });
+    }
     if (
       env.EMAIL_ENABLED &&
       env.EMAIL_PROVIDER === 'brevo' &&

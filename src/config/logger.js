@@ -16,6 +16,7 @@ export function createLogger(config) {
         'STRIPE_SECRET_KEY',
         'STRIPE_WEBHOOK_SECRET',
         'BREVO_API_KEY',
+        'WHATSAPP_ACCESS_TOKEN',
         'BREVO_WEBHOOK_SECRET',
         'VAPID_PRIVATE_KEY',
         'TURNSTILE_SECRET_KEY',
