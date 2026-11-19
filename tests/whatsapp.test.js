@@ -16,6 +16,74 @@ const config = parseEnv({
   WHATSAPP_ALERTS_START_AT: '2026-11-19T10:00:00Z',
 });
 describe('WhatsApp chat and owner alerts', () => {
+  it('supports CallMeBot with only the activated owner number and key, without Meta credentials', async () => {
+    const callmebot = parseEnv({
+      ...paymentConfig,
+      WHATSAPP_PROVIDER: 'callmebot',
+      WHATSAPP_OWNER_NUMBER: '+2349094135585',
+      CALLMEBOT_API_KEY: 'private-owner-key',
+      WHATSAPP_ALERTS_ENABLED: 'true',
+      WHATSAPP_ALERTS_START_AT: '2026-11-19T10:00:00Z',
+    });
+    const send = vi.fn(async () => ({
+      ok: true,
+      text: async () => '<b>Message queued.</b>',
+    }));
+    const result = await createWhatsAppService(callmebot, send).sendOwnerAlert({
+      title: 'A chair is booked',
+      body: 'MB-TEST',
+      url: '/admin/bookings/1',
+    });
+    expect(result).toBe('callmebot:accepted');
+    const url = new URL(send.mock.calls[0][0]);
+    expect(url.origin).toBe('https://api.callmebot.com');
+    expect(url.searchParams.get('phone')).toBe('+2349094135585');
+    expect(url.searchParams.get('apikey')).toBe('private-owner-key');
+    expect(url.searchParams.get('text')).toContain('/admin/bookings/1');
+    expect(send.mock.calls[0][1].redirect).toBe('error');
+    expect(() =>
+      parseEnv({
+        ...paymentConfig,
+        WHATSAPP_PROVIDER: 'callmebot',
+        WHATSAPP_OWNER_NUMBER: '+2349094135585',
+        WHATSAPP_ALERTS_START_AT: '2026-11-19T10:00:00Z',
+        WHATSAPP_ALERTS_ENABLED: 'true',
+        CALLMEBOT_API_KEY: '',
+      }),
+    ).toThrow(/CALLMEBOT_API_KEY/);
+  });
+  it('does not treat CallMeBot HTTP 200 error pages as successful alerts or expose their contents', async () => {
+    const result = createWhatsAppService(
+      {
+        ...config,
+        WHATSAPP_PROVIDER: 'callmebot',
+        CALLMEBOT_API_KEY: 'private-owner-key',
+      },
+      async () => ({
+        ok: true,
+        text: async () => 'ERROR: invalid apikey private-owner-key',
+      }),
+    );
+    await expect(result.sendOwnerAlert({ title: 'Booking' })).rejects.toThrow(
+      'CallMeBot rejected',
+    );
+  });
+  it('stops automatic retries when CallMeBot acceptance is unknown', async () => {
+    const service = createWhatsAppService(
+      {
+        ...config,
+        WHATSAPP_PROVIDER: 'callmebot',
+        CALLMEBOT_API_KEY: 'private-owner-key',
+      },
+      async () => ({
+        ok: true,
+        text: async () => 'Unrecognised provider response',
+      }),
+    );
+    await expect(
+      service.sendOwnerAlert({ title: 'Booking' }),
+    ).rejects.toMatchObject({ uncertain: true });
+  });
   it('builds the public chat link from env and hides it when unset', async () => {
     const make = (number) =>
       createApp({

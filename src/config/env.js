@@ -35,6 +35,8 @@ export const envSchema = z
       .union([z.literal(''), z.string().regex(/^\d+$/)])
       .default(''),
     WHATSAPP_ACCESS_TOKEN: optional,
+    WHATSAPP_PROVIDER: z.enum(['meta', 'callmebot']).default('meta'),
+    CALLMEBOT_API_KEY: optional,
     WHATSAPP_API_VERSION: z
       .string()
       .regex(/^v\d+\.0$/)
@@ -89,9 +91,10 @@ export const envSchema = z
     if (env.WHATSAPP_ALERTS_ENABLED) {
       for (const key of [
         'WHATSAPP_OWNER_NUMBER',
-        'WHATSAPP_PHONE_NUMBER_ID',
-        'WHATSAPP_ACCESS_TOKEN',
         'WHATSAPP_ALERTS_START_AT',
+        ...(env.WHATSAPP_PROVIDER === 'callmebot'
+          ? ['CALLMEBOT_API_KEY']
+          : ['WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_ACCESS_TOKEN']),
       ])
         if (!env[key])
           ctx.addIssue({

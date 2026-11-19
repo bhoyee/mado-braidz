@@ -8,6 +8,24 @@ Set `WHATSAPP_NUMBER` to the salon's WhatsApp number in international format wit
 
 ## Automated owner alerts
 
+### CallMeBot: owner-only notifications
+
+Use `WHATSAPP_PROVIDER=callmebot` for the owner's own activated WhatsApp number. CallMeBot documents this self-notification use case in its [shop-owner notification guide](https://www.callmebot.com/blog/whatsapp-messages-from-shopify/). It must not be used to send client messages.
+
+1. From the receiving WhatsApp number, follow the [current activation instructions](https://www.callmebot.com/blog/free-api-whatsapp-messages/). Use the bot contact listed there; availability/contact details can change.
+2. Send the activation phrase `I allow callmebot to send me messages` and wait for the API key.
+3. Add the key to private `.env` as `CALLMEBOT_API_KEY`; never put it in chat or Git.
+4. Set `WHATSAPP_OWNER_NUMBER` to that activated number, `WHATSAPP_PROVIDER=callmebot`, a fresh `WHATSAPP_ALERTS_START_AT` UTC timestamp, and `WHATSAPP_ALERTS_ENABLED=true` only after a successful owner test.
+5. Restart the app. The existing cron sends new booking confirmations and payment-review alerts only to that recipient. Email and Web Push remain independent backups.
+
+Changing to the owner's US number requires activating the US number with CallMeBot and replacing **both** `WHATSAPP_OWNER_NUMBER` and `CALLMEBOT_API_KEY`. Changing the public `WHATSAPP_NUMBER` affects the chat button only. No Meta sender ID, token, template approval or paid messaging account is required for the CallMeBot adapter.
+
+CallMeBot's API requires credentials in an HTTPS query. The app never logs this request URL or stores provider response bodies, which may echo credentials. Success is stored as `callmebot:accepted`; this means queued/sent by CallMeBot, not confirmed receipt on the owner's phone. Unknown/time-out outcomes stop automatic retries to avoid duplicate alerts. Confirm actual receipt before enabling unattended sending.
+
+### Meta provider (optional alternative)
+
+The settings below apply only when `WHATSAPP_PROVIDER=meta`.
+
 The integration uses [Meta WhatsApp Business Platform](https://developers.facebook.com/documentation/business-messaging/whatsapp/overview/). A normal WhatsApp app and phone number alone cannot authenticate the API. Set up a Business Platform sending number and token with messaging permission; confirm the owner's receiving number and opt-in, and review Meta's applicable messaging charges. Never put tokens in chat or Git.
 
 Create and obtain approval for the template named by `WHATSAPP_TEMPLATE_NAME` (default `mado_owner_alert`) in the configured `WHATSAPP_TEMPLATE_LANGUAGE` (default `en_US`). Its body must have exactly three text parameters, in this order:
