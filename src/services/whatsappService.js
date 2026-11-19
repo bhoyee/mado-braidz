@@ -32,6 +32,10 @@ export function createWhatsAppService(config, send = fetch) {
           throw error;
         }
         // Never store the provider body: it can echo the key, number and message.
+        if (/\baccount\s+is\s+paused\b/i.test(body.replace(/<[^>]*>/g, ' ')))
+          throw new Error(
+            'CallMeBot account is paused. Send resume to the CallMeBot contact that supplied your key, then retry.',
+          );
         if (
           !response.ok ||
           /\b(?:error|invalid|not activated|not allowed)\b/i.test(body)

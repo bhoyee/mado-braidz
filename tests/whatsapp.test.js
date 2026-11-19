@@ -16,6 +16,24 @@ const config = parseEnv({
   WHATSAPP_ALERTS_START_AT: '2026-11-19T10:00:00Z',
 });
 describe('WhatsApp chat and owner alerts', () => {
+  it('identifies a paused CallMeBot account even when the provider returns a 2xx response', async () => {
+    const service = createWhatsAppService(
+      {
+        ...config,
+        WHATSAPP_PROVIDER: 'callmebot',
+        CALLMEBOT_API_KEY: 'private-owner-key',
+      },
+      async () => ({
+        ok: true,
+        status: 208,
+        text: async () =>
+          '<p>Your Account is Paused due to technical issues.</p>',
+      }),
+    );
+    await expect(service.sendOwnerAlert({ title: 'Booking' })).rejects.toThrow(
+      'CallMeBot account is paused',
+    );
+  });
   it('supports CallMeBot with only the activated owner number and key, without Meta credentials', async () => {
     const callmebot = parseEnv({
       ...paymentConfig,

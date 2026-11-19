@@ -22,6 +22,8 @@ Changing to the owner's US number requires activating the US number with CallMeB
 
 CallMeBot's API requires credentials in an HTTPS query. The app never logs this request URL or stores provider response bodies, which may echo credentials. Success is stored as `callmebot:accepted`; this means queued/sent by CallMeBot, not confirmed receipt on the owner's phone. Unknown/time-out outcomes stop automatic retries to avoid duplicate alerts. Confirm actual receipt before enabling unattended sending.
 
+If CallMeBot reports that the receiving account is paused, follow its account-specific instruction to send `resume` from the activated WhatsApp number to its bot contact. A paused account can return HTTP 208, so a 2xx response alone is not treated as delivery success. Wait for reactivation and verify a real test before enabling alerts.
+
 ### Meta provider (optional alternative)
 
 The settings below apply only when `WHATSAPP_PROVIDER=meta`.
