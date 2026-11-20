@@ -2,6 +2,8 @@
 
 These are separate features. Both are optional and configured in the private `.env`.
 
+Run `npm run db:migrate` before enabling alerts. The jobs table must support the `sending` state so an alert can be claimed before its outbound request. The real-MySQL notification test verifies this delivery path and prevents repeat sends of completed jobs.
+
 ## Public chat button
 
 Set `WHATSAPP_NUMBER` to the salon's WhatsApp number in international format with no spaces, for example `+14437434979`. Restart the app after changing it. Leaving it empty hides the button. The button opens WhatsApp with a short booking enquiry; the visitor chooses whether to send it. It requires no messaging API account and does not automatically send booking alerts.

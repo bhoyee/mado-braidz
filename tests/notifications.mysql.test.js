@@ -1,5 +1,8 @@
 import 'dotenv/config';
-import { beforeAll, afterAll, describe, it, expect } from 'vitest';
+import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
+import { createNotificationService } from '../src/services/notificationService.js';
+import { parseEnv } from '../src/config/env.js';
+import { paymentConfig } from './fixtures/stripe.js';
 import mysql from 'mysql2/promise';
 import { randomBytes } from 'node:crypto';
 import { migrate } from 'drizzle-orm/mysql2/migrator';
@@ -155,6 +158,57 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       await expect(repo.saveSubscription(2, input)).rejects.toThrow();
       await repo.deleteSubscription(input.endpoint, 2);
       expect(await repo.subscriptions(1)).toHaveLength(1);
+    });
+    it('persists the sending state before a WhatsApp request and completes it without duplicate sends', async () => {
+      await repo.notify({
+        type: 'booking_confirmed',
+        title: 'Database delivery test',
+        body: 'No real message',
+        url: '/admin/notifications',
+      });
+      const [notification] = await db
+        .select()
+        .from(s.notifications)
+        .where(eq(s.notifications.title, 'Database delivery test'));
+      await repo.queue({
+        type: 'whatsapp',
+        payload: {
+          template: 'owner-whatsapp',
+          notificationId: notification.id,
+        },
+        dedupeKey: 'database-whatsapp-test',
+        status: 'pending',
+        runAt: new Date(),
+      });
+      const config = parseEnv({
+        ...paymentConfig,
+        EMAIL_ENABLED: 'false',
+        WHATSAPP_PROVIDER: 'callmebot',
+        WHATSAPP_OWNER_NUMBER: '+14437434979',
+        CALLMEBOT_API_KEY: 'test-only',
+        WHATSAPP_ALERTS_ENABLED: 'true',
+        WHATSAPP_ALERTS_START_AT: new Date(Date.now() - 60000).toISOString(),
+      });
+      const whatsapp = {
+        sendOwnerAlert: vi.fn(async () => {
+          const [job] = await db
+            .select()
+            .from(s.jobs)
+            .where(eq(s.jobs.dedupeKey, 'database-whatsapp-test'));
+          expect(job.status).toBe('sending');
+          return 'callmebot:accepted';
+        }),
+      };
+      const service = createNotificationService(repo, config, { whatsapp });
+      service.schedule = async () => {};
+      await service.run();
+      await service.run();
+      const [job] = await db
+        .select()
+        .from(s.jobs)
+        .where(eq(s.jobs.dedupeKey, 'database-whatsapp-test'));
+      expect(job.status).toBe('done');
+      expect(whatsapp.sendOwnerAlert).toHaveBeenCalledTimes(1);
     });
   },
 );

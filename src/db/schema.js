@@ -345,7 +345,13 @@ export const jobs = mysqlTable(
     type: str('type').notNull(),
     payload: json('payload').notNull(),
     runAt: dt('run_at').notNull(),
-    status: mysqlEnum('status', ['pending', 'done', 'failed', 'cancelled'])
+    status: mysqlEnum('status', [
+      'pending',
+      'sending',
+      'done',
+      'failed',
+      'cancelled',
+    ])
       .notNull()
       .default('pending'),
     attempts: int('attempts').notNull().default(0),
