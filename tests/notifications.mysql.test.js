@@ -86,6 +86,8 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         priceSnapshot: { styleName: 'Knotless Braids' },
         subtotalCents: 18000,
         depositCents: 3000,
+        paidCents: 18000,
+        balanceCents: 0,
         manageTokenHash: 'test-only',
         updatedAt: new Date(),
       };
