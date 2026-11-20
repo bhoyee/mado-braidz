@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import * as webpush from 'web-push';
 import { createWhatsAppService } from './whatsappService.js';
+import { whatsappBookingMessage } from './whatsappBookingMessage.js';
 import { createHash } from 'node:crypto';
 import {
   createEmailService,
@@ -358,9 +359,41 @@ export function createNotificationService(
               await repository.saveJob(job.id, { status: 'cancelled' });
               continue;
             }
+            const bookingId = Number(
+              /^\/admin\/bookings\/(\d+)$/.exec(notification.url || '')?.[1],
+            );
+            const linked = state.bookings.find(
+              (b) =>
+                b.id === bookingId ||
+                b.ref === notification.body?.split(':')[0],
+            );
+            let alert = notification;
+            if (linked) {
+              const detail = await repository.detail(linked.id);
+              if (
+                notification.type === 'booking_confirmed' &&
+                detail?.booking.status !== 'confirmed'
+              ) {
+                await repository.saveJob(job.id, { status: 'cancelled' });
+                continue;
+              }
+              if (detail?.client) {
+                const visits = repository.completedVisitsBefore
+                  ? await repository.completedVisitsBefore(detail.booking)
+                  : 0;
+                alert = {
+                  ...notification,
+                  whatsappText: whatsappBookingMessage(
+                    detail,
+                    visits,
+                    notification.type === 'payment_review',
+                  ),
+                };
+              }
+            }
             // A process interruption must not automatically send the same alert twice.
             await repository.saveJob(job.id, { status: 'sending' });
-            whatsappProviderId = await whatsapp.sendOwnerAlert(notification);
+            whatsappProviderId = await whatsapp.sendOwnerAlert(alert);
             sent++;
           } else if (job.type === 'push') {
             if (!config.VAPID_PRIVATE_KEY || !config.VAPID_PUBLIC_KEY) continue;

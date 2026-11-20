@@ -16,6 +16,28 @@ const config = parseEnv({
   WHATSAPP_ALERTS_START_AT: '2026-11-19T10:00:00Z',
 });
 describe('WhatsApp chat and owner alerts', () => {
+  it('preserves the formatted owner booking message in the CallMeBot request', async () => {
+    const send = vi.fn(async () => ({
+      ok: true,
+      text: async () => 'Message queued.',
+    }));
+    await createWhatsAppService(
+      {
+        ...config,
+        WHATSAPP_PROVIDER: 'callmebot',
+        CALLMEBOT_API_KEY: 'test-key',
+      },
+      send,
+    ).sendOwnerAlert({
+      title: 'Booking',
+      whatsappText:
+        '💰 NEW BOOKING\n👤 Test Client\n💵 Paid $30.00 · Balance $130.00',
+      url: '/admin/bookings/1',
+    });
+    expect(new URL(send.mock.calls[0][0]).searchParams.get('text')).toBe(
+      '💰 NEW BOOKING\n👤 Test Client\n💵 Paid $30.00 · Balance $130.00\n\nhttp://localhost:4780/admin/bookings/1',
+    );
+  });
   it('identifies a paused CallMeBot account even when the provider returns a 2xx response', async () => {
     const service = createWhatsAppService(
       {

@@ -9,12 +9,17 @@ export function createWhatsAppService(config, send = fetch) {
         url.search = new URLSearchParams({
           phone: '+' + config.WHATSAPP_OWNER_NUMBER.replace(/\D/g, ''),
           apikey: config.CALLMEBOT_API_KEY,
-          text: [
-            'Mado African Braids',
-            notification.title,
-            notification.body || 'Open your owner portal for details.',
-            config.APP_URL.replace(/\/$/, '') + path,
-          ].join('\n'),
+          text: notification.whatsappText
+            ? notification.whatsappText +
+              '\n\n' +
+              config.APP_URL.replace(/\/$/, '') +
+              path
+            : [
+                'Mado African Braids',
+                notification.title,
+                notification.body || 'Open your owner portal for details.',
+                config.APP_URL.replace(/\/$/, '') + path,
+              ].join('\n'),
         }).toString();
         let response, body;
         try {

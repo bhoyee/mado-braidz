@@ -20,6 +20,8 @@ Use `WHATSAPP_PROVIDER=callmebot` for the owner's own activated WhatsApp number.
 4. Set `WHATSAPP_OWNER_NUMBER` to that activated number, `WHATSAPP_PROVIDER=callmebot`, a fresh `WHATSAPP_ALERTS_START_AT` UTC timestamp, and `WHATSAPP_ALERTS_ENABLED=true` only after a successful owner test.
 5. Restart the app. The existing cron sends new booking confirmations and payment-review alerts only to that recipient. Email and Web Push remain independent backups.
 
+Owner alerts include the client's name and phone, booked style/size/length, Eastern appointment date and time (EST/EDT), recorded amount paid, balance and booking code. Returning-visit labels count only that client's earlier completed appointments; cancelled, no-show and later visits are excluded. With no recorded completed visits, the message says “First recorded visit”. Payment-review alerts explicitly say approval is pending and do not treat uploaded proof as money received.
+
 Changing to the owner's US number requires activating the US number with CallMeBot and replacing **both** `WHATSAPP_OWNER_NUMBER` and `CALLMEBOT_API_KEY`. Changing the public `WHATSAPP_NUMBER` affects the chat button only. No Meta sender ID, token, template approval or paid messaging account is required for the CallMeBot adapter.
 
 CallMeBot's API requires credentials in an HTTPS query. The app never logs this request URL or stores provider response bodies, which may echo credentials. Success is stored as `callmebot:accepted`; this means queued/sent by CallMeBot, not confirmed receipt on the owner's phone. Unknown/time-out outcomes stop automatic retries to avoid duplicate alerts. Confirm actual receipt before enabling unattended sending.
@@ -65,4 +67,4 @@ Use a fresh activation timestamp so historical events are not sent. The existing
 
 Jobs use a unique notification ID to prevent resending successful alerts. Known provider rejections use existing bounded retries; uncertain network outcomes stop automatic retries and raise an owner-portal alert. If a job is interrupted while `sending`, check provider records before manually requeueing. Provider acceptance is not proof the message reached the phone; delivery webhooks are not implemented here. Verify a real alert on the owner's device before calling WhatsApp alerts enabled and tested. Existing email and Web Push continue independently.
 
-Keep `WHATSAPP_ALERTS_ENABLED=false` until the owner has provided the account settings and verified receipt. Do not upload screenshots or customer contact information to WhatsApp for these alerts.
+Keep `WHATSAPP_ALERTS_ENABLED=false` until the owner has provided the account settings and verified receipt. Contact and appointment details are sent only to the configured owner as requested. Do not attach payment-proof images, private notes or guest booking-management tokens.

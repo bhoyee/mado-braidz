@@ -64,6 +64,20 @@ export function createNotificationRepository(db) {
     async client(id) {
       return (await db.select().from(s.clients).where(eq(s.clients.id, id)))[0];
     },
+    async completedVisitsBefore(booking) {
+      const [row] = await db
+        .select({ count: sql`COUNT(*)` })
+        .from(s.bookings)
+        .where(
+          and(
+            eq(s.bookings.clientId, booking.clientId),
+            eq(s.bookings.status, 'completed'),
+            lt(s.bookings.endAt, booking.startAt),
+            sql`${s.bookings.id} <> ${booking.id}`,
+          ),
+        );
+      return Number(row.count);
+    },
     async queue(values) {
       await db
         .insert(s.jobs)

@@ -61,6 +61,58 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       expect(a.id).toBe(b.id);
       await repo.saveLog(a.id, { providerId: 'brevo-one', status: 'sent' });
     });
+    it('counts only earlier completed visits for the WhatsApp returning-client label', async () => {
+      await db
+        .insert(s.styleCategories)
+        .values({ id: 90, name: 'Test', slug: 'whatsapp-visits-test' });
+      await db
+        .insert(s.styles)
+        .values({
+          id: 90,
+          categoryId: 90,
+          name: 'Knotless Braids',
+          slug: 'whatsapp-visits-test',
+          durationMin: 240,
+          updatedAt: new Date(),
+        });
+      const start = new Date('2026-12-07T17:00:00Z');
+      const base = {
+        clientId: 1,
+        styleId: 90,
+        startAt: new Date('2026-12-01T15:00:00Z'),
+        endAt: new Date('2026-12-01T19:00:00Z'),
+        blockEndAt: new Date('2026-12-01T19:30:00Z'),
+        paymentStatus: 'paid_in_full',
+        paymentChoice: 'full',
+        source: 'web',
+        priceSnapshot: { styleName: 'Knotless Braids' },
+        subtotalCents: 18000,
+        depositCents: 3000,
+        manageTokenHash: 'test-only',
+        updatedAt: new Date(),
+      };
+      await db.insert(s.bookings).values([
+        { ...base, id: 90, ref: 'VISIT-DONE', status: 'completed' },
+        { ...base, id: 91, ref: 'VISIT-CANCELLED', status: 'cancelled' },
+        { ...base, id: 92, ref: 'VISIT-NOSHOW', status: 'no_show' },
+        {
+          ...base,
+          id: 93,
+          ref: 'VISIT-LATER',
+          status: 'completed',
+          startAt: new Date('2026-12-10T15:00:00Z'),
+          endAt: new Date('2026-12-10T19:00:00Z'),
+          blockEndAt: new Date('2026-12-10T19:30:00Z'),
+        },
+      ]);
+      expect(
+        await repo.completedVisitsBefore({
+          id: 95,
+          clientId: 1,
+          startAt: start,
+        }),
+      ).toBe(1);
+    });
     it('keeps future reminders eligible across activation without releasing old confirmations', async () => {
       const now = new Date(),
         cutoff = new Date(+now - 60000),
