@@ -326,8 +326,11 @@
   background: transparent;
   border-color: #a88dbc;
 }
-.owner-app .button.outline:hover {
+.owner-app .button.outline:hover,
+.owner-app .button.outline:focus-visible {
   background: #f4eefb;
+  color: #5f2d9e;
+  border-color: #5f2d9e;
 }
 .owner-app button:disabled {
   opacity: 0.5;
