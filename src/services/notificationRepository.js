@@ -65,12 +65,16 @@ export function createNotificationRepository(db) {
       return (await db.select().from(s.clients).where(eq(s.clients.id, id)))[0];
     },
     async completedVisitsBefore(booking) {
+      const client = await this.client(booking.clientId);
+      const email = client?.email?.trim().toLowerCase();
+      if (!email) return 0;
       const [row] = await db
         .select({ count: sql`COUNT(*)` })
         .from(s.bookings)
+        .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
         .where(
           and(
-            eq(s.bookings.clientId, booking.clientId),
+            sql`LOWER(TRIM(${s.clients.email})) = ${email}`,
             eq(s.bookings.status, 'completed'),
             lt(s.bookings.endAt, booking.startAt),
             sql`${s.bookings.id} <> ${booking.id}`,

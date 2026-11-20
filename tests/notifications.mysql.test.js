@@ -61,7 +61,21 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       expect(a.id).toBe(b.id);
       await repo.saveLog(a.id, { providerId: 'brevo-one', status: 'sent' });
     });
-    it('counts only earlier completed visits for the WhatsApp returning-client label', async () => {
+    it('matches earlier completed visits by email across different client names and IDs', async () => {
+      await db.insert(s.clients).values([
+        {
+          id: 90,
+          name: 'Different name',
+          email: ' CLIENT@EXAMPLE.TEST ',
+          phoneE164: '+14437434979',
+        },
+        {
+          id: 91,
+          name: 'Test Client',
+          email: 'someone-else@example.test',
+          phoneE164: '+14437434979',
+        },
+      ]);
       await db
         .insert(s.styleCategories)
         .values({ id: 90, name: 'Test', slug: 'whatsapp-visits-test' });
@@ -97,6 +111,20 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         { ...base, id: 92, ref: 'VISIT-NOSHOW', status: 'no_show' },
         {
           ...base,
+          id: 94,
+          clientId: 90,
+          ref: 'VISIT-SAME-EMAIL',
+          status: 'completed',
+        },
+        {
+          ...base,
+          id: 96,
+          clientId: 91,
+          ref: 'VISIT-OTHER-EMAIL',
+          status: 'completed',
+        },
+        {
+          ...base,
           id: 93,
           ref: 'VISIT-LATER',
           status: 'completed',
@@ -109,6 +137,20 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         await repo.completedVisitsBefore({
           id: 95,
           clientId: 1,
+          startAt: start,
+        }),
+      ).toBe(2);
+      expect(
+        await repo.completedVisitsBefore({
+          id: 95,
+          clientId: 90,
+          startAt: start,
+        }),
+      ).toBe(2);
+      expect(
+        await repo.completedVisitsBefore({
+          id: 95,
+          clientId: 91,
           startAt: start,
         }),
       ).toBe(1);
