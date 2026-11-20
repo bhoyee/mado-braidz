@@ -65,16 +65,14 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       await db
         .insert(s.styleCategories)
         .values({ id: 90, name: 'Test', slug: 'whatsapp-visits-test' });
-      await db
-        .insert(s.styles)
-        .values({
-          id: 90,
-          categoryId: 90,
-          name: 'Knotless Braids',
-          slug: 'whatsapp-visits-test',
-          durationMin: 240,
-          updatedAt: new Date(),
-        });
+      await db.insert(s.styles).values({
+        id: 90,
+        categoryId: 90,
+        name: 'Knotless Braids',
+        slug: 'whatsapp-visits-test',
+        durationMin: 240,
+        updatedAt: new Date(),
+      });
       const start = new Date('2026-12-07T17:00:00Z');
       const base = {
         clientId: 1,
