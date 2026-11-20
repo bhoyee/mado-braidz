@@ -1,4 +1,17 @@
 const alertBox = document.querySelector('.owner-alert');
+document
+  .querySelector('[data-owner-password-toggle]')
+  ?.addEventListener('click', (event) => {
+    const button = event.currentTarget,
+      input = document.getElementById(button.getAttribute('aria-controls'));
+    const visible = input.type === 'password';
+    input.type = visible ? 'text' : 'password';
+    button.textContent = visible ? 'Hide' : 'Show';
+    button.setAttribute(
+      'aria-label',
+      visible ? 'Hide password' : 'Show password',
+    );
+  });
 const notificationBadge = document.querySelector('[data-notification-count]');
 const bell = document.querySelector('[data-notification-bell]');
 const dropdown = document.querySelector('[data-notification-dropdown]');

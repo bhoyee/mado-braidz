@@ -1,10 +1,21 @@
 {% extends "layouts/admin.njk" %}{% block content %}
-<section class="owner-auth"><a href="/"><img src="/img/logo.webp" alt="Mado African Braidz" width="72" height="72"></a><p class="eyebrow">Your studio, in hand</p>
-<h1>{% if page == 'login' %}Welcome <em>back.</em>{% elif page == 'forgot' %}Find your <em>way in.</em>{% else %}A fresh <em>start.</em>{% endif %}</h1>
-<p class="owner-muted">{% if page == 'login' %}Sign in to manage your appointments and payments.{% elif page == 'forgot' %}Enter the owner email to request a password reset.{% else %}Choose a password with at least 12 characters.{% endif %}</p>
+<div class="owner-entry">
+<aside class="owner-entry-brand" aria-label="Mado African Braids owner studio">
+<a class="owner-entry-wordmark" href="/"><img src="/img/logo.webp" alt="Mado logo" width="64" height="64"><span>Mado<small>African Braids</small></span></a>
+<div class="owner-entry-story"><p class="eyebrow">The owner studio</p><h2>Every appointment.<br>One place.</h2><p>Your calendar, clients and payments.<br>Ready when you are.</p></div>
+<div class="owner-entry-photo"><img src="/media/studio-space.webp" alt="Inside the Mado African Braids salon" width="800" height="600"></div>
+<p class="owner-entry-location">Lanham, Maryland <span>7375 Executive Place</span></p>
+</aside>
+<section class="owner-auth owner-entry-form">
+<a class="owner-entry-back" href="/">← Back to the website</a>
+<div class="owner-entry-form-inner"><p class="eyebrow">Owner access</p>
+<h1>{% if page == 'login' %}Welcome back.{% elif page == 'forgot' %}Forgot your password?{% else %}Set a new password.{% endif %}</h1>
+<p class="owner-muted">{% if page == 'login' %}Sign in to your studio.{% elif page == 'forgot' %}Enter your owner email and we’ll send you a reset link.{% else %}Choose a password with at least 12 characters.{% endif %}</p>
 {% if error %}<p class="owner-error" role="alert">{{ error }}</p>{% endif %}{% if message %}<p class="owner-success" role="status">{{ message }}</p>{% endif %}
 <form action="/admin/{{ page }}" method="post" class="owner-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
-{% if page != 'reset' %}<label>Email<input type="email" name="email" autocomplete="username" required maxlength="255"></label>{% endif %}
-{% if page == 'login' %}<label>Password<input type="password" name="password" autocomplete="current-password" required maxlength="128"></label><label>Authenticator code <span class="owner-muted">if enabled</span><input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>{% elif page == 'reset' %}<input type="hidden" name="token" id="reset-token"><label>New password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>{% endif %}
-<button class="button" type="submit">{% if page == 'login' %}Sign in{% elif page == 'forgot' %}Request reset link{% else %}Save new password{% endif %}</button></form>
-<a class="owner-text-link" href="/admin/{% if page == 'login' %}forgot{% else %}login{% endif %}">{% if page == 'login' %}Forgot your password?{% else %}Back to sign in{% endif %}</a></section>{% endblock %}
+{% if page != 'reset' %}<label>Email<input type="email" name="email" autocomplete="username" placeholder="Your email address" required maxlength="255"></label>{% endif %}
+{% if page == 'login' %}<div class="owner-entry-password-field"><label for="owner-login-password">Password</label><span class="owner-entry-password"><input type="password" name="password" autocomplete="current-password" placeholder="Enter your password" required maxlength="128" id="owner-login-password"><button type="button" class="owner-password-toggle" data-owner-password-toggle aria-controls="owner-login-password" aria-label="Show password">Show</button></span></div>{% if showCode %}<label>Authenticator code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label>{% endif %}<a class="owner-entry-forgot" href="/admin/forgot">Forgot password?</a>{% elif page == 'reset' %}<input type="hidden" name="token" id="reset-token"><label>New password<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>{% endif %}
+<button class="button" type="submit">{% if page == 'login' %}Sign in{% elif page == 'forgot' %}Send reset link{% else %}Save new password{% endif %}</button></form>
+{% if page != 'login' %}<a class="owner-text-link owner-entry-return" href="/admin/login">Back to sign in</a>{% endif %}
+</div><p class="owner-entry-footer">Mado African Braids <span>Owner portal</span></p>
+</section></div>{% endblock %}

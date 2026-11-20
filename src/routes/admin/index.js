@@ -107,7 +107,14 @@ export function adminRouter(
   });
   const renderAuth = (res, page, extra = {}) =>
     res.render('admin/auth', { page, ...extra });
-  router.get('/login', (_req, res) => renderAuth(res, 'login'));
+  router.get(
+    '/login',
+    asyncRoute(async (_req, res) =>
+      renderAuth(res, 'login', {
+        showCode: Boolean(await admins.ownerTwoFactorEnabled?.()),
+      }),
+    ),
+  );
   router.post(
     '/login',
     authLimit,
@@ -136,7 +143,10 @@ export function adminRouter(
         res.redirect(303, '/admin');
       } catch (error) {
         if (!(error instanceof BookingError)) throw error;
-        renderAuth(res.status(error.status), 'login', { error: error.message });
+        renderAuth(res.status(error.status), 'login', {
+          error: error.message,
+          showCode: Boolean(await admins.ownerTwoFactorEnabled?.()),
+        });
       }
     }),
   );

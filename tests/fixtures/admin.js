@@ -5,6 +5,8 @@ export function memoryAdminRepository(bookings, owner) {
   let tail = Promise.resolve();
   const repository = {
     rows,
+    ownerTwoFactorEnabled: async () =>
+      rows.some((r) => r.role === 'owner' && r.totpSecret),
     auditList: async (offset = 0) =>
       bookings.auditRows
         .slice()

@@ -43,6 +43,18 @@ export function createAdminRepository(db) {
   return {
     ...context(db),
     transaction: (run) => db.transaction((tx) => run(context(tx, true))),
+    async ownerTwoFactorEnabled() {
+      const [row] = await db
+        .select({ enabled: sql`COUNT(*)` })
+        .from(s.admins)
+        .where(
+          and(
+            eq(s.admins.role, 'owner'),
+            sql`${s.admins.totpSecret} IS NOT NULL AND ${s.admins.totpSecret} <> ''`,
+          ),
+        );
+      return Number(row.enabled) > 0;
+    },
     async list({
       from,
       to,

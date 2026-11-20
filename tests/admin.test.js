@@ -400,6 +400,23 @@ describe('owner booking operations', () => {
   });
 });
 describe('owner portal routes', () => {
+  it('keeps password-only owner login clean and shows an authenticator field only when enabled', async () => {
+    const { repo, admins } = await setup();
+    const app = createApp({
+      config,
+      bookingRepository: repo,
+      adminRepository: admins,
+      catalog: fixtureCatalog(),
+      stripeProvider: fakeStripe(),
+    });
+    const login = await request(app).get('/admin/login').expect(200);
+    expect(login.text).toContain('owner-entry');
+    expect(login.text).not.toContain('name="code"');
+    admins.rows[0].totpSecret = 'enabled-test-record';
+    expect((await request(app).get('/admin/login')).text).toContain(
+      'name="code"',
+    );
+  });
   it('shows all upcoming visits and active pending payments together, with owner-only financial reports', async () => {
     const { repo, admins, service } = await setup();
     await service.createHold(validHold);
