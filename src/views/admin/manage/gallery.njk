@@ -1,32 +1,31 @@
 {% extends "layouts/admin.njk" %}
-{% from "admin/manage/macros.njk" import csrf,field,styleSelect,upload %}
-{% from "admin/manage/photo-controls.njk" import replacePhoto,addMissingPhoto %}
+{% from "admin/manage/macros.njk" import csrf,field,styleSelect %}
 {% block content %}
-<header class="owner-page-head"><div><p class="eyebrow">The studio portfolio</p><h1>Photos & Our Work.</h1><p>Replace a photo directly, or edit its description and placement below.</p></div></header>
+<header class="owner-page-head"><div><p class="eyebrow">The studio portfolio</p><h1>Photos & Our Work.</h1><p>Your photo library. Keep every style looking its best.</p></div><button class="button" type="button" data-gallery-upload>Add photo</button></header>
 {% if stylesWithoutPhotos.length %}
-<section aria-labelledby="missing-photo-heading"><h2 id="missing-photo-heading">Styles waiting for a photo</h2><div class="manage-gallery manage-missing-list">{% for style in stylesWithoutPhotos %}{{ addMissingPhoto(style,csrfToken) }}{% endfor %}</div></section>
+<details class="library-missing"><summary><span class="library-missing-count">{{ stylesWithoutPhotos.length }}</span><span><strong>Styles waiting for a photo</strong><small>Add an image to complete their style pages.</small></span></summary><div class="library-missing-list">{% for style in stylesWithoutPhotos %}<div data-missing-style="{{ style.id }}"><span>{{ style.name }}{% if not style.active %}<small>Archived style</small>{% endif %}</span><button class="button outline" type="button" data-add-style-photo="{{ style.id }}" data-style-name="{{ style.name }}">Add photo<span class="sr-only"> for {{ style.name }}</span></button></div>{% endfor %}</div></details>
 {% endif %}
-{{ upload(styles,csrfToken) }}
-<p class="owner-muted">Drag photos to reorder, or use Move earlier / Move later. Press Save photo order when ready.</p>
-<button class="button outline" type="button" data-save-photo-order>Save photo order</button>
-<div class="manage-gallery" data-photo-list>
+<section class="library" aria-label="Photo library">
+<div class="library-tools"><div class="library-tabs" role="group" aria-label="Photo placement"><button type="button" aria-pressed="true" data-library-kind="all">All photos <span>{{ media.length }}</span></button><button type="button" aria-pressed="false" data-library-kind="style">Style pages</button><button type="button" aria-pressed="false" data-library-kind="gallery">Our Work</button></div><button type="button" class="owner-text-link" data-photo-reorder-toggle {% if media.length < 2 %}disabled{% endif %}>Reorder photos</button></div>
+<div class="library-filters"><label class="owner-field"><span class="sr-only">Search photos</span><input type="search" placeholder="Search a style or description" data-library-search></label><label class="owner-field"><span class="sr-only">Filter by style</span><select data-library-style><option value="">Every style</option>{% for style in styles %}<option value="{{ style.id }}">{{ style.name }}</option>{% endfor %}<option value="untagged">No style assigned</option></select></label></div>
+<div class="library-order-bar" data-library-order-bar hidden><p>Drag to reorder, or use the arrows on each photo.</p><div><button class="button outline" type="button" data-photo-reorder-cancel>Cancel</button><button class="button" type="button" data-save-photo-order>Save photo order</button></div></div>
+<p class="library-results" role="status" data-library-results>{{ media.length }} photo{% if media.length != 1 %}s{% endif %}</p>
+<div class="library-grid" data-photo-list>
 {% for photo in media %}
-<article id="photo-{{ photo.id }}" class="owner-panel" draggable="true" data-photo-id="{{ photo.id }}">
-  <div class="owner-actions"><button type="button" class="owner-text-link" data-photo-move="-1">Move earlier</button><button type="button" class="owner-text-link" data-photo-move="1">Move later</button></div>
-  {% for style in styles %}{% if photo.styleId==style.id %}<h2>{{ style.name }}</h2>{% endif %}{% endfor %}
-  <img class="manage-photo" src="{{ photo.path }}" alt="{{ photo.alt }}" width="320" height="400" loading="lazy">
-  {{ replacePhoto(photo,csrfToken) }}
-  <details class="manage-details"><summary>Edit description & placement</summary>
-    <form method="post" action="/admin/gallery/{{ photo.id }}" data-owner-form>
-      {{ csrf(csrfToken) }}{{ field('alt','Photo description',photo.alt,'text',true) }}{{ styleSelect(styles,photo.styleId) }}
-      <label class="owner-field"><span>Show in</span><select name="kind"><option value="style" {% if photo.kind=='style' %}selected{% endif %}>Style page</option><option value="gallery" {% if photo.kind=='gallery' %}selected{% endif %}>Our Work</option></select></label>
-      {{ field('sort','Display order (lower appears first)',photo.sort,'number',true) }}<button class="button" type="submit">Save photo details</button>
-    </form>
-  </details>
-  <form method="post" action="/admin/gallery/{{ photo.id }}/remove" data-owner-form data-confirm="Remove this photo?" data-confirm-detail="Only this photo is removed. The style, prices and booking history stay saved." data-confirm-label="Remove photo">
-    {{ csrf(csrfToken) }}<button class="owner-text-link manage-remove" type="submit">Remove photo</button>
-  </form>
+{% set styleName = 'Portfolio photo' %}{% for style in styles %}{% if photo.styleId==style.id %}{% set styleName = style.name %}{% endif %}{% endfor %}
+<article id="photo-{{ photo.id }}" class="library-card" data-photo-id="{{ photo.id }}" data-photo-style="{{ photo.styleId or '' }}" data-photo-kind="{{ photo.kind }}" data-photo-sort="{{ photo.sort }}" data-photo-alt="{{ photo.alt }}" data-photo-name="{{ styleName }}" data-photo-path="{{ photo.path }}">
+<div class="library-image"><img src="{{ photo.path }}" alt="{{ photo.alt }}" width="480" height="600" loading="lazy" draggable="false"><span class="library-placement">{% if photo.kind=='style' %}Style page{% else %}Our Work{% endif %}</span></div>
+<div class="library-card-body"><h2>{{ styleName }}</h2><p>{{ photo.alt }}</p><button class="button outline" type="button" data-photo-edit>Manage photo<span class="sr-only">: {{ styleName }}, {{ photo.alt }}</span></button><div class="library-move" hidden><button type="button" data-photo-move="-1" aria-label="Move {{ photo.alt }} earlier">&larr;</button><span>Move photo</span><button type="button" data-photo-move="1" aria-label="Move {{ photo.alt }} later">&rarr;</button></div></div>
 </article>
-{% else %}<p>No photos yet. Choose a style above to add its photo.</p>{% endfor %}
+{% endfor %}
 </div>
+<div class="library-empty" data-library-empty {% if media.length %}hidden{% endif %}><h2>{% if media.length %}No matching photos{% else %}Your portfolio starts here.{% endif %}</h2><p>{% if media.length %}Try another style or clear your search.{% else %}Add your first photo to show clients your work.{% endif %}</p></div>
+</section>
+<dialog id="library-upload-dialog" class="owner-dialog owner-extra-dialog library-dialog" aria-labelledby="library-upload-title" aria-describedby="library-upload-description"><header class="owner-extra-heading"><div><p class="eyebrow">Grow your portfolio</p><h2 id="library-upload-title">Add a photo</h2></div><button type="button" class="owner-extra-close" data-owner-modal-close aria-label="Close upload">&times;</button></header><p class="owner-muted" id="library-upload-description">Choose a photo and where clients should see it.</p>
+<form action="/admin/gallery/upload" method="post" enctype="multipart/form-data" data-owner-form data-gallery-upload-form>{{ csrf(csrfToken) }}<input type="hidden" name="sort" value="{{ media.length }}"><input type="hidden" name="returnTo" value="gallery"><p class="owner-error" role="alert" data-owner-form-error hidden></p><label class="library-file"><span>Choose photo</span><small>JPEG, PNG, WebP or AVIF · up to 8 MB</small><input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/avif" required></label><img class="library-upload-preview" data-gallery-upload-preview alt="Selected photo preview" hidden>{{ field('alt','Photo description', '', 'text',true) }}<p class="owner-muted">A short description helps visitors who use screen readers.</p><div class="owner-form-grid">{{ styleSelect(styles) }}<label class="owner-field"><span>Show in</span><select name="kind"><option value="gallery">Our Work</option><option value="style">Style page</option></select></label></div><div class="owner-actions owner-extra-actions"><button type="button" class="button outline" data-owner-modal-close>Cancel</button><button class="button" type="submit">Upload photo</button></div></form></dialog>
+<dialog id="library-edit-dialog" class="owner-dialog owner-extra-dialog library-dialog" aria-labelledby="library-edit-title"><header class="owner-extra-heading"><div><p class="eyebrow">Photo details</p><h2 id="library-edit-title">Manage photo</h2></div><button type="button" class="owner-extra-close" data-owner-modal-close aria-label="Close photo details">&times;</button></header><img class="library-edit-preview" data-gallery-edit-preview alt="">
+<form method="post" data-owner-form data-gallery-edit-form>{{ csrf(csrfToken) }}<input type="hidden" name="sort"><p class="owner-error" role="alert" data-owner-form-error hidden></p>{{ field('alt','Photo description','','text',true) }}<div class="owner-form-grid">{{ styleSelect(styles) }}<label class="owner-field"><span>Show in</span><select name="kind"><option value="style">Style page</option><option value="gallery">Our Work</option></select></label></div><button class="button" type="submit">Save photo details</button></form>
+<section class="library-replace" aria-labelledby="library-replace-title"><h3 id="library-replace-title">Replace image only</h3><p class="owner-muted">Keep the description, style and position. Just swap the image.</p><form method="post" enctype="multipart/form-data" data-owner-form data-gallery-replace-form>{{ csrf(csrfToken) }}<input type="hidden" name="returnTo" value="gallery"><p class="owner-error" role="alert" data-owner-form-error hidden></p><label class="owner-field"><span>New photo</span><input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/avif" required></label><button class="button outline" type="submit">Replace photo</button></form></section>
+<div class="library-remove"><p>Removing a photo keeps the style and prices saved.</p><form method="post" data-owner-form data-gallery-remove-form data-confirm="Remove this photo?" data-confirm-detail="Only this photo is removed. The style, prices and booking history stay saved." data-confirm-label="Remove photo">{{ csrf(csrfToken) }}<p class="owner-error" role="alert" data-owner-form-error hidden></p><button type="submit" class="button owner-danger-button">Remove photo</button></form></div></dialog>
+<script defer src="/build/admin-gallery.js"></script>
 {% endblock %}

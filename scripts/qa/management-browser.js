@@ -174,13 +174,15 @@ try {
     );
     const originalPhoto = initialStyle.photos[0];
     let card = page.locator('[data-photo-id="' + originalPhoto.id + '"]');
-    await card.getByLabel('New photo', { exact: true }).setInputFiles({
+    await card.getByRole('button', { name: /Manage photo/ }).click();
+    const galleryDialog = page.locator('#library-edit-dialog');
+    await galleryDialog.getByLabel('New photo', { exact: true }).setInputFiles({
       name: 'replacement.jpg',
       mimeType: 'image/jpeg',
       buffer: image,
     });
     await save(
-      card.getByRole('button', { name: 'Replace photo', exact: true }),
+      galleryDialog.getByRole('button', { name: 'Replace photo', exact: true }),
     );
     const changed = (await repo.catalog()).styles.find(
       (style) => style.id === initialStyle.id,
@@ -191,7 +193,8 @@ try {
     assert.equal(changed.styleId, originalPhoto.styleId);
     assert.notEqual(changed.path, originalPhoto.path);
     card = page.locator('[data-photo-id="' + originalPhoto.id + '"]');
-    await card
+    await card.getByRole('button', { name: /Manage photo/ }).click();
+    await galleryDialog
       .getByRole('button', { name: 'Remove photo', exact: true })
       .click();
     const confirmation = page.getByRole('dialog', {
@@ -212,14 +215,14 @@ try {
         .find((style) => style.id === initialStyle.id)
         .photos.some((photo) => photo.id === originalPhoto.id),
     );
-    await card
+    await galleryDialog
       .getByRole('button', { name: 'Remove photo', exact: true })
       .click();
     await confirmation
       .getByRole('button', { name: 'Cancel', exact: true })
       .click();
     await confirmation.waitFor({ state: 'hidden' });
-    await card
+    await galleryDialog
       .getByRole('button', { name: 'Remove photo', exact: true })
       .click();
     await save(
@@ -228,23 +231,23 @@ try {
     const missing = page.locator(
       '[data-missing-style="' + initialStyle.id + '"]',
     );
-    assert.equal(
-      await missing
-        .getByRole('heading', { name: initialStyle.name, exact: true })
-        .count(),
-      1,
-    );
+    assert.ok((await missing.textContent()).includes(initialStyle.name));
     const withoutPhoto = (await repo.catalog()).styles.find(
       (style) => style.id === initialStyle.id,
     );
     assert.equal(withoutPhoto.photos.length, 0);
     assert.deepEqual(withoutPhoto.variants, initialStyle.variants);
-    await missing.locator('input[type="file"]').setInputFiles({
+    await page.locator('.library-missing > summary').click();
+    await missing.getByRole('button', { name: /Add photo/ }).click();
+    const galleryUpload = page.locator('#library-upload-dialog');
+    await galleryUpload.locator('input[type="file"]').setInputFiles({
       name: 'restored.jpg',
       mimeType: 'image/jpeg',
       buffer: image,
     });
-    await save(missing.getByRole('button', { name: 'Add photo', exact: true }));
+    await save(
+      galleryUpload.getByRole('button', { name: 'Upload photo', exact: true }),
+    );
     assert.equal(
       (await repo.catalog()).styles.find(
         (style) => style.id === initialStyle.id,
@@ -267,12 +270,16 @@ try {
       }),
     );
     await page.goto(origin + '/admin/gallery');
+    await page
+      .getByRole('button', { name: 'Reorder photos', exact: true })
+      .click();
     await page.locator('[data-photo-move="1"]').first().click();
     await save(
       page.getByRole('button', { name: 'Save photo order', exact: true }),
     );
     await page.waitForLoadState('networkidle');
     await page.goto(origin + '/admin/addons');
+    await page.getByRole('button', { name: 'Add extra', exact: true }).click();
     const extra = page.locator('form[action="/admin/addons"]').last();
     await extra.getByLabel('Name', { exact: true }).fill('Beads ' + width);
     await extra

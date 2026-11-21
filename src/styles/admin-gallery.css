@@ -1,0 +1,350 @@
+.library-missing {
+  margin-bottom: 28px;
+  border: 1px solid #dfd1ba;
+  border-radius: 12px;
+  background: #faf4e9;
+}
+.library-missing > summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+.library-missing > summary::-webkit-details-marker {
+  display: none;
+}
+.library-missing > summary::after {
+  content: '+';
+  margin-left: auto;
+  font-size: 24px;
+}
+.library-missing[open] > summary::after {
+  content: '−';
+}
+.library-missing-count {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #f0e1c6;
+  font-size: 18px;
+  font-weight: 700;
+}
+.library-missing strong {
+  font-size: 14px;
+}
+.library-missing small {
+  display: block;
+  color: #625346;
+  font-size: 12px;
+}
+.library-missing-list {
+  padding: 0 20px 12px;
+}
+.library-missing-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid #e4d9c7;
+  font-size: 14px;
+}
+.owner-app .library-missing-list .button {
+  margin: 0;
+  flex-shrink: 0;
+}
+.library-tools,
+.library-order-bar,
+.library-order-bar > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.library-tools {
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.library-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.library-tabs button {
+  min-height: 44px;
+  padding: 10px 15px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 650;
+  background: transparent;
+  color: #62546a;
+  cursor: pointer;
+}
+.library-tabs button[aria-pressed='true'] {
+  background: #f4eefb;
+  color: #5f2d9e;
+  border-color: #d8c6eb;
+}
+.library-tabs span {
+  margin-left: 6px;
+  font-size: 12px;
+}
+.library-tools > button {
+  min-height: 44px;
+  font-size: 13px;
+}
+.library button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.library-filters {
+  display: grid;
+  grid-template-columns: 1fr minmax(160px, 260px);
+  gap: 12px;
+}
+.library-filters .owner-field {
+  margin: 0;
+}
+.library-filters input,
+.library-filters select {
+  background: #fbf7f2;
+}
+.owner-app .library-results {
+  margin: 18px 0 14px;
+  color: #66556d;
+  font-size: 13px;
+}
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.library-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e2d9e8;
+  border-radius: 12px;
+  background: #fbf7f2;
+}
+.library-image {
+  position: relative;
+  aspect-ratio: 4/3;
+  background: #ece5ee;
+}
+.library-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 35%;
+}
+.library-placement {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: #fbf7f2;
+  color: #3d234e;
+  font-size: 11px;
+  font-weight: 700;
+}
+.library-card-body {
+  padding: 16px;
+}
+.owner-app .library-card h2 {
+  margin: 0 0 6px;
+  font:
+    700 16px/1.4 Figtree,
+    sans-serif;
+}
+.owner-app .library-card p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-height: 38px;
+  margin: 0 0 16px;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #66556d;
+  overflow-wrap: anywhere;
+}
+.owner-app .library-card .button {
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.library-order-bar {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #d8c6eb;
+  border-radius: 8px;
+  background: #f4eefb;
+  flex-wrap: wrap;
+}
+.owner-app .library-order-bar p {
+  margin: 0;
+  font-size: 13px;
+}
+.owner-app .library-order-bar .button {
+  margin: 0;
+  font-size: 13px;
+}
+.library-card[draggable='true'] {
+  cursor: grab;
+  border-color: #bba1d8;
+}
+.library-move {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #66556d;
+}
+.library-move button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #d8c6eb;
+  border-radius: 6px;
+  background: #f4eefb;
+  color: #5f2d9e;
+  font-size: 20px;
+  cursor: pointer;
+}
+.library-empty {
+  padding: 60px 20px;
+  text-align: center;
+  border: 1px dashed #cdbed6;
+  border-radius: 12px;
+}
+.owner-app .library-empty h2 {
+  font-size: 24px;
+}
+.library-empty p {
+  color: #66556d;
+  font-size: 14px;
+}
+.library-file {
+  display: grid;
+  gap: 8px;
+  padding: 22px;
+  border: 1px dashed #baa0d4;
+  border-radius: 10px;
+  background: #f4eefb;
+  margin: 20px 0;
+}
+.library-file > span {
+  font-weight: 700;
+  font-size: 15px;
+}
+.library-file small {
+  font-size: 12px;
+  color: #66556d;
+}
+.library-file input {
+  max-width: 100%;
+  min-height: 44px;
+  font-size: 13px;
+}
+.library-upload-preview,
+.library-edit-preview {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  background: #f4eefb;
+  border-radius: 8px;
+  margin: 18px 0;
+}
+.library-dialog .owner-muted {
+  font-size: 13px;
+}
+.owner-app .library-dialog .owner-field {
+  margin: 0 0 16px;
+}
+.owner-app .library-dialog .owner-form-grid > .owner-field {
+  margin: 0;
+}
+.library-dialog .owner-form-grid {
+  gap: 16px;
+}
+.library-dialog .owner-field input[type='file'] {
+  font-size: 13px;
+}
+.library-replace {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #e2d9e8;
+}
+.owner-app .library-replace h3 {
+  font:
+    700 16px/1.4 Figtree,
+    sans-serif;
+  margin: 0 0 8px;
+}
+.library-remove {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e2d9e8;
+}
+.library-remove p {
+  font-size: 12px;
+  color: #66556d;
+}
+.owner-app .library-remove .button {
+  margin: 0;
+}
+@media (min-width: 1650px) {
+  .library-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1100px) {
+  .library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .library-filters {
+    grid-template-columns: 1fr;
+  }
+  .library-grid {
+    gap: 12px;
+  }
+  .library-card-body {
+    padding: 12px;
+  }
+  .library-tabs button {
+    padding: 9px 11px;
+    font-size: 13px;
+  }
+  .owner-app .library-card h2 {
+    font-size: 14px;
+  }
+  .library-missing > summary {
+    padding: 14px;
+    gap: 10px;
+  }
+  .library-missing-list {
+    padding: 0 14px 12px;
+  }
+  .library-order-bar > div {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .library-dialog .owner-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 380px) {
+  .library-grid {
+    grid-template-columns: 1fr;
+  }
+}

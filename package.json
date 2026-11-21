@@ -31,6 +31,7 @@
     "test:stripe:batch": "node scripts/qa/stripe-batch-sandbox.js",
     "test:admin:browser": "node scripts/qa/admin-browser.js",
     "test:management:browser": "node scripts/qa/management-browser.js",
+    "test:gallery:browser": "node scripts/qa/gallery-browser.js",
     "catalog:men": "node scripts/add-men-styles.js",
     "test:notifications:browser": "node scripts/qa/notifications-browser.js"
   },

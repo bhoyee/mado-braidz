@@ -385,7 +385,16 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
         );
       if (result.url) {
         sessionStorage.setItem('owner-message', result.message || 'Saved.');
-        location.assign(result.url);
+        const target = new URL(result.url, location.href);
+        if (
+          target.origin === location.origin &&
+          target.pathname === location.pathname &&
+          target.search === location.search
+        ) {
+          // A photo anchor alone would leave the old library and dialog open.
+          history.replaceState(null, '', target.href);
+          location.reload();
+        } else location.assign(result.url);
       }
     } catch (error) {
       reportError(error.message);
