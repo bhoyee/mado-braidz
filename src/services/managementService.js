@@ -192,16 +192,7 @@ export function createManagementService(db, clock = () => new Date()) {
       )[0];
     },
     async saveStyle(id, raw, actor) {
-      const { fromPrice, ...input } = styleInput.parse(raw);
       return db.transaction(async (tx) => {
-        exists(
-          (
-            await tx
-              .select()
-              .from(s.styleCategories)
-              .where(eq(s.styleCategories.id, input.categoryId))
-          )[0],
-        );
         const before = id
           ? exists(
               (
@@ -213,6 +204,45 @@ export function createManagementService(db, clock = () => new Date()) {
               )[0],
             )
           : null;
+        let slug = raw.slug || before?.slug;
+        if (!slug) {
+          const base =
+            String(raw.name || '')
+              .normalize('NFKD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .slice(0, 160)
+              .replace(/^-|-$/g, '') || 'style';
+          slug = base;
+          let suffix = 2;
+          while (
+            (
+              await tx
+                .select({ id: s.styles.id })
+                .from(s.styles)
+                .where(eq(s.styles.slug, slug))
+                .limit(1)
+            ).length ||
+            (
+              await tx
+                .select({ id: s.redirects.id })
+                .from(s.redirects)
+                .where(eq(s.redirects.source, '/styles/' + slug))
+                .limit(1)
+            ).length
+          )
+            slug = `${base}-${suffix++}`;
+        }
+        const { fromPrice, ...input } = styleInput.parse({ ...raw, slug });
+        exists(
+          (
+            await tx
+              .select()
+              .from(s.styleCategories)
+              .where(eq(s.styleCategories.id, input.categoryId))
+          )[0],
+        );
         const values = {
           ...input,
           fromPriceCents: fromPrice,

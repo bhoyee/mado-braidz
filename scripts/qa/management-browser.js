@@ -132,9 +132,7 @@ try {
     await page
       .getByLabel('Style name', { exact: true })
       .fill('Studio braids ' + width);
-    await page
-      .getByLabel('Page address', { exact: false })
-      .fill('studio-braids-' + width);
+    assert.equal(await page.locator('input[name="slug"]').count(), 0);
     await save(page.getByRole('button', { name: 'Save style', exact: true }));
     await page.waitForURL(/\/admin\/styles\/\d+$/);
     const editURL = page.url();

@@ -150,6 +150,38 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       fromPrice: '180',
       sort: 0,
     };
+    it('generates readable unique page addresses automatically and preserves them on name changes', async () => {
+      const values = {
+        ...styleValues,
+        name: 'Café & Twist Braids',
+        slug: undefined,
+      };
+      const first = await service.saveStyle(null, values, actor);
+      const second = await service.saveStyle(null, values, actor);
+      const [a] = await db
+        .select()
+        .from(s.styles)
+        .where(eq(s.styles.id, first));
+      const [b] = await db
+        .select()
+        .from(s.styles)
+        .where(eq(s.styles.id, second));
+      expect(a.slug).toBe('cafe-twist-braids');
+      expect(b.slug).toBe('cafe-twist-braids-2');
+      await service.saveStyle(
+        first,
+        { ...values, name: 'A new display name' },
+        actor,
+      );
+      const [updated] = await db
+        .select()
+        .from(s.styles)
+        .where(eq(s.styles.id, first));
+      expect(updated.slug).toBe(a.slug);
+      await request(app)
+        .get('/styles/' + a.slug)
+        .expect(200);
+    });
     it('renders all new screens for the owner and denies anonymous mutations', async () => {
       for (const path of [
         'styles',
