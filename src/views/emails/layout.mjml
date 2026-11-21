@@ -4,20 +4,46 @@
     ><mj-preview>{{ intro }}</mj-preview
     ><mj-attributes
       ><mj-all font-family="Arial, sans-serif" color="#1c0f26" /><mj-text
-        font-size="16px"
-        line-height="1.6" /><mj-button
+        font-size="15px"
+        line-height="1.6"
+        padding="8px 0" /><mj-button
         background-color="#7b3fc4"
         color="#ffffff"
         border-radius="6px"
-        font-weight="bold" /></mj-attributes
-  ></mj-head>
+        font-weight="bold"
+        font-size="14px"
+        inner-padding="14px 20px"
+        padding="16px 0" /></mj-attributes
+    ><mj-style>
+      @media only screen and (max-width: 479px) {
+        .email-brand div {
+          font-size: 18px !important;
+        }
+        .email-title div {
+          font-size: 22px !important;
+          line-height: 1.25 !important;
+        }
+        .email-copy div {
+          font-size: 14px !important;
+          line-height: 1.6 !important;
+        }
+        .email-logo img {
+          width: 48px !important;
+        }
+        .email-panel > table > tbody > tr > td {
+          padding: 20px !important;
+        }
+      }
+    </mj-style></mj-head
+  >
   <mj-body background-color="#fbf7f2" width="600px">
-    <mj-section padding="24px 24px 20px"
+    <mj-section padding="20px"
       ><mj-group vertical-align="middle"
         ><mj-column width="20%" vertical-align="middle"
           ><mj-image
-            src="{{ appUrl }}/img/email-logo.png"
-            width="64px"
+            src="{{ logoUrl }}"
+            css-class="email-logo"
+            width="56px"
             padding="0"
             align="left"
             alt="Mado African Braids"
@@ -25,10 +51,11 @@
         ><mj-column width="80%" vertical-align="middle"
           ><mj-text
             font-family="Georgia, serif"
-            font-size="24px"
+            css-class="email-brand"
+            font-size="20px"
             font-weight="bold"
             line-height="1.2"
-            padding="8px 0 8px 12px"
+            padding="8px 0 8px 10px"
             >{{ businessName }}</mj-text
           ></mj-column
         ></mj-group
@@ -36,18 +63,20 @@
     >
     <mj-section
       background-color="#ffffff"
+      css-class="email-panel"
       border-top="2px solid #7b3fc4"
-      padding="24px 16px"
+      padding="24px 28px"
       ><mj-column
         ><mj-text
           font-family="Georgia, serif"
-          font-size="30px"
+          css-class="email-title"
+          font-size="26px"
           font-weight="bold"
           line-height="1.2"
           padding-bottom="12px"
           >{{ subject }}</mj-text
-        ><mj-text>{{ intro }}</mj-text
-        ><mj-text>{{ content | safe }}</mj-text
+        ><mj-text css-class="email-copy">{{ intro }}</mj-text
+        ><mj-text css-class="email-copy">{{ content | safe }}</mj-text
         ><mj-button href="{{ actionUrl }}">{{ actionLabel }}</mj-button
         ><mj-text font-size="13px" color="#62596b">{{
           footer

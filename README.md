@@ -30,19 +30,19 @@ Visit http://localhost:4780 and http://localhost:4780/health. `npm start` runs w
 
 `.env.example` lists every Section 12 variable plus owner seed credentials and LOG_DIR:
 
-| Variables                                                        | Purpose                                                                                        |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| NODE_ENV, APP_URL, PORT                                          | Environment, canonical URL, listening port (4780 locally)                                      |
-| SESSION_SECRET                                                   | Random secret, at least 32 characters                                                          |
-| DATABASE_URL                                                     | MySQL connection URL for `mado`                                                                |
-| ADMIN_EMAIL, ADMIN_PASSWORD                                      | Owner seed account; Argon2id hash stored, existing passwords preserved                         |
-| STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET | Payment integration credentials for Milestone 4                                                |
-| EMAIL_PROVIDER, RESEND_API_KEY, EMAIL_FROM, ADMIN_ALERT_EMAILS   | Email configuration for Milestone 7; use `log` locally                                         |
-| VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY                              | Future Web Push credentials                                                                    |
-| TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY                         | Future booking/contact protection                                                              |
-| UPLOAD_DIR                                                       | Absolute upload directory outside the deploy folder/webroot                                    |
-| CRON_SECRET                                                      | Future cron authentication secret                                                              |
-| LOG_DIR                                                          | Pino rotating log directory, defaults to `logs`; use an absolute persistent path in production |
+| Variables                                                                    | Purpose                                                                                              |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| NODE_ENV, APP_URL, PORT                                                      | Environment, canonical URL, listening port (4780 locally)                                            |
+| SESSION_SECRET                                                               | Random secret, at least 32 characters                                                                |
+| DATABASE_URL                                                                 | MySQL connection URL for `mado`                                                                      |
+| ADMIN_EMAIL, ADMIN_PASSWORD                                                  | Owner seed account; Argon2id hash stored, existing passwords preserved                               |
+| STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET             | Payment integration credentials for Milestone 4                                                      |
+| EMAIL_PROVIDER, BREVO_API_KEY, EMAIL_ENABLED, EMAIL_FROM, ADMIN_ALERT_EMAILS | Use `brevo` and `EMAIL_ENABLED=true` for real local email testing; `log` is an optional preview mode |
+| VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY                                          | Future Web Push credentials                                                                          |
+| TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY                                     | Future booking/contact protection                                                                    |
+| UPLOAD_DIR                                                                   | Absolute upload directory outside the deploy folder/webroot                                          |
+| CRON_SECRET                                                                  | Future cron authentication secret                                                                    |
+| LOG_DIR                                                                      | Pino rotating log directory, defaults to `logs`; use an absolute persistent path in production       |
 
 Production validates HTTPS and payment/Turnstile/cron secrets. Milestone 7 adds Brevo delivery; see the notification activation guide below. Local unused provider keys can remain empty. Windows UPLOAD_DIR example is `C:/mado-uploads`; use `/home/<user>/mado-uploads` on cPanel. Logs rotate daily and retain 14 files. Session cookies are httpOnly/SameSite=Lax and secure in production; proxy trust is one hop.
 
@@ -319,6 +319,8 @@ Fresh installs include these services in `npm run db:seed`. For an existing data
 # Notifications and emails (Milestone 7)
 
 See [the notification setup and activation guide](docs/MILESTONE-7.md). Build compiles the branded MJML email layout. Run `npm run db:migrate` for the email delivery-key and suppression migrations. The existing five-minute jobs cron schedules and sends notifications; no separate worker is needed.
+
+For real local email tests, set `EMAIL_PROVIDER=brevo`, `EMAIL_ENABLED=true`, and the verified `BREVO_API_KEY`, `EMAIL_FROM` and `EMAIL_REPLY_TO` in ignored `.env`. Set `NOTIFICATIONS_START_AT` to the UTC time you first enable delivery so historical test messages are not sent. Keep that value stable afterward. `npm run dev` starts **http://localhost:4780** and runs the existing jobs command at startup and every minute; it stops scheduling jobs when development exits. Emails can take up to a minute to leave the queue. Use `npm run jobs` to process them immediately. `npm start` does not schedule jobs; production retains its five-minute cron. Local payment links point to localhost and must be opened on this PC; email logo images use the public salon URL so they display in inboxes.
 
 Owners can enable phone/tablet alerts in **Notifications**, then select **Send test alert** to check the current device. The test sends immediately to that owner's registered device; provider acceptance does not guarantee the phone displayed it. Check browser and operating-system permissions and Do Not Disturb if nothing appears. iPhone/iPad users must open the portal as a Home Screen web app on iOS/iPadOS 16.4 or later. Test alerts are limited to three per minute.
 

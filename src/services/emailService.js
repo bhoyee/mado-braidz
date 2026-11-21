@@ -74,7 +74,8 @@ export async function renderEmail(config, payload, detail, settings = {}) {
   const address = `${business.street}, ${business.city}, ${business.region} ${business.postalCode}`;
   let actionUrl = appUrl + '/book',
     actionLabel = 'Explore styles & book',
-    text = '';
+    text = '',
+    directionsUrl;
   if (booking) {
     const token = accessToken(booking.ref, config.SESSION_SECRET);
     const canManage = tokenHash(token) === booking.manageTokenHash;
@@ -84,6 +85,7 @@ export async function renderEmail(config, payload, detail, settings = {}) {
     const directions =
       'https://www.google.com/maps/search/?api=1&query=' +
       encodeURIComponent(address);
+    directionsUrl = directions;
     text += `Directions: ${directions}\n`;
     if (payload.template.startsWith('winback')) {
       actionUrl = `${appUrl}/book?style=${encodeURIComponent(payload.styleSlug || '')}`;
@@ -131,13 +133,20 @@ export async function renderEmail(config, payload, detail, settings = {}) {
   const preferencesUrl = client
     ? `${appUrl}/unsubscribe/${unsubscribeToken(client, config.SESSION_SECRET)}`
     : appUrl + '/contact';
+  let content = escapeHtml(text).replace(/\n/g, '<br />');
+  if (directionsUrl)
+    content = content.replace(
+      `Directions: ${escapeHtml(directionsUrl)}`,
+      `<a href="${escapeHtml(directionsUrl)}" style="color:#5f2d9e;font-weight:bold">Get directions</a>`,
+    );
   const vars = {
     subject: custom.subject || def.subject,
     intro: custom.intro || def.intro,
-    content: escapeHtml(text).replace(/\n/g, '<br />'),
+    content,
     actionUrl,
     actionLabel,
     appUrl,
+    logoUrl: `${(/^https:\/\//.test(business.url || '') ? business.url : appUrl).replace(/\/$/, '')}/img/email-logo.png`,
     address,
     street: business.street,
     locality: `${business.city}, ${business.region} ${business.postalCode}`,

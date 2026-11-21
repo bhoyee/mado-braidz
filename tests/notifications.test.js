@@ -374,6 +374,18 @@ describe('Milestone 7 scheduling', () => {
   });
 });
 describe('Brevo content and security', () => {
+  it('uses a publicly accessible logo while keeping local payment links local', async () => {
+    const f = notificationFixture();
+    const message = await renderEmail(
+      { ...f.config, APP_URL: 'http://localhost:4780' },
+      { template: 'deposit-payment' },
+      { booking: f.booking, client: f.client },
+    );
+    expect(message.html).toContain(
+      'src="https://madoafricanbraidz.com/img/email-logo.png"',
+    );
+    expect(message.html).toContain('href="http://localhost:4780/booking/');
+  });
   it('allows external email clients to embed the public PNG logo', async () => {
     const f = notificationFixture();
     const response = await request(
