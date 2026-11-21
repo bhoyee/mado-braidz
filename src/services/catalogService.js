@@ -31,7 +31,7 @@ export function createCatalogService(db) {
           .select()
           .from(s.addons)
           .where(eq(s.addons.active, true))
-          .orderBy(asc(s.addons.sort)),
+          .orderBy(asc(s.addons.sort), asc(s.addons.id)),
         db.select().from(s.media).orderBy(asc(s.media.sort)),
         db.select().from(s.settings),
         db.select().from(s.redirects),

@@ -98,6 +98,32 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       const page = await agent.get('/admin/styles');
       token = page.text.match(/name="csrf-token" content="([^"]+)"/)[1];
     }, 30000);
+    it('places new extras last and preserves their position when edited without display-order input', async () => {
+      const before = await db.select().from(s.addons);
+      const input = {
+        name: 'Test extra',
+        slug: 'automatic-order-extra',
+        price: '15',
+        durationMin: 0,
+        active: true,
+        appliesToAll: true,
+      };
+      const id = await service.saveAddon(null, input, actor);
+      const [created] = await db
+        .select()
+        .from(s.addons)
+        .where(eq(s.addons.id, id));
+      expect(created.sort).toBe(
+        Math.max(-1, ...before.map((row) => row.sort)) + 1,
+      );
+      await service.saveAddon(id, { ...input, name: 'Updated extra' }, actor);
+      const [updated] = await db
+        .select()
+        .from(s.addons)
+        .where(eq(s.addons.id, id));
+      expect(updated.sort).toBe(created.sort);
+      expect(updated.name).toBe('Updated extra');
+    });
     afterAll(async () => {
       await pool?.end();
       if (

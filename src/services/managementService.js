@@ -32,7 +32,7 @@ export function createManagementService(db, clock = () => new Date()) {
       db.select().from(s.styles).orderBy(asc(s.styles.sort)),
       db.select().from(s.styleVariants).orderBy(asc(s.styleVariants.sort)),
       db.select().from(s.styleCategories).orderBy(asc(s.styleCategories.sort)),
-      db.select().from(s.addons).orderBy(asc(s.addons.sort)),
+      db.select().from(s.addons).orderBy(asc(s.addons.sort), asc(s.addons.id)),
       db.select().from(s.addonStyles),
       db
         .select()
@@ -332,7 +332,18 @@ export function createManagementService(db, clock = () => new Date()) {
               )[0],
             )
           : null;
-        const values = { ...v, priceCents: price };
+        const next = before
+          ? before.sort
+          : Number(
+              (
+                await tx
+                  .select({
+                    value: sql`COALESCE(MAX(${s.addons.sort}), -1) + 1`,
+                  })
+                  .from(s.addons)
+              )[0].value,
+            );
+        const values = { ...v, sort: next, priceCents: price };
         if (id)
           await tx.update(s.addons).set(values).where(eq(s.addons.id, id));
         else
