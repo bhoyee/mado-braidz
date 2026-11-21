@@ -47,11 +47,19 @@
   gap: 8px;
 }
 .owner-sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: #dfd2e8;
   padding: 13px 14px;
   border-radius: 5px;
   text-decoration: none;
   font-weight: 650;
+  font-size: 14px;
+}
+.owner-menu-icon {
+  display: block;
+  flex: 0 0 20px;
 }
 .owner-sidebar nav a:hover,
 .owner-sidebar nav a[aria-current] {
@@ -74,6 +82,12 @@
   border: 0;
   padding: 8px 0;
   cursor: pointer;
+}
+.owner-sidebar-end a,
+.owner-sidebar-end button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 .owner-main {
   margin-left: 236px;

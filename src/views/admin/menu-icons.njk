@@ -1,0 +1,22 @@
+{% macro adminIcon(key) %}
+{% set paths = {
+  '/admin': 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
+  '/admin/calendar': 'M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z M7 3v4 M17 3v4 M3 11h18 M7 15h2 M15 15h2',
+  '/admin/bookings': 'M9 4H6a2 2 0 0 0-2 2v14h16V6a2 2 0 0 0-2-2h-3 M9 2h6v5H9z M8 12h8 M8 16h5',
+  '/admin/payment-reviews': 'M4 4h16v16H4z M4 9h16 M8 14l2 2 5-5',
+  '/admin/styles': 'M3 12l9-9h8v8l-9 10Z M16 7h.01 M7 12l5 5',
+  '/admin/addons': 'M12 3v18 M3 12h18 M5 5l14 14 M5 19 19 5',
+  '/admin/availability': 'M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9Z M12 7v5l3 2',
+  '/admin/gallery': 'M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z M3 17l6-6 4 4 3-3 5 5 M16 7h.01',
+  '/admin/clients': 'M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z M2 21v-2a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v2 M17 4a4 4 0 0 1 0 7 M18 14a5 5 0 0 1 4 5v2',
+  '/admin/settings': 'M4 6h16 M4 12h16 M4 18h16 M8 3v6 M16 9v6 M10 15v6',
+  '/admin/redirects': 'M3 6h14 M13 2l4 4-4 4 M21 18H7 M11 14l-4 4 4 4',
+  '/admin/notifications': 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9 M10 21h4',
+  '/admin/email-templates': 'M3 5h18v14H3z M3 5l9 7 9-7',
+  '/admin/audit': 'M3 11a9 9 0 1 1 2 7 M3 4v7h7 M12 7v5l3 2',
+  '/admin/security': 'M12 2l8 4v6c0 5-8 10-8 10S4 17 4 12V6Z M9 12l2 2 4-4',
+  'website': 'M14 3h7v7 M21 3 10 14 M10 3H3v18h18v-7',
+  'logout': 'M9 3H3v18h6 M9 12h12 M17 8l4 4-4 4'
+} %}
+<svg class="owner-menu-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="{{ paths[key] }}"/></svg>
+{% endmacro %}
