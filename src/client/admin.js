@@ -1,4 +1,15 @@
 const alertBox = document.querySelector('.owner-alert');
+document.querySelectorAll('[data-owner-modal-open]').forEach((button) => {
+  const dialog = document.getElementById(button.dataset.ownerModalOpen);
+  if (!(dialog instanceof HTMLDialogElement)) return;
+  button.addEventListener('click', () => {
+    dialog.showModal();
+    dialog.querySelector('input:not([type="hidden"])')?.focus();
+  });
+});
+document.querySelectorAll('[data-owner-modal-close]').forEach((button) => {
+  button.addEventListener('click', () => button.closest('dialog')?.close());
+});
 document
   .querySelector('[data-owner-password-toggle]')
   ?.addEventListener('click', (event) => {
@@ -296,6 +307,12 @@ if (resetToken && /^[a-f0-9]{64}$/.test(location.hash.slice(1))) {
   history.replaceState(null, '', location.pathname);
 }
 document.querySelectorAll('[data-owner-form]').forEach((form) => {
+  const formError = form.querySelector('[data-owner-form-error]');
+  const reportError = (message) => {
+    if (!formError) return report(message);
+    formError.textContent = message;
+    formError.hidden = false;
+  };
   let busy = false;
   let confirming = false;
   form.addEventListener('submit', async (event) => {
@@ -317,12 +334,13 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
       if (input.disabled || input.value === '' || input.closest('[hidden]'))
         continue;
       const match = input.value.match(/^(\d+)(?:\.(\d{1,2}))?$/);
-      if (!match) return report('Enter a valid amount in USD.');
+      if (!match) return reportError('Enter a valid amount in USD.');
       body[input.dataset.money] =
         Number(match[1]) * 100 + Number((match[2] || '').padEnd(2, '0'));
     }
     busy = true;
     alertBox.hidden = true;
+    if (formError) formError.hidden = true;
     const buttons = [
       ...form.querySelectorAll('button[type="submit"], button:not([type])'),
     ];
@@ -370,7 +388,7 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
         location.assign(result.url);
       }
     } catch (error) {
-      report(error.message);
+      reportError(error.message);
     } finally {
       busy = false;
       buttons.forEach((button) => (button.disabled = false));

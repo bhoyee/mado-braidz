@@ -316,6 +316,66 @@
   width: min(92vw, 480px);
   max-height: 90vh;
 }
+.owner-app .owner-extra-dialog {
+  box-sizing: border-box;
+  margin: auto;
+  width: min(680px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #e2d9e8;
+  border-radius: 16px;
+  box-shadow: 0 24px 80px #1c0f2630;
+}
+.owner-extra-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.owner-app .owner-extra-heading h2 {
+  margin: 0;
+}
+.owner-app .owner-extra-heading .eyebrow {
+  margin: 0 0 6px;
+}
+.owner-extra-close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #e2d9e8;
+  border-radius: 50%;
+  color: #5f2d9e;
+  background: #f4eefb;
+  font-size: 26px;
+  cursor: pointer;
+}
+.owner-extra-close:hover {
+  background: #e9ddf6;
+}
+.owner-app .owner-extra-actions {
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e2d9e8;
+}
+.owner-app .owner-extra-actions .button {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .owner-app .owner-extra-dialog {
+    padding: 20px;
+  }
+  .owner-extra-dialog .owner-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .owner-confirm-dialog .owner-actions {
   margin-top: 1.5rem;
   justify-content: flex-end;
