@@ -1,4 +1,5 @@
 import { publicSettings } from '../../db/public-defaults.js';
+import { studioVideos } from '../../services/studioVideos.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { marked } from 'marked';
@@ -183,37 +184,8 @@ export const galleryLabel = (item) => {
     'Our work'
   );
 };
-// Studio films for Our Work, each with a short title and the style shown.
-const WORK_FILMS = [
-  {
-    name: 'studio-knotless',
-    title: 'That final turn',
-    label: 'Knotless braids',
-    description:
-      'A client smiles and swings her finished knotless braids in front of the Mado Braids sign',
-  },
-  {
-    name: 'transformation',
-    title: 'Before & after',
-    label: 'Spring twists',
-    description:
-      'Spring twists from the first parted section to the finished look',
-  },
-  {
-    name: 'at-the-chair',
-    title: 'Made by hand',
-    label: 'At the chair',
-    description: 'Braiding a client in a purple cape',
-  },
-  {
-    name: 'braid-detail',
-    title: 'Up close',
-    label: 'Boho curls',
-    description: 'A close look at braided sections and curly lengths',
-  },
-];
 // Photos and films mixed into one portfolio: a film, two photos, a film...
-export function workItems(suppliedStyles, gallery) {
+export function workItems(suppliedStyles, gallery, videos = studioVideos()) {
   const photos = [
     ...suppliedStyles.map((style) => ({
       type: 'photo',
@@ -231,7 +203,9 @@ export function workItems(suppliedStyles, gallery) {
           : galleryLabel(item)),
     })),
   ];
-  const films = WORK_FILMS.map((film) => ({ type: 'film', ...film }));
+  const films = videos
+    .filter((v) => v.enabled && v.showInWork)
+    .map((v) => ({ type: 'film', ...v, name: v.id }));
   const items = [];
   while (photos.length || films.length) {
     if (films.length) items.push(films.shift());
@@ -380,6 +354,9 @@ export function decorateCatalog(data) {
     pages.home = publicSettings.seo.pages.home;
   return {
     ...data,
+    studioClips: Object.fromEntries(
+      studioVideos(data.settings).map((v) => [v.id, v]),
+    ),
     styles,
     mensStyles: styles.filter((style) => style.category === 'mens'),
     heroStyle:
@@ -563,7 +540,11 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
   router.get('/our-work', (req, res) =>
     res.render('pages/gallery', {
       title: `Our Work | ${res.locals.business.name}`,
-      items: workItems(res.locals.suppliedStyles, res.locals.gallery),
+      items: workItems(
+        res.locals.suppliedStyles,
+        res.locals.gallery,
+        Object.values(res.locals.studioClips),
+      ),
     }),
   );
   router.get('/about', render('about', 'Meet Mado'));

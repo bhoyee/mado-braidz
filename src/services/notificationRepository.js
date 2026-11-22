@@ -380,11 +380,16 @@ export function createNotificationRepository(db) {
         uploadDir &&
         (!last || +now - +new Date(decode(last.value).at) > 7 * 86400000)
       ) {
+        const [videoSettings] = await db
+          .select()
+          .from(s.settings)
+          .where(eq(s.settings.key, 'videos'));
         await cleanupUploads(
           uploadDir,
           await db.select().from(s.media),
           await db.select().from(s.paymentProofs),
           now,
+          videoSettings ? decode(videoSettings.value).items || [] : [],
         );
         const value = { at: now.toISOString() };
         await db

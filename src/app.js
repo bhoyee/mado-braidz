@@ -115,7 +115,11 @@ export function createApp({
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", 'https://challenges.cloudflare.com'],
           styleSrc: ["'self'", (_req, res) => `'nonce-${res.locals.cspNonce}'`],
-          imgSrc: ["'self'", 'data:'],
+          imgSrc: [
+            "'self'",
+            'data:',
+            (req) => (req.path.startsWith('/admin') ? 'blob:' : "'self'"),
+          ],
           frameSrc: [
             "'self'",
             'https://maps.google.com',
@@ -127,7 +131,10 @@ export function createApp({
             "'self'",
             (req) => (req.path.startsWith('/admin') ? 'data:' : "'self'"),
           ],
-          mediaSrc: ["'self'"],
+          mediaSrc: [
+            "'self'",
+            (req) => (req.path.startsWith('/admin') ? 'blob:' : "'self'"),
+          ],
           objectSrc: ["'none'"],
           frameAncestors: ["'none'"],
           upgradeInsecureRequests: config.NODE_ENV === 'production' ? [] : null,
@@ -264,6 +271,23 @@ export function createApp({
       ),
     );
   app.use('/admin', designRouter(catalog, limits.preview));
+  app.get('/media/videos/:file', (req, res) => {
+    if (!/^[a-f0-9-]{36}\.mp4$/.test(req.params.file))
+      return res.sendStatus(404);
+    res.type('video/mp4');
+    res.sendFile(
+      req.params.file,
+      {
+        root: resolve(config.UPLOAD_DIR, 'videos'),
+        maxAge: '1y',
+        immutable: true,
+        dotfiles: 'deny',
+      },
+      (error) => {
+        if (error && !res.headersSent) res.sendStatus(404);
+      },
+    );
+  });
   app.get('/media/catalog/:file', (req, res) => {
     if (!/^[a-f0-9-]{36}-(480|960|1600)\.(webp|avif)$/.test(req.params.file))
       return res.sendStatus(404);

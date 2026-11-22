@@ -79,6 +79,7 @@ try {
         viewport: { width, height: 1000 },
       }),
       page = await context.newPage();
+    page.setDefaultTimeout(20000);
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('dialog', async (d) => {
@@ -110,16 +111,144 @@ try {
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.waitForURL(origin + '/admin');
     await page.goto(origin + '/admin/gallery');
+    if (process.argv.includes('--videos-only')) {
+      await page.getByRole('button', { name: /^Videos/ }).click();
+      assert.ok((await page.locator('[data-video-id]').count()) >= 5);
+      await accessible('Video library');
+      const original = page.locator('[data-video-id="studio-knotless"]');
+      await save(original.getByRole('button', { name: /^Hide video/ }));
+      assert.ok(
+        !(await (await fetch(origin + '/')).text()).includes(
+          '/media/studio-knotless.mp4',
+        ),
+      );
+      assert.ok(
+        !(await (await fetch(origin + '/our-work')).text()).includes(
+          'film-studio-knotless',
+        ),
+      );
+      await save(original.getByRole('button', { name: /^Publish video/ }));
+      assert.ok(
+        (await (await fetch(origin + '/')).text()).includes(
+          '/media/studio-knotless.mp4',
+        ),
+      );
+      await page
+        .getByRole('button', { name: 'Add video', exact: true })
+        .click();
+      const upload = page.locator('#library-video-upload');
+      await upload
+        .locator('[name=video]')
+        .setInputFiles('public/media/studio-knotless.mp4');
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-video-upload-form]').elements.poster
+            .files.length === 1,
+      );
+      await upload
+        .getByLabel('Video title', { exact: true })
+        .fill('Video browser test ' + width);
+      await upload
+        .getByLabel('Video description', { exact: true })
+        .fill('A short studio video for browser verification.');
+      await accessible('Video upload dialog');
+      await save(
+        upload.getByRole('button', { name: 'Upload video', exact: true }),
+      );
+      const record = (await service.all()).videos.find(
+        (v) => v.title === 'Video browser test ' + width,
+      );
+      assert.ok(record?.src.startsWith('/media/videos/'));
+      const range = await page.request.get(origin + record.src, {
+        headers: { Range: 'bytes=0-99' },
+      });
+      assert.equal(range.status(), 206);
+      assert.equal((await range.body()).length, 100);
+      const publicPage = await context.newPage();
+      await publicPage.goto(origin + '/our-work');
+      const player = publicPage.locator('#film-' + record.id);
+      await player
+        .locator('..')
+        .getByRole('button', { name: 'Play film', exact: true })
+        .click();
+      await publicPage.waitForFunction((id) => {
+        const v = document.getElementById('film-' + id);
+        return v?.videoWidth > 0 && !v.paused;
+      }, record.id);
+      await publicPage.close();
+      const card = page.locator(`[data-video-id="${record.id}"]`);
+      await card.getByRole('button', { name: /^Manage video/ }).click();
+      const edit = page.locator('#library-video-edit');
+      await edit
+        .getByLabel('Video title', { exact: true })
+        .fill('Updated video ' + width);
+      await accessible('Video management dialog');
+      await save(edit.getByRole('button', { name: 'Save video', exact: true }));
+      assert.ok(
+        (await (await fetch(origin + '/our-work')).text()).includes(
+          'Updated video ' + width,
+        ),
+      );
+      await save(card.getByRole('button', { name: /^Hide video/ }));
+      assert.ok(
+        !(await (await fetch(origin + '/our-work')).text()).includes(
+          record.src,
+        ),
+      );
+      const csrf = await page
+        .locator('meta[name="csrf-token"]')
+        .getAttribute('content');
+      const invalid = await page.request.post(
+        origin + '/admin/gallery/videos/upload',
+        {
+          headers: { Accept: 'application/json', 'x-csrf-token': csrf },
+          multipart: {
+            title: 'Not a video',
+            description: 'Malformed upload check',
+            enabled: 'true',
+            showInWork: 'true',
+            video: {
+              name: 'fake.mp4',
+              mimeType: 'video/mp4',
+              buffer: Buffer.from('<html>invalid video</html>'),
+            },
+            poster: {
+              name: 'cover.jpg',
+              mimeType: 'image/jpeg',
+              buffer: image,
+            },
+          },
+        },
+      );
+      assert.equal(invalid.status(), 400);
+      assert.equal(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth > innerWidth,
+        ),
+        false,
+      );
+      await page.screenshot({
+        path: `tmp/qa/video-library-${width}.png`,
+        fullPage: true,
+        timeout: 60000,
+      });
+      assert.deepEqual(errors, []);
+      console.log(
+        `PASS ${width}px: existing clip hide/publish, real MP4 upload, automatic cover, public playback, byte ranges, details, malformed-file rejection and accessibility.`,
+      );
+      await context.close();
+      continue;
+    }
     assert.equal(
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,
       ),
       false,
     );
-    assert.ok((await page.locator('.library-card').count()) > 1);
+    assert.ok((await page.locator('[data-photo-id]').count()) > 1);
     assert.ok(
       (await page
-        .locator('.library-card')
+        .locator('[data-photo-id]')
         .first()
         .getAttribute('data-photo-name')) !== 'Portfolio photo',
     );
@@ -133,17 +262,20 @@ try {
       .getByLabel('Search photos', { exact: true })
       .fill('no photo should match this phrase');
     await page.locator('[data-library-empty]:not([hidden])').waitFor();
-    assert.equal(await page.locator('.library-card:not([hidden])').count(), 0);
+    assert.equal(
+      await page.locator('[data-photo-id]:not([hidden])').count(),
+      0,
+    );
     await page.getByLabel('Search photos', { exact: true }).fill('');
     const firstStyle = await page
-      .locator('.library-card')
+      .locator('[data-photo-id]')
       .first()
       .getAttribute('data-photo-style');
     await page.locator('[data-library-style]').selectOption(firstStyle);
     assert.ok(
       (
         await page
-          .locator('.library-card:not([hidden])')
+          .locator('[data-photo-id]:not([hidden])')
           .evaluateAll((rows) => rows.map((r) => r.dataset.photoStyle))
       ).every((id) => id === firstStyle),
     );

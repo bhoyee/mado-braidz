@@ -1,5 +1,5 @@
 {% extends "layouts/base.njk" %}
-{% from "partials/components.njk" import photo, studioVideo %}
+{% from "partials/components.njk" import photo, studioVideo with context %}
 {% block content %}
 <section class="page-head">
   <div class="wrap">
@@ -16,7 +16,7 @@
     {% for item in items %}
     {% if item.type == 'film' %}
     <li class="work-tile work-film">
-      {{ studioVideo(item.name, item.description) }}
+      {{ studioVideo(item.name, item.description, false, item.src, item.poster) }}
       <div class="work-caption" aria-hidden="true"><span class="work-kind">Film</span><strong>{{ item.title }}</strong><span class="work-sub">{{ item.label }}</span></div>
     </li>
     {% elif item.href %}

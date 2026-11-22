@@ -1,6 +1,7 @@
 import { ManagementError } from './managementErrors.js';
 import { and, eq, desc, asc, inArray, sql, lt, gt } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { studioVideos } from './studioVideos.js';
 import { DateTime } from 'luxon';
 import * as s from '../db/schema.js';
 import {
@@ -47,38 +48,40 @@ export function createManagementService(db, clock = () => new Date()) {
         .where(gt(s.timeBlocks.endAt, new Date()))
         .orderBy(asc(s.timeBlocks.startAt))
         .limit(500),
-    ]).then(
-      ([
-        styles,
-        variants,
-        categories,
-        addons,
-        links,
-        media,
-        settings,
-        redirects,
-        blocks,
-      ]) => ({
-        styles,
-        variants,
-        categories,
-        addons: addons.map((a) => ({
-          ...a,
-          styleIds: links
-            .filter((l) => l.addonId === a.id)
-            .map((l) => l.styleId),
-        })),
-        media,
-        settings: Object.fromEntries(
-          settings.map((r) => [
-            r.key,
-            typeof r.value === 'string' ? JSON.parse(r.value) : r.value,
-          ]),
-        ),
-        redirects,
-        blocks,
-      }),
-    );
+    ])
+      .then(
+        ([
+          styles,
+          variants,
+          categories,
+          addons,
+          links,
+          media,
+          settings,
+          redirects,
+          blocks,
+        ]) => ({
+          styles,
+          variants,
+          categories,
+          addons: addons.map((a) => ({
+            ...a,
+            styleIds: links
+              .filter((l) => l.addonId === a.id)
+              .map((l) => l.styleId),
+          })),
+          media,
+          settings: Object.fromEntries(
+            settings.map((r) => [
+              r.key,
+              typeof r.value === 'string' ? JSON.parse(r.value) : r.value,
+            ]),
+          ),
+          redirects,
+          blocks,
+        }),
+      )
+      .then((data) => ({ ...data, videos: studioVideos(data.settings) }));
   async function setting(tx, key, value, actor) {
     const [before] = await tx
       .select()
@@ -107,6 +110,45 @@ export function createManagementService(db, clock = () => new Date()) {
   }
   return {
     all,
+    async saveVideo(id, input, asset, actor) {
+      return db.transaction(async (tx) => {
+        await tx
+          .insert(s.settings)
+          .values({
+            key: 'videos',
+            value: { items: [] },
+            updatedAt: new Date(),
+          })
+          .onDuplicateKeyUpdate({ set: { key: 'videos' } });
+        const [row] = await tx
+          .select()
+          .from(s.settings)
+          .where(eq(s.settings.key, 'videos'))
+          .for('update');
+        const value =
+          typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+        const before = id
+          ? exists(studioVideos({ videos: value }).find((v) => v.id === id))
+          : null;
+        if (!before && !asset)
+          throw new ManagementError('Choose a video and cover image');
+        const video = {
+          ...before,
+          ...asset,
+          id: before?.id || randomUUID(),
+          ...input,
+          builtin: before?.builtin || false,
+        };
+        if (!before) video.locations = ['Our Work'];
+        const items = (value.items || []).filter((v) => v.id !== video.id);
+        if (items.length >= 100)
+          throw new ManagementError(
+            'The video library is full. Contact the website administrator.',
+          );
+        await setting(tx, 'videos', { items: [...items, video] }, actor);
+        return video;
+      });
+    },
     async media(id) {
       const row = exists(
         (

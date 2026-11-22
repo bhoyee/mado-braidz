@@ -27,13 +27,18 @@
 </section>
 {% endmacro %}
 
-{% macro studioVideo(name, description, hero=false) %}
+{% macro studioVideo(name, description, hero=false, source='', poster='') %}
+{% set clip = studioClips[name] %}
+{% set videoSource = media(name + '.mp4') if clip.builtin else (clip.src or source or media(name + '.mp4')) %}
+{% set videoPoster = media(name + '.webp') if clip.builtin else (clip.poster or poster or media(name + '.webp')) %}
+{% if clip and not clip.enabled %}<div class="studio-video"><img src="/img/studio/office-entrance-960.webp" alt="The salon building at 7375 Executive Place" width="960" height="540"></div>{% else %}
 <div class="studio-video{% if hero %} hero-video{% endif %}" data-studio-player>
-  <video id="film-{{ name }}" muted loop playsinline preload="none" poster="{{ media(name + '.webp') }}" aria-label="{{ description }}" data-studio-video {% if hero %}data-hero-video{% endif %}><source data-src="{{ media(name + '.mp4') }}" type="video/mp4">Your browser does not support this video.</video>
+  <video id="film-{{ name }}" muted loop playsinline preload="none" poster="{{ videoPoster }}" aria-label="{{ clip.description or description }}" data-studio-video {% if hero %}data-hero-video{% endif %}><source data-src="{{ videoSource }}" type="video/mp4">Your browser does not support this video.</video>
   <button type="button" class="video-control" data-video-toggle aria-controls="film-{{ name }}" aria-pressed="false"><span data-video-icon aria-hidden="true">▶</span><span data-video-label>Play film</span></button>
-  <noscript><a href="{{ media(name + '.mp4') }}" class="video-fallback">Watch the studio film (MP4)</a></noscript>
+  <noscript><a href="{{ videoSource }}" class="video-fallback">Watch the studio film (MP4)</a></noscript>
   <p class="video-feedback sr-only" data-video-feedback role="status"></p>
 </div>
+{% endif %}
 {% endmacro %}
 
 {% macro ring(label, id) %}
@@ -48,5 +53,8 @@
 {# Hero films: silent, looping, start on their own (JS), no controls.
    Reduced-motion and data-saver visitors keep the poster frame. #}
 {% macro heroFilm(name, description) %}
+{% set clip = studioClips[name] %}
+{% if clip and not clip.enabled %}<img class="hero-clip" src="/img/studio/office-entrance-960.webp" alt="The salon building at 7375 Executive Place" width="960" height="540">{% else %}
 <video class="hero-clip" muted loop playsinline preload="none" disablepictureinpicture poster="{{ media(name + '.webp') }}" aria-label="{{ description }}" data-hero-video><source data-src="{{ media(name + '.mp4') }}" type="video/mp4"></video>
+{% endif %}
 {% endmacro %}

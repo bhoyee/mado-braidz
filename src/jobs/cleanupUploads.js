@@ -5,6 +5,7 @@ export async function cleanupUploads(
   media,
   proofs,
   now = new Date(),
+  videos = [],
 ) {
   if (!directory) return 0;
   const root = await realpath(resolve(directory)).catch(() => null);
@@ -14,10 +15,17 @@ export async function cleanupUploads(
     if (typeof value !== 'string') return;
     if (value.startsWith('/media/catalog/'))
       references.add(join(root, 'catalog', basename(value)));
+    else if (value.startsWith('/media/videos/'))
+      references.add(join(root, 'videos', basename(value)));
     else if (!value.includes('/') && !value.includes('\\'))
       references.add(join(root, value));
   };
-  for (const row of [...media, ...proofs]) {
+  for (const video of videos) remember(video.src);
+  for (const row of [
+    ...media,
+    ...proofs,
+    ...videos.map((v) => ({ path: v.poster, variants: v.posterVariants })),
+  ]) {
     remember(row.path);
     const variants =
       typeof row.variants === 'string'
@@ -29,16 +37,18 @@ export async function cleanupUploads(
     }
   }
   let removed = 0;
-  for (const part of ['', 'catalog']) {
+  for (const part of ['', 'catalog', 'videos']) {
     const folder = await realpath(join(root, part)).catch(() => null);
     if (!folder || (folder !== root && !folder.startsWith(root + sep)))
       continue;
     for (const entry of await readdir(folder, { withFileTypes: true })) {
       if (!entry.isFile()) continue;
       const allowed =
-        part === 'catalog'
-          ? /^[a-f0-9-]{36}-(480|960|1600)\.(webp|avif)$/
-          : /^(?:[a-f0-9]{40}|payment-[a-f0-9]{48})\.webp$/;
+        part === 'videos'
+          ? /^[a-f0-9-]{36}\.mp4$/
+          : part === 'catalog'
+            ? /^[a-f0-9-]{36}-(480|960|1600)\.(webp|avif)$/
+            : /^(?:[a-f0-9]{40}|payment-[a-f0-9]{48})\.webp$/;
       if (!allowed.test(entry.name)) continue;
       const file = resolve(folder, entry.name);
       if (!file.startsWith(root + sep) || references.has(file)) continue;

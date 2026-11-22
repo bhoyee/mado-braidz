@@ -7,6 +7,7 @@ import {
   dollars,
 } from '../../services/managementValidation.js';
 import { prepareCatalogImage } from '../../services/catalogImages.js';
+import { prepareCatalogVideo } from '../../services/catalogVideos.js';
 import { publicSettings } from '../../db/public-defaults.js';
 import { ManagementError } from '../../services/managementErrors.js';
 
@@ -152,6 +153,85 @@ export function managementRouter(service, config) {
       const ids = z.array(entityId).max(500).parse(req.body.ids);
       await service.reorderMedia(ids, actor(req, res));
       finish(req, res, '/admin/gallery');
+    }),
+  );
+  const videoInput = z.object({
+    title: z.string().trim().min(1).max(120),
+    description: z.string().trim().min(3).max(500),
+    enabled: checked,
+    showInWork: checked,
+  });
+  const videoUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 30 * 1024 * 1024,
+      files: 2,
+      fields: 8,
+      fieldSize: 2000,
+    },
+  }).fields([
+    { name: 'video', maxCount: 1 },
+    { name: 'poster', maxCount: 1 },
+  ]);
+  router.post(
+    '/gallery/videos/upload',
+    (req, res, next) =>
+      videoUpload(req, res, (error) =>
+        next(
+          error
+            ? new ManagementError(
+                'Choose a video under 30 MB and a cover image under 8 MB.',
+              )
+            : null,
+        ),
+      ),
+    run(async (req, res) => {
+      const input = videoInput.parse(req.body);
+      let clip, poster;
+      try {
+        clip = await prepareCatalogVideo(
+          req.files?.video?.[0]?.buffer,
+          config.UPLOAD_DIR,
+        );
+        poster = await prepareCatalogImage(
+          req.files?.poster?.[0]?.buffer,
+          config.UPLOAD_DIR,
+        );
+        await service.saveVideo(
+          null,
+          input,
+          {
+            src: clip.src,
+            poster: poster.path,
+            posterVariants: poster.variants,
+            width: clip.width,
+            height: clip.height,
+            durationSec: clip.durationSec,
+          },
+          actor(req, res),
+        );
+      } catch (error) {
+        await clip?.cleanup();
+        await poster?.cleanup();
+        throw error;
+      }
+      finish(req, res, '/admin/gallery#videos');
+    }),
+  );
+  router.post(
+    '/gallery/videos/:id',
+    run(async (req, res) => {
+      const id = z
+        .string()
+        .regex(/^[a-z0-9-]{3,80}$/)
+        .parse(req.params.id);
+      await service.saveVideo(
+        id,
+        videoInput.parse(req.body),
+        null,
+        actor(req, res),
+      );
+      finish(req, res, '/admin/gallery#videos');
     }),
   );
   const upload = multer({
