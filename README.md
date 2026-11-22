@@ -24,7 +24,7 @@ npm run build
 npm run dev
 ```
 
-Visit http://localhost:4780 and http://localhost:4780/health. `npm start` runs without file watching. PORT is read from the environment and defaults to 4780. This repository also installs a development-only Node 20 runtime; npm scripts use it when the global Node installation differs. Use a system Node 20 installation for production.
+Visit http://localhost:4780 and http://localhost:4780/health. `npm run dev` keeps the local server running without automatic restarts, so sign-in and booking redirects are not interrupted by file-watcher restarts. Restart it after changing server code or `.env`. Developers can opt into automatic restarts with `npm run dev:watch`; use the normal `dev` command for browser testing. Both development commands process queued email jobs every minute. `npm start` runs the server without the development jobs timer. PORT is read from the environment and defaults to 4780. This repository also installs a development-only Node 20 runtime; npm scripts use it when the global Node installation differs. Use a system Node 20 installation for production.
 
 ## Environment
 

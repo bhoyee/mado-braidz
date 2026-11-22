@@ -19,7 +19,11 @@ await new Promise((resolve, reject) => {
   probe.listen(config.PORT, () => probe.close(resolve));
 });
 
-const server = spawn(process.execPath, ['--watch', 'src/server.js'], {
+// Keep browser testing stable: watch-mode restarts briefly close the port.
+const serverArgs = process.argv.includes('--watch')
+  ? ['--watch', 'src/server.js']
+  : ['src/server.js'];
+const server = spawn(process.execPath, serverArgs, {
   stdio: 'inherit',
   windowsHide: true,
 });
