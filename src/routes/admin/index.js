@@ -4,10 +4,7 @@ import { DateTime } from 'luxon';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { rateLimit } from 'express-rate-limit';
-import {
-  createAdminAuthService,
-  newTotpSecret,
-} from '../../services/adminAuthService.js';
+import { createAdminAuthService } from '../../services/adminAuthService.js';
 import {
   createBookingService,
   accessToken,
@@ -204,6 +201,12 @@ export function adminRouter(
   );
   const actor = (req, res) => ({ ...res.locals.admin, ip: req.ip });
   if (notifications) router.use(ownerNotifications(notifications));
+  router.get('/settings', (req, res, next) => {
+    if (req.query.tab !== 'security') return next();
+    res.render('admin/security', {
+      enabled: Boolean(res.locals.admin.totpSecret),
+    });
+  });
   if (management) router.use(managementRouter(management, config));
   const finish = (req, res, url, message) =>
     req.accepts(['html', 'json']) === 'json'
@@ -216,13 +219,9 @@ export function adminRouter(
         : res.clearCookie('mado.sid').redirect(303, '/admin/login'),
     ),
   );
-  router.get('/security', (req, res) => {
-    if (!res.locals.admin.totpSecret) req.session.totpSetup ||= newTotpSecret();
-    res.render('admin/security', {
-      secret: req.session.totpSetup,
-      enabled: Boolean(res.locals.admin.totpSecret),
-    });
-  });
+  router.get('/security', (_req, res) =>
+    res.redirect(303, '/admin/settings?tab=security'),
+  );
   router.post(
     '/security',
     authLimit,

@@ -535,6 +535,64 @@ describe('owner portal routes', () => {
     expect(all.text).toContain('OV-VISIT-10');
     await agent.get('/admin/payments?period=invalid').expect(400);
   });
+  it('puts password settings inside Settings without a separate menu item or two-factor setup, and keeps password changes protected', async () => {
+    const { repo, admins } = await setup();
+    const app = createApp({
+      config,
+      bookingRepository: repo,
+      adminRepository: admins,
+      catalog: fixtureCatalog(),
+      stripeProvider: fakeStripe(),
+    });
+    await request(app).get('/admin/settings?tab=security').expect(303);
+    const agent = request.agent(app),
+      login = await agent.get('/admin/login');
+    const token = login.text.match(/name="_csrf" value="([^"]+)"/)[1];
+    await agent
+      .post('/admin/login')
+      .send({ email: owner.email, password, _csrf: token })
+      .expect(303);
+    await agent
+      .get('/admin/security')
+      .expect(303)
+      .expect('Location', '/admin/settings?tab=security');
+    const page = await agent.get('/admin/settings?tab=security').expect(200);
+    expect(page.text).toContain('Settings sections');
+    expect(page.text).not.toContain('href="/admin/security"');
+    expect(page.text).not.toContain('Two-factor authentication');
+    expect(page.text).not.toContain('owner-secret');
+    const csrf = page.text.match(/name="_csrf" value="([^"]+)"/)[1];
+    const nextPassword = 'New-secure-owner-password!';
+    await agent
+      .post('/admin/security')
+      .send({ action: 'password', password, newPassword: nextPassword })
+      .expect(403);
+    await agent
+      .post('/admin/security')
+      .set('Accept', 'application/json')
+      .send({
+        _csrf: csrf,
+        action: 'password',
+        password: 'wrong',
+        newPassword: nextPassword,
+      })
+      .expect(400);
+    const saved = await agent
+      .post('/admin/security')
+      .set('Accept', 'application/json')
+      .send({
+        _csrf: csrf,
+        action: 'password',
+        password,
+        newPassword: nextPassword,
+      })
+      .expect(200);
+    expect(saved.body.url).toBe('/admin/login');
+    expect(await argon2.verify(admins.rows[0].passwordHash, nextPassword)).toBe(
+      true,
+    );
+    await agent.get('/admin').expect(303);
+  });
   it('requires session login, rejects Basic auth, renders owner screens and protects mutations with CSRF', async () => {
     const { repo, admins } = await setup();
     const service = createBookingService(
@@ -576,7 +634,7 @@ describe('owner portal routes', () => {
       '/admin/bookings/1/edit',
       '/admin/bookings/new',
       '/admin/calendar',
-      '/admin/security',
+      '/admin/settings?tab=security',
       '/admin/audit',
       '/admin/payment-reviews',
     ]) {
