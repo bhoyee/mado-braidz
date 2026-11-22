@@ -612,3 +612,71 @@ if (editor) {
       }
     });
 }
+// Filter the appointment book without moving focus out of the search field.
+const appointmentFilters = document.querySelector('[data-appointment-filters]');
+if (appointmentFilters) {
+  const status = document.querySelector('[data-appointment-search-status]');
+  const search = appointmentFilters.elements.search;
+  let timer,
+    controller,
+    version = 0;
+  appointmentFilters.querySelector('[type="submit"]').hidden = true;
+  async function findAppointments() {
+    clearTimeout(timer);
+    controller?.abort();
+    controller = new AbortController();
+    const requestVersion = ++version;
+    const url = new URL(appointmentFilters.action || location.href);
+    url.search = new URLSearchParams(
+      new FormData(appointmentFilters),
+    ).toString();
+    const results = document.querySelector('[data-appointment-results]');
+    results.setAttribute('aria-busy', 'true');
+    status.textContent = 'Searching appointments…';
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: 'text/html' },
+        cache: 'no-store',
+      });
+      if (!response.ok)
+        throw new Error('Unable to load appointments. Try again.');
+      const page = new DOMParser().parseFromString(
+        await response.text(),
+        'text/html',
+      );
+      if (requestVersion !== version) return;
+      const updated = page.querySelector('[data-appointment-results]');
+      if (!updated) throw new Error('Please refresh and sign in again.');
+      results.replaceWith(document.importNode(updated, true));
+      history.replaceState(null, '', url);
+      const count = updated.querySelectorAll(
+        'tbody tr:not(:has(.owner-empty))',
+      ).length;
+      status.textContent = count
+        ? `${count} appointment${count === 1 ? '' : 's'} shown.`
+        : 'No appointments found.';
+    } catch (error) {
+      if (error.name !== 'AbortError' && requestVersion === version)
+        status.textContent = error.message;
+    } finally {
+      if (requestVersion === version)
+        document
+          .querySelector('[data-appointment-results]')
+          .removeAttribute('aria-busy');
+    }
+  }
+  search.addEventListener('input', () => {
+    clearTimeout(timer);
+    controller?.abort();
+    version++;
+    timer = setTimeout(findAppointments, 300);
+  });
+  appointmentFilters.addEventListener('change', (event) => {
+    if (event.target !== search) findAppointments();
+  });
+  appointmentFilters.addEventListener('submit', (event) => {
+    event.preventDefault();
+    findAppointments();
+  });
+}
