@@ -3,6 +3,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import {
   entityId,
+  durationFromHours,
   checked,
   dollars,
 } from '../../services/managementValidation.js';
@@ -80,7 +81,7 @@ export function managementRouter(service, config) {
     run(async (req, res) => {
       const id = await service.saveStyle(
         optionalId(req.body.id),
-        req.body,
+        durationFromHours(req.body),
         actor(req, res),
       );
       finish(req, res, '/admin/styles/' + id);
@@ -93,7 +94,7 @@ export function managementRouter(service, config) {
       await service.saveVariant(
         styleId,
         optionalId(req.body.id),
-        req.body,
+        durationFromHours(req.body),
         actor(req, res),
       );
       finish(req, res, '/admin/styles/' + styleId);

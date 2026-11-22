@@ -514,7 +514,7 @@ if (editor) {
       const price = await response.json();
       if (version !== quoteVersion) return;
       if (!response.ok) throw new Error(price.message);
-      preview.textContent = `${price.consultation ? 'Consultation · provisional ' : 'New total '}${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(price.subtotalCents / 100)} · ${price.durationMin} minutes`;
+      preview.textContent = `${price.consultation ? 'Consultation · provisional ' : 'New total '}${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(price.subtotalCents / 100)} · ${Number((price.durationMin / 60).toFixed(2))} ${price.durationMin === 60 ? 'hr' : 'hrs'}`;
       editor.dataset.duration = price.durationMin;
     } catch (error) {
       preview.textContent = error.message || 'Unable to load price.';

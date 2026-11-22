@@ -2,6 +2,26 @@ import { ManagementError } from './managementErrors.js';
 import { z } from 'zod';
 import { DateTime } from 'luxon';
 export const entityId = z.coerce.number().int().positive().safe();
+export function durationFromHours(body) {
+  if (body.durationHours === undefined) return body;
+  const value = body.durationHours;
+  const minutes =
+    value === ''
+      ? ''
+      : z.coerce
+          .number()
+          .finite()
+          .min(0.5)
+          .max(15)
+          .transform((hours) => hours * 60)
+          .refine(
+            (n) => Math.abs(n - Math.round(n)) < 0.000001,
+            'Enter a duration in whole minutes',
+          )
+          .transform(Math.round)
+          .parse(value);
+  return { ...body, durationMin: minutes };
+}
 export const checked = z.preprocess(
   (v) => [true, 'true', 'on', '1'].includes(v),
   z.boolean(),
