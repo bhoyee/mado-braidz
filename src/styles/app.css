@@ -3353,3 +3353,21 @@ dialog .button-row {
 .owner-back-link svg {
   flex-shrink: 0;
 }
+.owner-app [data-appointment-filters] .owner-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: end;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px 22px;
+  flex: 0 0 auto;
+}
+.owner-app [data-appointment-filters] label {
+  margin-bottom: 0;
+}
+@media (max-width: 600px) {
+  .owner-app [data-appointment-filters] .owner-filter-clear {
+    flex: 1 0 100%;
+  }
+}
