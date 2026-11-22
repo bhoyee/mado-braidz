@@ -30,7 +30,10 @@ export function createManagementService(db, clock = () => new Date()) {
     });
   const all = () =>
     Promise.all([
-      db.select().from(s.styles).orderBy(asc(s.styles.sort)),
+      db
+        .select()
+        .from(s.styles)
+        .orderBy(desc(s.styles.createdAt), desc(s.styles.id)),
       db.select().from(s.styleVariants).orderBy(asc(s.styleVariants.sort)),
       db.select().from(s.styleCategories).orderBy(asc(s.styleCategories.sort)),
       db.select().from(s.addons).orderBy(asc(s.addons.sort), asc(s.addons.id)),
@@ -287,6 +290,7 @@ export function createManagementService(db, clock = () => new Date()) {
         );
         const values = {
           ...input,
+          sort: before?.sort ?? 0,
           fromPriceCents: fromPrice,
           updatedAt: new Date(),
         };
@@ -353,7 +357,13 @@ export function createManagementService(db, clock = () => new Date()) {
           throw new ManagementError(
             'That size and length already exists. Edit its row instead.',
           );
-        const values = { ...v, priceCents: price, styleId };
+        const values = {
+          ...v,
+          sort:
+            before?.sort ?? Math.max(-1, ...rows.map((row) => row.sort)) + 1,
+          priceCents: price,
+          styleId,
+        };
         if (id)
           await tx
             .update(s.styleVariants)

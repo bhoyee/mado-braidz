@@ -52,7 +52,6 @@ export const styleInput = z.object({
   fromPrice: optionalDollars,
   featured: checked,
   active: checked,
-  sort: z.coerce.number().int().min(0).max(9999).default(0),
   seoTitle: text(),
   seoDescription: text(500),
 });
@@ -78,7 +77,6 @@ export const variantInput = z.object({
     z.coerce.number().int().min(30).max(900).nullable(),
   ),
   active: checked,
-  sort: z.coerce.number().int().min(0).max(9999).default(0),
 });
 export const addonInput = z.object({
   name: text().refine(Boolean, 'Name is required'),

@@ -1,4 +1,4 @@
-import { eq, asc, and } from 'drizzle-orm';
+import { eq, asc, desc, and } from 'drizzle-orm';
 import * as s from '../db/schema.js';
 export function createCatalogService(db) {
   return {
@@ -17,7 +17,7 @@ export function createCatalogService(db) {
           .select()
           .from(s.styles)
           .where(eq(s.styles.active, true))
-          .orderBy(asc(s.styles.sort)),
+          .orderBy(desc(s.styles.createdAt), desc(s.styles.id)),
         db
           .select()
           .from(s.styleVariants)

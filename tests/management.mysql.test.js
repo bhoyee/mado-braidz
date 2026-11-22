@@ -150,6 +150,60 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       fromPrice: '180',
       sort: 0,
     };
+    it('lists newest styles first without manual ordering and keeps edits in place', async () => {
+      const actor = { id: 1, ip: '127.0.0.1' };
+      const first = await service.saveStyle(
+        null,
+        {
+          ...styleValues,
+          name: 'First automatic style',
+          slug: 'first-automatic-style',
+          sort: 9999,
+        },
+        actor,
+      );
+      const second = await service.saveStyle(
+        null,
+        {
+          ...styleValues,
+          name: 'Second automatic style',
+          slug: 'second-automatic-style',
+          sort: 0,
+        },
+        actor,
+      );
+      await db
+        .update(s.styles)
+        .set({ createdAt: new Date('2026-11-22T12:00:00Z') })
+        .where(eq(s.styles.id, first));
+      await db
+        .update(s.styles)
+        .set({ createdAt: new Date('2026-11-22T12:00:00Z') })
+        .where(eq(s.styles.id, second));
+      await service.saveStyle(
+        first,
+        {
+          ...styleValues,
+          name: 'Edited first automatic style',
+          slug: 'first-automatic-style',
+        },
+        actor,
+      );
+      for (const styles of [
+        (await service.all()).styles,
+        (await createCatalogService(db).load()).styles,
+      ]) {
+        const ids = styles
+          .filter((style) => [first, second].includes(style.id))
+          .map((style) => style.id);
+        expect(ids).toEqual([second, first]);
+      }
+      for (const path of ['/admin/styles/new', '/admin/styles/' + first]) {
+        const page = await agent.get(path);
+        expect(page.status).toBe(200);
+        expect(page.text).not.toContain('Display order');
+      }
+    });
     it('searches owner records by contact/code and content while excluding private inspiration and literal SQL wildcards', async () => {
       const hold = await bookings.createHold(
         {
