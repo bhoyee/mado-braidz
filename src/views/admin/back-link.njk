@@ -1,0 +1,28 @@
+{% if admin and currentPath and currentPath != '/' %}
+  {% set backUrl = '/admin' %}
+  {% set backLabel = 'Back to overview' %}
+  {% if currentPath.indexOf('/styles/') == 0 or currentPath == '/addons' %}
+    {% set backUrl = '/admin/styles' %}
+    {% set backLabel = 'Back to Styles & prices' %}
+  {% elif currentPath.indexOf('/bookings/') == 0 %}
+    {% set backUrl = '/admin/bookings' %}
+    {% set backLabel = 'Back to appointments' %}
+    {% if currentPath.endsWith('/edit') %}
+      {% set backUrl = '/admin/bookings/' + currentPath.split('/')[2] %}
+      {% set backLabel = 'Back to appointment' %}
+    {% endif %}
+  {% elif currentPath == '/payment-reviews' %}
+    {% set backUrl = '/admin/bookings' %}
+    {% set backLabel = 'Back to appointments' %}
+  {% elif currentPath.indexOf('/clients/') == 0 %}
+    {% set backUrl = '/admin/clients' %}
+    {% set backLabel = 'Back to clients' %}
+  {% elif currentPath.indexOf('/gallery/') == 0 %}
+    {% set backUrl = '/admin/gallery' %}
+    {% set backLabel = 'Back to Photos & Our Work' %}
+  {% elif currentPath == '/availability' %}
+    {% set backUrl = '/admin/settings' %}
+    {% set backLabel = 'Back to settings' %}
+  {% endif %}
+  <nav class="owner-back-nav" aria-label="Back navigation"><a class="button outline owner-back-link" href="{{ backUrl }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg><span>{{ backLabel }}</span></a></nav>
+{% endif %}

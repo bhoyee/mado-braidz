@@ -3338,3 +3338,18 @@ dialog .button-row {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
 }
+
+.owner-back-nav {
+  margin-bottom: 20px;
+}
+.owner-app .owner-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.owner-back-link svg {
+  flex-shrink: 0;
+}
