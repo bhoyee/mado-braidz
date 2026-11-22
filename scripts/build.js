@@ -43,6 +43,7 @@ copyFileSync('src/client/booking.js', 'public/build/booking.js');
 copyFileSync('src/client/payment.js', 'public/build/payment.js');
 copyFileSync('src/client/batch-payment.js', 'public/build/batch-payment.js');
 copyFileSync('src/client/admin.js', 'public/build/admin.js');
+copyFileSync('src/client/admin-search.js', 'public/build/admin-search.js');
 copyFileSync('src/client/admin-gallery.js', 'public/build/admin-gallery.js');
 copyFileSync('src/client/admin-videos.js', 'public/build/admin-videos.js');
 buildSync({

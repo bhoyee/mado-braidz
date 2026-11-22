@@ -1,5 +1,6 @@
 import { and, or, eq, gte, gt, lt, asc, desc, sql, inArray } from 'drizzle-orm';
 import { presentAppointment } from './adminAppointment.js';
+import { createOwnerSearch } from './ownerSearch.js';
 import * as s from '../db/schema.js';
 
 export function createAdminRepository(db) {
@@ -41,6 +42,7 @@ export function createAdminRepository(db) {
     };
   }
   return {
+    searchPortal: createOwnerSearch(db),
     ...context(db),
     transaction: (run) => db.transaction((tx) => run(context(tx, true))),
     async ownerTwoFactorEnabled() {

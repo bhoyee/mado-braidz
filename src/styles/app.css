@@ -2,6 +2,7 @@
 @import './admin.css';
 @import './management.css';
 @import './admin-gallery.css';
+@import './admin-search.css';
 @import 'tailwindcss';
 @source '../views';
 

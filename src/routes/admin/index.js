@@ -16,6 +16,7 @@ import { daySlots, ZONE } from '../../services/availabilityService.js';
 import { priceBooking } from '../../services/pricingService.js';
 import { managementRouter } from './management.js';
 import { ownerNotifications } from './notifications.js';
+import { searchPortalPages } from '../../services/ownerSearch.js';
 
 const id = z.coerce.number().int().positive().safe();
 const cents = z.coerce.number().int().min(1).max(99999999);
@@ -200,6 +201,35 @@ export function adminRouter(
     }),
   );
   const actor = (req, res) => ({ ...res.locals.admin, ip: req.ip });
+  router.get(
+    '/api/search',
+    rateLimit({
+      windowMs: 60000,
+      limit: 90,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      handler: (_req, res) =>
+        res.status(429).json({ message: 'Try searching again shortly.' }),
+    }),
+    asyncRoute(async (req, res) => {
+      const query = z.string().trim().min(2).max(120).parse(req.query.q);
+      const pages = searchPortalPages(query);
+      const groups = await admins.searchPortal(query);
+      let remaining = 20;
+      res.json({
+        groups: [
+          ...(pages.length ? [{ label: 'Pages', items: pages }] : []),
+          ...groups,
+        ]
+          .map((group) => {
+            const items = group.items.slice(0, Math.min(3, remaining));
+            remaining -= items.length;
+            return { ...group, items };
+          })
+          .filter((group) => group.items.length),
+      });
+    }),
+  );
   if (notifications) router.use(ownerNotifications(notifications));
   router.get('/settings', (req, res, next) => {
     if (req.query.tab !== 'security') return next();

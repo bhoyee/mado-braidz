@@ -25,6 +25,7 @@ export function createLogger(config) {
         'req.body["cf-turnstile-response"]',
         'manageToken',
         'req.query.session_id',
+        'req.query.q',
         'req.params.token',
         'req.headers["x-csrf-token"]',
       ],

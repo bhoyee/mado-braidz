@@ -23,7 +23,17 @@ if (videoPanel) {
       );
     }),
   );
-  show(location.hash === '#videos' ? 'videos' : 'photos');
+  show(
+    location.hash === '#videos' || location.hash.startsWith('#video-')
+      ? 'videos'
+      : 'photos',
+  );
+  if (location.hash.startsWith('#video-'))
+    requestAnimationFrame(() =>
+      document
+        .getElementById(location.hash.slice(1))
+        ?.scrollIntoView({ block: 'center' }),
+    );
   const editDialog = document.querySelector('#library-video-edit'),
     edit = document.querySelector('[data-video-edit-form]');
   videoPanel.addEventListener('click', (event) => {

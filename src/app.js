@@ -98,7 +98,8 @@ export function createApp({
             safe.url = safe.url
               .replace(/(\/booking\/)[a-f0-9]{64}/g, '$1[redacted]')
               .replace(/(\/unsubscribe\/)\d+\.[a-f0-9]{64}/g, '$1[redacted]')
-              .replace(/(session_id=)[^&]+/g, '$1[redacted]');
+              .replace(/(session_id=)[^&]+/g, '$1[redacted]')
+              .replace(/([?&]q=)[^&]*/gi, '$1[redacted]');
           return safe;
         },
       },

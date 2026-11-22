@@ -1,0 +1,110 @@
+.owner-search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  max-width: 640px;
+}
+.owner-search-icon {
+  position: absolute;
+  left: 15px;
+  top: 14px;
+  color: #796588;
+  pointer-events: none;
+}
+.owner-app .owner-search input {
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  padding: 10px 14px 10px 45px;
+  border: 1px solid #d8cddb;
+  border-radius: 10px;
+  background: #fbf7f2;
+  color: #1c0f26;
+  font:
+    400 15px/1.4 Figtree,
+    sans-serif;
+}
+.owner-app .owner-search input:focus {
+  outline: 2px solid #7b3fc4;
+  outline-offset: 2px;
+  border-color: #7b3fc4;
+}
+.owner-search-popup {
+  position: absolute;
+  z-index: 60;
+  top: 58px;
+  left: 0;
+  width: 100%;
+  max-height: min(600px, 70vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #d8cddb;
+  border-radius: 12px;
+  background: #fbf7f2;
+  box-shadow: 0 16px 40px #1c0f2626;
+}
+.owner-search-status {
+  padding: 12px 16px;
+  margin: 0;
+  font-size: 12px;
+  color: #66556d;
+  border-bottom: 1px solid #e5dce9;
+}
+.owner-search-status.is-error {
+  color: #b3261e;
+}
+.owner-search-group {
+  padding: 12px 16px 6px;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5f2d9e;
+}
+.owner-search-result {
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px;
+  min-height: 56px;
+  color: #1c0f26;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.owner-search-result strong {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.owner-search-result span {
+  font-size: 12px;
+  color: #66556d;
+  line-height: 1.5;
+}
+.owner-search-result:hover,
+.owner-search-result[aria-selected='true'] {
+  background: #f4eefb;
+}
+.owner-notifications-header {
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-left: 236px;
+  padding: 16px clamp(20px, 4vw, 64px) 0;
+}
+.owner-notification-menu {
+  flex: 0 0 auto;
+}
+@media (max-width: 760px) {
+  .owner-notifications-header {
+    margin-left: 0;
+    gap: 12px;
+    padding: 16px 18px 0;
+  }
+  .owner-app .owner-search input {
+    font-size: 16px;
+  }
+  .owner-search-popup {
+    width: calc(100vw - 36px);
+    max-height: min(520px, 65vh);
+  }
+}

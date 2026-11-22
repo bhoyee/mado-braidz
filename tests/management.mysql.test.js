@@ -150,6 +150,103 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       fromPrice: '180',
       sort: 0,
     };
+    it('searches owner records by contact/code and content while excluding private inspiration and literal SQL wildcards', async () => {
+      const hold = await bookings.createHold(
+        {
+          ...validHold,
+          name: 'Maya Search',
+          email: 'maya.search@example.test',
+          phone: '+14437434979',
+          startAt: now.plus({ days: 19 }).set({ hour: 15, minute: 0 }).toISO(),
+        },
+        null,
+        { admin: actor, mode: 'override' },
+      );
+      const search = createAdminRepository(db).searchPortal;
+      for (const query of [
+        'MAYA.SEARCH@EXAMPLE.TEST',
+        '(443) 743-4979',
+        hold.ref,
+      ]) {
+        const groups = await search(query);
+        expect(
+          groups
+            .flatMap((g) => g.items)
+            .some((item) => item.href === '/admin/bookings/' + hold.id),
+        ).toBe(true);
+      }
+      const styleId = await service.saveStyle(
+        null,
+        {
+          ...styleValues,
+          name: 'Searchworthy Twists',
+          slug: undefined,
+          active: false,
+        },
+        actor,
+      );
+      await service.saveAddon(
+        null,
+        {
+          name: 'Searchworthy Wash',
+          slug: 'searchworthy-wash',
+          price: '25',
+          durationMin: 0,
+          active: true,
+          appliesToAll: true,
+        },
+        actor,
+      );
+      await service.saveMedia(
+        null,
+        {
+          kind: 'style',
+          styleId,
+          path: '/img/logo.webp',
+          alt: 'Searchworthy portfolio photo',
+          sort: 0,
+        },
+        actor,
+      );
+      await service.saveVideo(
+        null,
+        {
+          title: 'Searchworthy Film',
+          description: 'Short braid clip',
+          enabled: false,
+          showInWork: true,
+        },
+        { src: '/media/videos/test.mp4', poster: '/img/logo.webp' },
+        actor,
+      );
+      await db.insert(s.media).values({
+        kind: 'inspiration',
+        path: 'private.webp',
+        alt: 'PrivateInspirationOnly',
+        sort: 0,
+      });
+      const groups = await search('Searchworthy');
+      expect(groups.map((g) => g.label)).toEqual(
+        expect.arrayContaining([
+          'Styles & prices',
+          'Extras',
+          'Photos',
+          'Videos',
+        ]),
+      );
+      for (const query of ['PrivateInspirationOnly', '%_', "' OR 1=1 --"])
+        expect(await search(query)).toEqual([]);
+      const response = await agent
+        .get('/admin/api/search?q=Searchworthy')
+        .set('Accept', 'application/json')
+        .expect(200);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(
+        response.body.groups
+          .flatMap((g) => g.items)
+          .some((item) => item.href === '/admin/styles/' + styleId),
+      ).toBe(true);
+    });
     it('generates readable unique page addresses automatically and preserves them on name changes', async () => {
       const values = {
         ...styleValues,
