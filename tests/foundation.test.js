@@ -28,7 +28,7 @@ describe('foundation', () => {
       .get('/')
       .expect(200);
     expect(response.text).toContain('<!doctype html>');
-    expect(response.text).toContain('Mado African Braidz');
+    expect(response.text).toContain('Mado African Braids');
   });
   it('rejects unsafe form submissions', async () => {
     await request(

@@ -466,7 +466,7 @@ One item to confirm: the flyer lists Senegalese Twist as "Medium $180, Waist Len
       "capacity": 3
     },
     "business": {
-      "name": "Mado African Braidz",
+      "name": "Mado African Braids",
       "street": "7375 Executive Place",
       "city": "Lanham",
       "region": "MD",
@@ -786,7 +786,7 @@ The goal is to rank in Google's local map pack for "\[style\] near me" and "\[st
 {
   "@context": "https://schema.org",
   "@type": "HairSalon",
-  "name": "Mado African Braidz",
+  "name": "Mado African Braids",
   "url": "https://madoafricanbraidz.com",
   "telephone": "+1-443-743-4979",
   "image": "https://madoafricanbraidz.com/img/og-default.jpg",
@@ -942,3 +942,7 @@ Use Brevo instead of Postmark for automated email delivery. Retain the cPanel ma
 ## Owner amendment — additional owner accounts (November 23, 2026)
 
 More than one `owner` account is allowed, replacing the one-owner limit of the Milestone 5 amendment. Owners are added only by the server command `npm run admin:add`; each has full access, their own password and optional two-factor. Staff sign-in, invitations and team management UI stay deferred.
+
+## Owner amendment — payment recovery and name (November 23, 2026)
+
+The signed webhook stays the primary confirmation. As a backup, the server may retrieve a stored Checkout session directly from Stripe with the secret key; only a complete and paid session is applied, through the same bookingService validation, locks and duplicate protection. The browser is never trusted. The public salon name is "Mado African Braids"; the domain keeps its spelling.

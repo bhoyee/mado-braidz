@@ -7,7 +7,7 @@ export function designRouter(catalog, limit) {
     try {
       res.render('pages/design', {
         ...decorateCatalog(await catalog.load()),
-        title: 'Design library | Mado African Braidz',
+        title: 'Design library | Mado African Braids',
         isDesign: true,
       });
     } catch (error) {

@@ -298,7 +298,11 @@ export function decorateCatalog(data) {
         : null,
     };
   });
-  const b = data.settings.business;
+  const b = {
+    ...data.settings.business,
+    // Earlier setups stored the domain spelling.
+    name: data.settings.business.name.replace(/\bBraidz\b/, 'Braids'),
+  };
   const pages = { ...(data.settings.seo?.pages || {}) };
   let openingHours = data.settings.hours;
   if (openingHours?.customHours) {

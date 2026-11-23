@@ -11,7 +11,7 @@ export function contactRouter(config, notifications) {
   const router = Router();
   const render = (req, res, extra = {}) =>
     res.set('Cache-Control', 'no-store').render('pages/contact', {
-      title: 'Contact the studio | Mado African Braidz',
+      title: 'Contact the studio | Mado African Braids',
       csrfToken: generateToken(req),
       ...extra,
     });

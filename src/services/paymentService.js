@@ -339,7 +339,52 @@ export function createPaymentService(repository, provider, config, clock) {
       }
     }
   }
-  return {
+  // Backup for a missed webhook. Stripe itself is asked about the stored session
+  // and the result takes the same validated, locked path as a signed event, so a
+  // webhook arriving later cannot record the payment twice.
+  async function reconcileSession(sessionId) {
+    const session = await provider.retrieveSession(sessionId);
+    if (!session || session.id !== sessionId) return 'unknown';
+    const paid =
+      session.status === 'complete' && session.payment_status === 'paid';
+    if (!paid && session.status !== 'expired') return 'pending';
+    const object = { ...session, object: 'checkout.session' };
+    await service.handleEvent({
+      id: `reconcile_${sessionId}_${paid ? 'paid' : 'expired'}`,
+      type: paid ? 'checkout.session.completed' : 'checkout.session.expired',
+      data: { object },
+    });
+    return paid ? 'confirmed' : 'expired';
+  }
+  const lastCheck = new Map();
+  async function reconcileSoon(sessionId) {
+    const now = Date.now();
+    if (!provider || now - (lastCheck.get(sessionId) ?? 0) < 10000) return;
+    if (lastCheck.size > 500) lastCheck.clear();
+    lastCheck.set(sessionId, now);
+    try {
+      return await reconcileSession(sessionId);
+    } catch {
+      // The scheduled check retries; the page keeps showing its waiting state.
+      return 'failed';
+    }
+  }
+  const service = {
+    async reconcile() {
+      const result = { confirmed: 0, expired: 0, failed: 0 };
+      if (!provider) return result;
+      const now = clock ? clock().toJSDate() : new Date();
+      for (const sessionId of await repository.openSessions(now)) {
+        try {
+          const outcome = await reconcileSession(sessionId);
+          if (outcome in result) result[outcome]++;
+        } catch {
+          result.failed++;
+        }
+      }
+      return result;
+    },
+    reconcileSoon,
     checkout,
     cancel,
     authorize,
@@ -391,7 +436,7 @@ export function createPaymentService(repository, provider, config, clock) {
                     currency: 'usd',
                     unit_amount: batch.totalCents,
                     product_data: {
-                      name: `Payment for ${rows.length} Mado African Braidz appointments`,
+                      name: `Payment for ${rows.length} Mado African Braids appointments`,
                     },
                   },
                   quantity: 1,
@@ -557,8 +602,13 @@ export function createPaymentService(repository, provider, config, clock) {
       const attempt = await repository.attemptBySession(sessionId);
       if (!attempt)
         throw new BookingError('NOT_FOUND', 'Payment not found.', 404);
-      const booking = await repository.bookingById(attempt.bookingId);
+      let booking = await repository.bookingById(attempt.bookingId);
       await authorize(booking.ref, token);
+      if (
+        ['creating', 'open'].includes(attempt.status) &&
+        (await reconcileSoon(sessionId))
+      )
+        booking = await repository.bookingById(attempt.bookingId);
       const price =
         typeof booking.priceSnapshot === 'string'
           ? JSON.parse(booking.priceSnapshot)
@@ -576,4 +626,5 @@ export function createPaymentService(repository, provider, config, clock) {
       };
     },
   };
+  return service;
 }

@@ -4,7 +4,7 @@ document.querySelectorAll('[data-load-map]').forEach((button) => {
     const panel = button.closest('[data-map]');
     const iframe = document.createElement('iframe');
     iframe.src = panel.dataset.map;
-    iframe.title = 'Map to Mado African Braidz';
+    iframe.title = 'Map to Mado African Braids';
     iframe.referrerPolicy = 'no-referrer';
     iframe.allowFullscreen = true;
     panel.replaceChildren(iframe);

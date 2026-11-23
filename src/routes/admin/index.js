@@ -99,7 +99,7 @@ export function adminRouter(
       return res.status(403).send('HTTPS is required');
     res.locals.csrfToken = generateToken(req);
     res.locals.requestKey = randomUUID();
-    res.locals.title = 'Owner studio | Mado African Braidz';
+    res.locals.title = 'Owner studio | Mado African Braids';
     res.locals.currentPath = req.path;
     next();
   });

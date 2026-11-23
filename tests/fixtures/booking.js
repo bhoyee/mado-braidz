@@ -46,6 +46,15 @@ export async function memoryBookingRepository() {
           (b) => ['creating', 'open'].includes(b.status) && b.expiresAt < now,
         )
         .map((b) => ({ id: b.id })),
+    openSessions: async () =>
+      [
+        ...attempts.filter(
+          (a) => !a.batchId && ['creating', 'open'].includes(a.status),
+        ),
+        ...batches.filter((b) => b.status !== 'paid'),
+      ]
+        .map((row) => row.stripeSessionId)
+        .filter(Boolean),
     batch: async (id) => batches.find((b) => b.id === id),
     batchBySession: async (id) => batches.find((b) => b.stripeSessionId === id),
     batchByIntent: async (id) =>

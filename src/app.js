@@ -89,6 +89,13 @@ export function createApp({
     ? config.TURNSTILE_SITE_KEY
     : '';
   app.disable('x-powered-by');
+  const site = new URL(config.APP_URL);
+  app.use((req, res, next) =>
+    ['GET', 'HEAD'].includes(req.method) &&
+    req.hostname === 'www.' + site.hostname
+      ? res.redirect(301, site.origin + req.originalUrl)
+      : next(),
+  );
   app.use(
     pinoHttp({
       logger,

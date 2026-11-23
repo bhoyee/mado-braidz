@@ -68,7 +68,7 @@ export function paymentPortal(repository, config, payments, catalog) {
         'Referrer-Policy': 'no-referrer',
       })
       .render('pages/pay', {
-        title: 'Make a payment | Mado African Braidz',
+        title: 'Make a payment | Mado African Braids',
         csrfToken: generateToken(req),
         manualMethods: manualMethods(
           config,
@@ -242,7 +242,7 @@ export function paymentPortal(repository, config, payments, catalog) {
     res
       .set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' })
       .render('pages/batch-payment-result', {
-        title: 'Your payments | Mado African Braidz',
+        title: 'Your payments | Mado African Braids',
         sessionId,
         csrfToken: generateToken(req),
         hideMobileBooking: true,
@@ -257,7 +257,7 @@ export function paymentPortal(repository, config, payments, catalog) {
           'X-Robots-Tag': 'noindex, nofollow',
         })
         .render('pages/batch-payment-result', {
-          title: 'Your payments | Mado African Braidz',
+          title: 'Your payments | Mado African Braids',
           sessionId: batch.stripeSessionId,
           batchId: batch.id,
           cancelRequested: req.query.cancel === '1',
@@ -280,7 +280,12 @@ export function paymentPortal(repository, config, payments, catalog) {
         const initial = await repository.batchBySession(sessionId);
         if (!initial)
           throw new BookingError('NOT_FOUND', 'Payment not found.', 404);
-        const batch = await batchAccess(req, initial.id);
+        let batch = await batchAccess(req, initial.id);
+        if (
+          batch.status !== 'paid' &&
+          (await payments?.reconcileSoon(sessionId))
+        )
+          batch = await batchAccess(req, initial.id);
         const entries = await Promise.all(
           batch.items.map(async (item) => {
             const row = await repository.bookingById(item.bookingId);
@@ -440,7 +445,7 @@ export function paymentPortal(repository, config, payments, catalog) {
             })),
         );
         res.set('Cache-Control', 'no-store').render('pages/payment-reviews', {
-          title: 'Payment reviews | Mado African Braidz',
+          title: 'Payment reviews | Mado African Braids',
           rows,
           csrfToken: generateToken(req),
           hideMobileBooking: true,

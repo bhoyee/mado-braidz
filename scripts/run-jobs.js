@@ -20,12 +20,19 @@ try {
   else {
     const repository = createBookingRepository(db),
       bookings = createBookingService(repository);
-    const expired = await expireHolds(repository, bookings);
-    await createPaymentService(
+    const payments = createPaymentService(
       repository,
       createStripeProvider(config),
       config,
-    ).runRefunds();
+    );
+    // Check Stripe before releasing holds, so a paid chair is never given away.
+    const recovered = await payments.reconcile();
+    if (recovered.confirmed || recovered.failed)
+      console.log(
+        `Payment check: ${recovered.confirmed} recovered, ${recovered.failed} to retry`,
+      );
+    const expired = await expireHolds(repository, bookings);
+    await payments.runRefunds();
     const notifications = await createNotificationService(
       createNotificationRepository(db),
       config,

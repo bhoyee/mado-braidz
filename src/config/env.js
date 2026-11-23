@@ -64,7 +64,7 @@ export const envSchema = z
       .default(''),
     EMAIL_FROM: z
       .string()
-      .default('Mado African Braidz <bookings@madoafricanbraidz.com>'),
+      .default('Mado African Braids <bookings@madoafricanbraidz.com>'),
     ADMIN_ALERT_EMAILS: optional,
     VAPID_PUBLIC_KEY: optional,
     VAPID_PRIVATE_KEY: optional,

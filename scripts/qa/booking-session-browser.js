@@ -93,7 +93,7 @@ try {
   // Stripe finished, but the webhook has not arrived.
   const session = provider.sessions.get('cs_test_2');
   session.status = 'complete';
-  session.payment_status = 'paid';
+  session.payment_status = 'unpaid';
   const status = origin + '/book/success?session_id=cs_test_2';
   await page.goto(status);
   assert.equal(await page.locator('#payment-actions').isVisible(), false);

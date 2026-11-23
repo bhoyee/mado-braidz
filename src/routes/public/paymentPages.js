@@ -17,7 +17,7 @@ export function paymentPages(repository, config, payments, catalog) {
     res
       .set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' })
       .render('pages/payment-result', {
-        title: 'Your appointment | Mado African Braidz',
+        title: 'Your appointment | Mado African Braids',
         sessionId,
       });
   });
@@ -36,7 +36,7 @@ export function paymentPages(repository, config, payments, catalog) {
         'Referrer-Policy': 'no-referrer',
       })
       .render('pages/manage-payment', {
-        title: 'Your visit | Mado African Braidz',
+        title: 'Your visit | Mado African Braids',
         hideMobileBooking: true,
         appointment: row,
         price,

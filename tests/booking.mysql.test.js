@@ -435,6 +435,39 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       });
       expect(await db.select().from(s.payments)).toHaveLength(1);
     }, 30000);
+    it('records one payment when the webhook and the recovery check race', async () => {
+      const provider = fakeStripe();
+      const service = createBookingService(
+        repository,
+        () => now,
+        paymentConfig.SESSION_SECRET,
+      );
+      const payments = createPaymentService(
+        repository,
+        provider,
+        paymentConfig,
+        () => now,
+      );
+      const hold = await service.createHold(validHold);
+      const { sessionId } = await payments.checkout(hold.ref, hold.manageToken);
+      const session = provider.sessions.get(sessionId);
+      expect(await repository.openSessions(now.toJSDate())).toEqual([
+        sessionId,
+      ]);
+      expect(
+        await repository.openSessions(now.plus({ days: 4 }).toJSDate()),
+      ).toEqual([]);
+      Object.assign(session, { status: 'complete', payment_status: 'paid' });
+      await Promise.all([
+        payments.handleEvent(paidEvent(session, 'evt_race')),
+        payments.reconcile(),
+        payments.reconcile(),
+      ]);
+      const [booking] = await db.select().from(s.bookings);
+      expect(booking).toMatchObject({ status: 'confirmed', paidCents: 3000 });
+      expect(await db.select().from(s.payments)).toHaveLength(1);
+      expect(await repository.openSessions(now.toJSDate())).toEqual([]);
+    }, 30000);
     it('blocks staggered overlaps, snapshots addon money, and admits an expired hold replacement', async () => {
       const service = createBookingService(repository, () => now);
       await service.createHold({ ...validHold, addonIds: [2] });

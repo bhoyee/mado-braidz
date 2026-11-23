@@ -1,4 +1,14 @@
-import { and, eq, gt, inArray, lt, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  isNotNull,
+  lt,
+  sql,
+} from 'drizzle-orm';
 import { createCatalogService } from './catalogService.js';
 import * as s from '../db/schema.js';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -339,6 +349,39 @@ function context(db, locking = false) {
     },
     async notify(values) {
       await db.insert(s.notifications).values(values);
+    },
+    // Checkout sessions whose result has not been recorded yet.
+    async openSessions(now) {
+      const recent = new Date(+now - 3 * 86400000);
+      const [attempts, batches] = await Promise.all([
+        db
+          .select({ id: s.checkoutAttempts.stripeSessionId })
+          .from(s.checkoutAttempts)
+          .where(
+            and(
+              isNull(s.checkoutAttempts.batchId),
+              isNotNull(s.checkoutAttempts.stripeSessionId),
+              inArray(s.checkoutAttempts.status, ['creating', 'open']),
+              gt(s.checkoutAttempts.createdAt, recent),
+            ),
+          )
+          .orderBy(desc(s.checkoutAttempts.createdAt))
+          .limit(40),
+        db
+          .select({ id: s.paymentBatches.stripeSessionId })
+          .from(s.paymentBatches)
+          .where(
+            and(
+              isNotNull(s.paymentBatches.stripeSessionId),
+              // A locally expired group may still have been paid in time.
+              inArray(s.paymentBatches.status, ['creating', 'open', 'expired']),
+              gt(s.paymentBatches.createdAt, new Date(+now - 86400000)),
+            ),
+          )
+          .orderBy(desc(s.paymentBatches.createdAt))
+          .limit(20),
+      ]);
+      return [...attempts, ...batches].map((row) => row.id);
     },
     async expiredHolds(now) {
       return db
