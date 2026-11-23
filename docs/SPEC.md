@@ -938,3 +938,7 @@ Combined Checkout stores a durable `payment_batches` record and batch-linked `ch
 ## Owner amendment — Milestone 7 email provider (November 18, 2026)
 
 Use Brevo instead of Postmark for automated email delivery. Retain the cPanel mailbox for replies. Keep the existing reminder, consent, unsubscribe, email-log, owner notification and push requirements. Brevo delivery uses its email API and authenticated delivery callbacks. Verify the sending domain and test inbox delivery before enabling client sending.
+
+## Owner amendment — additional owner accounts (November 23, 2026)
+
+More than one `owner` account is allowed, replacing the one-owner limit of the Milestone 5 amendment. Owners are added only by the server command `npm run admin:add`; each has full access, their own password and optional two-factor. Staff sign-in, invitations and team management UI stay deferred.

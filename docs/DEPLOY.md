@@ -76,6 +76,18 @@ Build, lint, 158 application tests, 10 actual MySQL integration tests and isolat
 8. Configure the Stripe **test-mode** webhook endpoint at `https://madoafricanbraidz.com/webhooks/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`, `refund.updated`, `refund.failed`. Its `whsec_...` differs from the local Stripe CLI listener secret.
 9. Check HTTPS home/styles/booking/pay, static images/fonts/video, `/health`, actual database access and owner login. Verify protected admin routes, secure cookies, CSRF, availability, a sandbox checkout and webhook delivery. Do not interpret `/health` alone as database/payment verification.
 
+## Add another owner
+
+In the server terminal (cPanel Terminal or SSH):
+
+```bash
+cd /home/madoafri/mado-app
+export PATH=/opt/alt/alt-nodejs20/root/usr/bin:$PATH
+npm run admin:add -- --email=person@example.com --name="Person Name"
+```
+
+This adds a full-access owner to the database named in the server `.env` without changing other accounts. They set their password at https://madoafricanbraidz.com/admin/forgot.
+
 ## Deferred integrations
 
 The initial server configuration used `TURNSTILE_ENABLED=false` at the owner's request. The owner subsequently supplied genuine keys and requested activation; the server now uses **`TURNSTILE_ENABLED=true`**. Booking and contact tokens are verified server-side against the configured hostname and their respective `booking` / `contact` actions. Keep both keys private in the server runtime and restart Passenger after changes. Never insert fake keys on the server. The contact form remains disabled until email setup, as explicitly requested; its endpoint is already protected and no enquiries are stored or sent.

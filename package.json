@@ -15,6 +15,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.js",
+    "admin:add": "node scripts/add-admin.js",
     "db:seed": "node scripts/seed.js",
     "test:browser": "node scripts/qa/browser.js",
     "media:prepare": "node scripts/prepare-media.js",

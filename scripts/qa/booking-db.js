@@ -7,6 +7,7 @@ const result = spawnSync(
     'tests/booking.mysql.test.js',
     'tests/management.mysql.test.js',
     'tests/notifications.mysql.test.js',
+    'tests/admin-accounts.mysql.test.js',
   ],
   { stdio: 'inherit', env: { ...process.env, BOOKING_DATABASE_TEST: '1' } },
 );
