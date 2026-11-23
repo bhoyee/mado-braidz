@@ -204,6 +204,7 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
           (p) => p.id === id,
         ),
       ).toBe(false);
+      await service.removeMedia(id, actor);
     });
     it('creates a published style and its first priced size and length in one save', async () => {
       const response = await agent
