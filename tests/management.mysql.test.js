@@ -150,6 +150,54 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       fromPrice: '180',
       sort: 0,
     };
+    it('creates a published style and its first priced size and length in one save', async () => {
+      const response = await agent
+        .post('/admin/styles/save')
+        .set('Accept', 'application/json')
+        .send({
+          ...styleValues,
+          slug: 'one-save-priced-style',
+          name: 'One save priced style',
+          priceOnConsultation: false,
+          durationHours: '4',
+          initialPrice: '160.50',
+          initialSize: 'medium',
+          initialLength: 'shoulder',
+          _csrf: token,
+        })
+        .expect(200);
+      const id = Number(response.body.url.split('/').at(-1));
+      const catalog = await createCatalogService(db).load();
+      const style = catalog.styles.find((item) => item.id === id);
+      expect(style.priceOnConsultation).toBe(false);
+      expect(style.variants).toHaveLength(1);
+      expect(style.variants[0]).toMatchObject({
+        priceCents: 16050,
+        size: 'medium',
+        length: 'shoulder',
+        active: true,
+      });
+      expect(
+        (await repository.catalog()).styles.find((item) => item.id === id)
+          .variants[0].priceCents,
+      ).toBe(16050);
+      await agent
+        .post('/admin/styles/save')
+        .set('Accept', 'application/json')
+        .send({
+          ...styleValues,
+          slug: 'bad-first-price',
+          priceOnConsultation: false,
+          initialPrice: '-1',
+          _csrf: token,
+        })
+        .expect(400);
+      expect(
+        (await service.all()).styles.some(
+          (item) => item.slug === 'bad-first-price',
+        ),
+      ).toBe(false);
+    });
     it('lists newest styles first without manual ordering and keeps edits in place', async () => {
       const actor = { id: 1, ip: '127.0.0.1' };
       const first = await service.saveStyle(

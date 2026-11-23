@@ -280,6 +280,16 @@ export function createManagementService(db, clock = () => new Date()) {
             slug = `${base}-${suffix++}`;
         }
         const { fromPrice, ...input } = styleInput.parse({ ...raw, slug });
+        const firstPrice =
+          !id && !input.priceOnConsultation && raw.initialPrice
+            ? variantInput.parse({
+                price: raw.initialPrice,
+                size: raw.initialSize || '',
+                length: raw.initialLength || '',
+                durationMin: '',
+                active: true,
+              })
+            : null;
         exists(
           (
             await tx
@@ -306,7 +316,7 @@ export function createManagementService(db, clock = () => new Date()) {
                   ),
                 )
             : [];
-          if (!options.length)
+          if (!options.length && !firstPrice)
             throw new ManagementError(
               'Add a price option before publishing, or choose price on consultation.',
             );
@@ -315,6 +325,22 @@ export function createManagementService(db, clock = () => new Date()) {
           await tx.update(s.styles).set(values).where(eq(s.styles.id, id));
         else
           id = (await tx.insert(s.styles).values(values).$returningId())[0].id;
+        if (firstPrice) {
+          const { price, ...option } = firstPrice;
+          const variantValues = {
+            ...option,
+            styleId: id,
+            priceCents: price,
+            sort: 0,
+          };
+          const variantId = (
+            await tx
+              .insert(s.styleVariants)
+              .values(variantValues)
+              .$returningId()
+          )[0].id;
+          await audit(tx, actor, 'variant', variantId, null, variantValues);
+        }
         if (before && before.slug !== input.slug) {
           const source = '/styles/' + before.slug,
             target = '/styles/' + input.slug;

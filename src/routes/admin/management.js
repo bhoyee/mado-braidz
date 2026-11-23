@@ -53,7 +53,7 @@ export function managementRouter(service, config) {
     '/styles/new',
     run((req, res) =>
       render(req, res, 'style', {
-        item: { active: false, durationMin: 240 },
+        item: { active: true, durationMin: 240 },
         itemVariants: [],
       }),
     ),

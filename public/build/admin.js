@@ -1,4 +1,16 @@
 const alertBox = document.querySelector('.owner-alert');
+const firstStylePrice = document.querySelector('[data-first-style-price]');
+if (firstStylePrice) {
+  const consultation = firstStylePrice.form.elements.priceOnConsultation;
+  const togglePrice = () => {
+    firstStylePrice.hidden = consultation.checked;
+    firstStylePrice.disabled = consultation.checked;
+    firstStylePrice.querySelector('[name="initialPrice"]').required =
+      !consultation.checked;
+  };
+  consultation.addEventListener('change', togglePrice);
+  togglePrice();
+}
 document.querySelectorAll('[data-owner-modal-open]').forEach((button) => {
   const dialog = document.getElementById(button.dataset.ownerModalOpen);
   if (!(dialog instanceof HTMLDialogElement)) return;
