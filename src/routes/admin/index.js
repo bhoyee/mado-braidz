@@ -1,3 +1,4 @@
+import { guideFor } from '../../config/guideVideos.js';
 import { bookingPaymentSource } from '../../services/adminAppointment.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -102,6 +103,14 @@ export function adminRouter(
     res.locals.requestKey = randomUUID();
     res.locals.title = 'Owner studio | Mado African Braids';
     res.locals.currentPath = req.path;
+    const today = DateTime.now().setZone(ZONE);
+    res.locals.todayLabel = today.toFormat('cccc, LLLL d');
+    res.locals.year = today.year;
+    res.locals.guide = guideFor(
+      req.path,
+      req.query.tab,
+      config.NODE_ENV === 'production',
+    );
     next();
   });
   const renderAuth = (res, page, extra = {}) =>

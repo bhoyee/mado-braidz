@@ -1,3 +1,4 @@
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { paymentPages } from './routes/public/paymentPages.js';
 import { manualMethods } from './routes/public/paymentPortal.js';
 import {
@@ -135,6 +136,10 @@ export function createApp({
             'https://maps.google.com',
             'https://www.google.com',
             'https://challenges.cloudflare.com',
+            (req) =>
+              req.path.startsWith('/admin')
+                ? 'https://www.youtube-nocookie.com'
+                : "'self'",
           ],
           connectSrc: ["'self'", 'https://challenges.cloudflare.com'],
           fontSrc: [
@@ -254,6 +259,13 @@ export function createApp({
   );
   views.addFilter('money', money);
   views.addFilter('payMethod', methodName);
+  views.addFilter('phone', (value) => {
+    const phone = parsePhoneNumberFromString(String(value || ''));
+    if (!phone) return value;
+    return phone.country === 'US'
+      ? phone.formatNational()
+      : phone.formatInternational();
+  });
   views.addFilter('et', (value, format = 'ccc, LLL d · h:mm a') =>
     value
       ? DateTime.fromJSDate(new Date(value), {

@@ -950,3 +950,7 @@ The signed webhook stays the primary confirmation. As a backup, the server may r
 ## Owner amendment — search and AI tools (November 23, 2026)
 
 Tool-neutral SEO: owner-editable page titles and descriptions, verification meta tags (name and code only, never scripts), Service/Offer, BreadcrumbList and FAQPage data matching visible content, and `/llms.txt`. No third-party SEO script is loaded and no tool may change the site automatically.
+
+## Owner amendment — guide videos (November 23, 2026)
+
+Each admin page may have a YouTube guide video configured in code. It opens in a small floating player that never blocks the page, can be moved, enlarged, minimised or closed, and closes when the page changes. Nothing loads from YouTube before the owner asks; the public site is unaffected.

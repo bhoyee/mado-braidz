@@ -1,0 +1,8 @@
+<section class="guide-player" id="guide-player" data-guide-player data-video="{{ guide.id }}" role="region" aria-label="Guide: {{ guide.title }}" tabindex="-1" hidden>
+<div class="guide-bar" data-guide-bar><p><span>Guide</span> {{ guide.title }}</p>
+<button type="button" data-guide-min aria-label="Minimise video" title="Minimise"><span aria-hidden="true">–</span></button>
+<button type="button" data-guide-size aria-label="Make bigger" title="Bigger"><span aria-hidden="true">⤢</span></button>
+<button type="button" data-guide-close aria-label="Close video" title="Close"><span aria-hidden="true">✕</span></button></div>
+<div class="guide-frame" data-guide-frame></div>
+</section>
+<script defer src="/build/admin-guide.js"></script>

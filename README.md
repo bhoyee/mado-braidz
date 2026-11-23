@@ -60,6 +60,14 @@ All 21 Section 9 foundation tables are included; Milestone 4 adds checkout_attem
 
 Signed Stripe webhooks remain the normal confirmation path. If one is missed, `scripts/run-jobs.js` (before releasing holds) and the waiting page ask Stripe about the stored Checkout session and apply the same validated booking event. Keep the five-minute cron running. Requests to `www.` of `APP_URL` redirect permanently to `APP_URL`.
 
+### Owner guide videos
+
+Edit `src/config/guideVideos.js` and replace `SAMPLE` with each page's YouTube link. Samples appear locally only. The player uses youtube-nocookie.com, is allowed by CSP in `/admin` only, and loads after the owner clicks **Watch guide**.
+
+### Live admin pages
+
+`src/client/admin-live.js` refreshes `data-live` regions on the overview and appointment book every 15 seconds while the tab is visible. Check it with `npm run test:live:browser`.
+
 ### Booking emails
 
 `src/services/bookingEmail.js` builds customer booking emails and owner alerts (new booking, Zelle/Cash App review, reschedule, cancellation) for `src/views/emails/booking.html.njk`. Run `npm run emails:preview` to write samples to `tmp/email-preview/index.html`; it uses sample data and sends nothing. Owner alerts include client contact details, so list only trusted inboxes.

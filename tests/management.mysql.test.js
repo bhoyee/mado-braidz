@@ -277,6 +277,27 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         .where(eq(s.bookings.id, hold.id));
       expect(row).toMatchObject({ status: 'confirmed', paidCents: 3000 });
     });
+    it('shows the owner header, footer, live search and client phone', async () => {
+      await bookings.createHold(validHold);
+      for (const path of ['/admin', '/admin/bookings']) {
+        const { text } = await agent.get(path).expect(200);
+        expect(text).toContain('Developed and powered by');
+        expect(text).toContain('All rights reserved');
+        expect(text).toContain('class="owner-account"');
+        expect(text).toContain(
+          'class="owner-phone" href="tel:+14437434979">(443) 743-4979</a>',
+        );
+      }
+      const { text } = await agent.get('/admin');
+      expect(text).toContain('data-live-filter');
+      expect(text).toContain('data-live="appointments"');
+      for (const path of ['/admin/balances', '/admin/payment-reviews'])
+        expect((await agent.get(path).expect(200)).text).toContain(
+          'data-live=',
+        );
+      const login = await request(app).get('/admin/login').expect(200);
+      expect(login.text).not.toContain('owner-footer');
+    });
     it('creates a published style and its first priced size and length in one save', async () => {
       const response = await agent
         .post('/admin/styles/save')

@@ -232,12 +232,31 @@
   color: var(--color-night);
   text-decoration: none;
   transition:
+    transform 180ms,
     border-color 150ms,
-    box-shadow 150ms;
+    box-shadow 180ms;
 }
 .overview-metric:hover {
   border-color: var(--color-violet);
-  box-shadow: 0 6px 20px #1c0f2610;
+  box-shadow: 0 12px 28px #1c0f2624;
+}
+.overview-metric:focus-visible {
+  outline: 3px solid var(--color-violet);
+  outline-offset: 3px;
+}
+.overview-metric-foot span {
+  transition: transform 180ms;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .overview-metric:hover {
+    transform: translateY(-5px);
+  }
+  .overview-metric:active {
+    transform: translateY(-1px);
+  }
+  .overview-metric:hover .overview-metric-foot span {
+    transform: translate(3px, -3px);
+  }
 }
 .overview-metric-label {
   font-size: 13px;
@@ -264,7 +283,23 @@
   font-size: 18px;
 }
 .overview-metric-balance {
-  background: var(--color-mist);
+  border-color: #d99a2b;
+  background: #f9dfa6;
+  color: #3d2500;
+}
+.overview-metric-balance:hover {
+  border-color: #9a5f00;
+}
+.overview-metric-balance .overview-metric-foot {
+  color: #6b4300;
+}
+.overview-metric-upcoming {
+  border-color: var(--color-violet-deep);
+  background: var(--color-violet-deep);
+  color: #fff;
+}
+.overview-metric-upcoming .overview-metric-foot {
+  color: var(--color-lilac-soft);
 }
 .overview-panel .owner-section-heading {
   align-items: center;
