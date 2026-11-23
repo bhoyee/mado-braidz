@@ -43,7 +43,7 @@
     </div>
   </div>
   <div class="style-grid">
-    {% for style in styles %}{% if loop.index <= 6 %}{{ card(style) }}{% endif %}{% else %}<p>Call the studio to talk through the look you have in mind.</p>{% endfor %}
+    {% for style in featuredStyles %}{{ card(style) }}{% else %}<p>Call the studio to talk through the look you have in mind.</p>{% endfor %}
   </div>
 </section>
 

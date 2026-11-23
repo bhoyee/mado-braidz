@@ -3371,3 +3371,33 @@ dialog .button-row {
     flex: 1 0 100%;
   }
 }
+.owner-app .owner-alert {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  width: min(400px, calc(100vw - 32px));
+  margin: 0;
+  padding: 16px 54px 16px 20px;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px #1c0f2626;
+  overflow-wrap: anywhere;
+}
+.owner-app [data-owner-toast-close] {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 24px;
+  cursor: pointer;
+}
+@media (max-width: 600px) {
+  .owner-app .owner-alert {
+    top: 16px;
+    right: 16px;
+  }
+}

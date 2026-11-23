@@ -358,6 +358,9 @@ export function decorateCatalog(data) {
       studioVideos(data.settings).map((v) => [v.id, v]),
     ),
     styles,
+    featuredStyles: styles.filter(
+      (style) => style.featured && style.active !== false,
+    ),
     mensStyles: styles.filter((style) => style.category === 'mens'),
     heroStyle:
       styles.find((style) => style.slug === 'knotless-braids') || styles[0],

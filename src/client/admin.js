@@ -276,11 +276,35 @@ document
 document
   .querySelector('nav[aria-label="Owner navigation"] a[aria-current]')
   ?.scrollIntoView({ block: 'nearest', inline: 'center' });
-function report(message) {
-  alertBox.classList.remove('owner-alert-success');
-  alertBox.textContent = message;
+let toastTimer;
+function dismissToast() {
+  clearTimeout(toastTimer);
+  alertBox.hidden = true;
+}
+function toast(message, success = false) {
+  clearTimeout(toastTimer);
+  alertBox.querySelector('[data-owner-toast-message]').textContent = message;
+  alertBox.classList.toggle('owner-alert-success', success);
+  alertBox.setAttribute('role', success ? 'status' : 'alert');
   alertBox.hidden = false;
-  alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toastTimer = setTimeout(dismissToast, success ? 5000 : 8000);
+}
+alertBox
+  .querySelector('[data-owner-toast-close]')
+  .addEventListener('click', dismissToast);
+alertBox.addEventListener('mouseenter', () => clearTimeout(toastTimer));
+alertBox.addEventListener('focusin', () => clearTimeout(toastTimer));
+alertBox.addEventListener('mouseleave', () => {
+  toastTimer = setTimeout(dismissToast, 5000);
+});
+alertBox.addEventListener('focusout', () => {
+  toastTimer = setTimeout(dismissToast, 5000);
+});
+window.addEventListener('owner-toast', (event) =>
+  toast(event.detail.message, event.detail.success),
+);
+function report(message) {
+  toast(message);
 }
 const resetToken = document.querySelector('#reset-token');
 function confirmAction(form) {
@@ -312,6 +336,7 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
     if (!formError) return report(message);
     formError.textContent = message;
     formError.hidden = false;
+    report(message);
   };
   let busy = false;
   let confirming = false;
@@ -344,7 +369,18 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
     const buttons = [
       ...form.querySelectorAll('button[type="submit"], button:not([type])'),
     ];
+    const originalButtons = buttons.map((button) => ({
+      button,
+      disabled: button.disabled,
+      text: button.textContent,
+    }));
     buttons.forEach((button) => (button.disabled = true));
+    const submitter = event.submitter || buttons[0];
+    if (submitter)
+      submitter.textContent =
+        form.enctype === 'multipart/form-data' ? 'Uploading…' : 'Saving…';
+    form.setAttribute('aria-busy', 'true');
+    let navigating = false;
     try {
       // A control named "action" shadows HTMLFormElement.action. Read the
       // attribute so booking actions and hidden action fields cannot replace
@@ -384,6 +420,7 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
           result.message || result.error || 'Unable to save. Please try again.',
         );
       if (result.url) {
+        navigating = true;
         sessionStorage.setItem('owner-message', result.message || 'Saved.');
         const target = new URL(result.url, location.href);
         if (
@@ -395,12 +432,18 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
           history.replaceState(null, '', target.href);
           location.reload();
         } else location.assign(result.url);
-      }
+      } else toast(result.message || 'Saved.', true);
     } catch (error) {
       reportError(error.message);
     } finally {
-      busy = false;
-      buttons.forEach((button) => (button.disabled = false));
+      if (!navigating) {
+        busy = false;
+        form.removeAttribute('aria-busy');
+        for (const { button, disabled, text } of originalButtons) {
+          button.disabled = disabled;
+          button.textContent = text;
+        }
+      }
     }
   });
 });
@@ -467,9 +510,7 @@ if (photoList) {
 }
 if (savedMessage) {
   sessionStorage.removeItem('owner-message');
-  alertBox.textContent = savedMessage;
-  alertBox.classList.add('owner-alert-success');
-  alertBox.hidden = false;
+  toast(savedMessage, true);
 }
 document.querySelectorAll('[data-copy-link]').forEach((button) =>
   button.addEventListener('click', async () => {

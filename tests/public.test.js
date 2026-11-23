@@ -6,6 +6,21 @@ import { createApp } from '../src/app.js';
 import { parseEnv } from '../src/config/env.js';
 import { fixtureCatalog } from './fixtures/catalog.js';
 import { decorateCatalog, safePhoto } from '../src/routes/public/index.js';
+it('uses featured styles for the home signature section, including styles after the first six', async () => {
+  const data = await fixtureCatalog().load();
+  data.styles.forEach((style) => {
+    style.featured = false;
+  });
+  const selected = data.styles.at(-1);
+  selected.featured = true;
+  const app = createApp({ config, catalog: { load: async () => data } });
+  const page = await request(app).get('/').expect(200);
+  const section = page.text.match(
+    /<section[^>]*aria-labelledby="styles-heading"[\s\S]*?<\/section>/,
+  )[0];
+  expect(section).toContain('/styles/' + selected.slug);
+  expect(section).not.toContain('/styles/' + data.styles[0].slug + '"');
+});
 const config = parseEnv({
   NODE_ENV: 'test',
   SESSION_SECRET: 'test-secret-at-least-thirty-two-characters',

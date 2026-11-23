@@ -4,7 +4,6 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import luxonPlugin from '@fullcalendar/luxon3';
 const element = document.querySelector('#owner-calendar');
-const alertBox = document.querySelector('.owner-alert');
 const dialog = document.querySelector('#owner-dialog');
 if (element) {
   const calendar = new Calendar(element, {
@@ -38,9 +37,14 @@ if (element) {
     slotEventOverlap: false,
     events: '/admin/api/calendar',
     eventSourceFailure() {
-      alertBox.textContent =
-        'Unable to load appointments. Refresh or sign in again.';
-      alertBox.hidden = false;
+      window.dispatchEvent(
+        new CustomEvent('owner-toast', {
+          detail: {
+            message: 'Unable to load appointments. Refresh or sign in again.',
+            success: false,
+          },
+        }),
+      );
     },
     dateClick(info) {
       const local = info.dateStr;
@@ -84,14 +88,18 @@ if (element) {
             if (!response.ok)
               throw new Error(result.message || 'Unable to move appointment.');
             calendar.refetchEvents();
-            alertBox.textContent = 'Appointment moved.';
-            alertBox.classList.add('owner-alert-success');
-            alertBox.hidden = false;
+            window.dispatchEvent(
+              new CustomEvent('owner-toast', {
+                detail: { message: 'Appointment moved.', success: true },
+              }),
+            );
           } catch (error) {
             info.revert();
-            alertBox.classList.remove('owner-alert-success');
-            alertBox.textContent = error.message;
-            alertBox.hidden = false;
+            window.dispatchEvent(
+              new CustomEvent('owner-toast', {
+                detail: { message: error.message, success: false },
+              }),
+            );
           }
         },
         { once: true },
