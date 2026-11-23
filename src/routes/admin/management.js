@@ -11,6 +11,7 @@ import { prepareCatalogImage } from '../../services/catalogImages.js';
 import { prepareCatalogVideo } from '../../services/catalogVideos.js';
 import { publicSettings } from '../../db/public-defaults.js';
 import { ManagementError } from '../../services/managementErrors.js';
+import { photoPlacement } from '../../services/photoPlacement.js';
 
 const optionalId = (v) => (v ? entityId.parse(v) : null);
 const text = (max) => z.string().trim().max(max).default('');
@@ -248,6 +249,7 @@ export function managementRouter(service, config) {
     '/gallery/upload',
     upload,
     run(async (req, res) => {
+      const placement = photoPlacement(req.body);
       const input = z
         .object({
           alt: z.string().trim().min(3).max(500),
@@ -256,7 +258,7 @@ export function managementRouter(service, config) {
           sort: z.coerce.number().int().min(0).max(9999).default(0),
           returnTo: z.enum(['style', 'gallery']).default('style'),
         })
-        .parse(req.body);
+        .parse({ ...req.body, kind: placement.kind });
       const styleId = optionalId(input.styleId);
       if (input.kind === 'style' && !styleId)
         throw new ManagementError('Choose the style for this photo');
@@ -278,6 +280,7 @@ export function managementRouter(service, config) {
             ...values,
             alt: input.alt,
             kind: input.kind,
+            showInWork: placement.showInWork,
             styleId,
             sort: input.sort,
           },
@@ -329,6 +332,7 @@ export function managementRouter(service, config) {
   router.post(
     '/gallery/:id',
     run(async (req, res) => {
+      const placement = photoPlacement(req.body);
       const v = z
         .object({
           alt: z.string().trim().min(3).max(500),
@@ -336,13 +340,13 @@ export function managementRouter(service, config) {
           styleId: text(20),
           kind: z.enum(['style', 'gallery']),
         })
-        .parse(req.body);
+        .parse({ ...req.body, kind: placement.kind });
       const styleId = optionalId(v.styleId);
       if (v.kind === 'style' && !styleId)
         throw new ManagementError('Choose a style');
       await service.saveMedia(
         entityId.parse(req.params.id),
-        { ...v, styleId },
+        { ...v, styleId, showInWork: placement.showInWork },
         actor(req, res),
       );
       finish(req, res, '/admin/gallery');

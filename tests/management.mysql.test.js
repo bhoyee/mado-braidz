@@ -150,6 +150,61 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       fromPrice: '180',
       sort: 0,
     };
+    it('uploads one photo to both placements and preserves placement through replacement', async () => {
+      const image = await sharp({
+        create: { width: 32, height: 32, channels: 3, background: '#663399' },
+      })
+        .png()
+        .toBuffer();
+      const upload = await agent
+        .post('/admin/gallery/upload')
+        .set('x-csrf-token', token)
+        .set('Accept', 'application/json')
+        .field('_csrf', token)
+        .field('placementFields', '1')
+        .field('showOnStyle', 'on')
+        .field('showInWork', 'on')
+        .field('styleId', '1')
+        .field('alt', 'Shared braid photo')
+        .field('returnTo', 'gallery')
+        .attach('photo', image, 'shared.png')
+        .expect(200);
+      const id = Number(upload.body.url.split('#photo-')[1]);
+      const catalog = await createCatalogService(db).load();
+      expect(
+        catalog.styles.find((s) => s.id === 1).photos.some((p) => p.id === id),
+      ).toBe(true);
+      expect(catalog.gallery.some((p) => p.id === id)).toBe(true);
+      const before = await service.media(id);
+      await agent
+        .post('/admin/gallery/' + id + '/replace')
+        .set('x-csrf-token', token)
+        .set('Accept', 'application/json')
+        .field('_csrf', token)
+        .attach('photo', image, 'replacement.png')
+        .expect(200);
+      expect((await service.media(id)).variants.showInWork).toBe(true);
+      await agent
+        .post('/admin/gallery/' + id)
+        .set('Accept', 'application/json')
+        .send({
+          _csrf: token,
+          placementFields: '1',
+          showOnStyle: true,
+          styleId: '1',
+          alt: 'Style only braid photo',
+          sort: 0,
+        })
+        .expect(200);
+      const after = await service.media(id);
+      expect(after.variants.showInWork).toBe(false);
+      expect(after.variants.sizes.length).toBe(before.variants.sizes.length);
+      expect(
+        (await createCatalogService(db).load()).gallery.some(
+          (p) => p.id === id,
+        ),
+      ).toBe(false);
+    });
     it('creates a published style and its first priced size and length in one save', async () => {
       const response = await agent
         .post('/admin/styles/save')

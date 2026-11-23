@@ -12,7 +12,9 @@ if (list) {
     for (const card of cards) {
       const data = card.dataset;
       const visible =
-        (kind === 'all' || kind === data.photoKind) &&
+        (kind === 'all' ||
+          kind === data.photoKind ||
+          (kind === 'gallery' && data.photoWork === 'true')) &&
         (!style.value ||
           (style.value === 'untagged'
             ? !data.photoStyle
@@ -53,7 +55,8 @@ if (list) {
     clearPreview();
     uploadForm.querySelector('[data-owner-form-error]').hidden = true;
     uploadForm.elements.styleId.value = styleId;
-    uploadForm.elements.kind.value = styleId ? 'style' : 'gallery';
+    uploadForm.elements.showOnStyle.checked = !!styleId;
+    uploadForm.elements.showInWork.checked = !styleId;
     uploadForm.elements.alt.value = name ? `${name} hairstyle` : '';
     uploadDialog.showModal();
     uploadForm.elements.photo.focus();
@@ -92,7 +95,8 @@ if (list) {
     remove.action = `/admin/gallery/${data.photoId}/remove`;
     edit.elements.alt.value = data.photoAlt;
     edit.elements.styleId.value = data.photoStyle;
-    edit.elements.kind.value = data.photoKind;
+    edit.elements.showOnStyle.checked = data.photoKind === 'style';
+    edit.elements.showInWork.checked = data.photoWork === 'true';
     edit.elements.sort.value = data.photoSort;
     const preview = document.querySelector('[data-gallery-edit-preview]');
     preview.src = data.photoPath;

@@ -201,6 +201,9 @@ export function createManagementService(db, clock = () => new Date()) {
           variants: {
             ...image.variants,
             ...(previous?.size ? { size: previous.size } : {}),
+            ...(typeof previous?.showInWork === 'boolean'
+              ? { showInWork: previous.showInWork }
+              : {}),
           },
         };
         await tx.update(s.media).set(patch).where(eq(s.media.id, id));
@@ -582,7 +585,8 @@ export function createManagementService(db, clock = () => new Date()) {
         });
       });
     },
-    async saveMedia(id, values, actor) {
+    async saveMedia(id, rawValues, actor) {
+      const { showInWork, ...values } = rawValues;
       return db.transaction(async (tx) => {
         if (values.styleId)
           exists(
@@ -609,9 +613,19 @@ export function createManagementService(db, clock = () => new Date()) {
                 .for('update')
             )[0],
           );
+          if (typeof showInWork === 'boolean') {
+            const previous =
+              typeof before.variants === 'string'
+                ? JSON.parse(before.variants)
+                : before.variants;
+            values.variants = { ...previous, ...values.variants, showInWork };
+          }
           await tx.update(s.media).set(values).where(eq(s.media.id, id));
-        } else
+        } else {
+          if (typeof showInWork === 'boolean')
+            values.variants = { ...values.variants, showInWork };
           id = (await tx.insert(s.media).values(values).$returningId())[0].id;
+        }
         await audit(tx, actor, 'media', id, before, values);
         return id;
       });

@@ -287,7 +287,9 @@ try {
       await upload.locator('[name=styleId]').inputValue(),
       String(missingId),
     );
-    assert.equal(await upload.locator('[name=kind]').inputValue(), 'style');
+    assert.equal(await upload.locator('[name=showOnStyle]').isChecked(), true);
+    assert.equal(await upload.locator('[name=showInWork]').isChecked(), false);
+    await upload.locator('[name=showInWork]').check();
     await upload.locator('[name=photo]').setInputFiles({
       name: 'style.jpg',
       mimeType: 'image/jpeg',

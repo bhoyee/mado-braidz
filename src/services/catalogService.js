@@ -54,7 +54,15 @@ export function createCatalogService(db) {
             .filter((link) => link.addonId === addon.id)
             .map((link) => link.styleId),
         })),
-        gallery: media.filter((m) => m.kind === 'gallery'),
+        gallery: media.filter(
+          (m) =>
+            m.kind === 'gallery' ||
+            (m.kind === 'style' &&
+              (typeof m.variants === 'string'
+                ? JSON.parse(m.variants)
+                : m.variants
+              )?.showInWork === true),
+        ),
         settings: Object.fromEntries(
           settings.map((row) => [
             row.key,

@@ -187,12 +187,14 @@ export const galleryLabel = (item) => {
 // Photos and films mixed into one portfolio: a film, two photos, a film...
 export function workItems(suppliedStyles, gallery, videos = studioVideos()) {
   const photos = [
-    ...suppliedStyles.map((style) => ({
-      type: 'photo',
-      photo: style.photo,
-      label: style.name,
-      href: `/styles/${style.slug}`,
-    })),
+    ...suppliedStyles
+      .filter((style) => style.photo?.variants?.showInWork !== false)
+      .map((style) => ({
+        type: 'photo',
+        photo: style.photo,
+        label: style.name,
+        href: `/styles/${style.slug}`,
+      })),
     ...gallery.map((item) => ({
       type: 'photo',
       photo: item,
@@ -203,6 +205,14 @@ export function workItems(suppliedStyles, gallery, videos = studioVideos()) {
           : galleryLabel(item)),
     })),
   ];
+  const seenPhotos = new Set();
+  const uniquePhotos = photos.filter((item) => {
+    const path = item.photo.path;
+    if (seenPhotos.has(path)) return false;
+    seenPhotos.add(path);
+    return true;
+  });
+  photos.splice(0, photos.length, ...uniquePhotos);
   const films = videos
     .filter((v) => v.enabled && v.showInWork)
     .map((v) => ({ type: 'film', ...v, name: v.id }));
