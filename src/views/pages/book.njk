@@ -5,6 +5,7 @@
   <noscript><p class="notice">Please enable JavaScript to check live availability, or <a href="tel:{{ business.phone }}">call the studio</a> to book.</p></noscript>
   <form id="booking-form" class="booking-form" novalidate data-csrf="{{ csrfToken }}" data-payments-enabled="{{ 'true' if paymentsEnabled else 'false' }}">
     <ol class="booking-progress" aria-label="Booking steps"><li aria-current="step">1 · Style</li><li>2 · Extras</li><li>3 · Time</li><li>4 · Details</li></ol>
+    <p id="booking-pending" class="notice" hidden>An earlier payment is still being confirmed. <a id="booking-pending-link" href="/book">Check that payment</a>. Please don’t pay again for that visit.</p>
     <p id="booking-error" class="field-error" role="alert" tabindex="-1" hidden></p>
     <section data-booking-step="1" aria-labelledby="booking-style-heading">
       <h2 id="booking-style-heading" tabindex="-1">Choose your look.</h2>

@@ -21,6 +21,7 @@
     </aside>
     <div class="appointment-location"><span class="appointment-detail-label">Meet us at the studio</span><p>{{ business.street }}<br>{{ business.city }}, {{ business.region }} {{ business.postalCode }}</p><a class="text-link" href="{{ directions }}" target="_blank" rel="noopener">Get directions</a></div>
   </div>
+  <div id="payment-actions" hidden><div class="button-row"><a id="payment-retry" class="button" href="">Check again</a><a class="button outline" href="/book">Book another appointment</a></div></div>
   <p class="appointment-help">Need a hand with your visit? <a href="tel:{{ business.phone }}">Call {{ phoneDisplay }}</a></p>
 </section>
 <script defer src="/build/payment.js"></script>

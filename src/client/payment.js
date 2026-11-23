@@ -8,6 +8,33 @@ if (result) {
     message = document.getElementById('payment-message');
   let checks = 0;
   const started = Date.now();
+  const showActions = (retry = true) => {
+    document.getElementById('payment-retry').hidden = !retry;
+    document.getElementById('payment-actions').hidden = false;
+  };
+  const setPending = (pending) => {
+    try {
+      if (pending)
+        sessionStorage.setItem('mado-payment-pending', result.dataset.session);
+      else if (
+        sessionStorage.getItem('mado-payment-pending') ===
+        result.dataset.session
+      )
+        sessionStorage.removeItem('mado-payment-pending');
+    } catch {
+      /* storage is optional */
+    }
+  };
+  document.getElementById('payment-retry').href = location.href;
+  // Stripe has finished with this checkout, so the next booking starts clean.
+  if (result.dataset.session) {
+    try {
+      sessionStorage.removeItem('mado-booking');
+      sessionStorage.removeItem('mado-checkout-request');
+    } catch {
+      /* storage is optional */
+    }
+  }
   async function poll() {
     try {
       const response = await fetch(
@@ -21,6 +48,8 @@ if (result) {
       const data = await response.json();
       if (data.status === 'confirmed' || data.status === 'completed') {
         result.dataset.state = 'confirmed';
+        setPending(false);
+        document.getElementById('payment-actions').hidden = true;
         heading.textContent = 'Your chair is booked.';
         message.textContent =
           'Payment received. We look forward to seeing you.';
@@ -63,16 +92,12 @@ if (result) {
         document.getElementById('payment-calendar').href = URL.createObjectURL(
           new Blob([ics], { type: 'text/calendar' }),
         );
-        try {
-          sessionStorage.removeItem('mado-booking');
-          sessionStorage.removeItem('mado-checkout-request');
-        } catch {
-          /* storage is optional */
-        }
         return;
       }
       if (data.status === 'payment_conflict') {
         heading.textContent = 'Let’s find another time.';
+        setPending(false);
+        showActions(false);
         message.textContent =
           data.paymentStatus === 'refunded'
             ? 'Your payment was refunded because the time was no longer available. Please choose another appointment.'
@@ -81,17 +106,25 @@ if (result) {
       }
       if (['expired', 'cancelled'].includes(data.status)) {
         heading.textContent = 'This hold has ended.';
+        setPending(true);
+        showActions();
         message.textContent =
           'If you completed payment, confirmation may still arrive. Please call the studio before paying again.';
         return;
       }
+      setPending(true);
       if (++checks < 30 && Date.now() - started < 60000) setTimeout(poll, 2000);
-      else
+      else {
         message.textContent =
-          'Your payment is still being checked. Please call the studio if confirmation does not arrive.';
+          'This is taking longer than usual. Please don’t pay again for this visit. Call the studio if confirmation does not arrive.';
+        showActions();
+        // Keep checking quietly in case confirmation arrives late.
+        if (checks < 90) setTimeout(poll, 10000);
+      }
     } catch (error) {
       heading.textContent = 'Let’s check your appointment.';
       message.textContent = error.message;
+      showActions();
     }
   }
   if (result.dataset.session) poll();

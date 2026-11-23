@@ -30,6 +30,7 @@
     "jobs": "node scripts/run-jobs.js",
     "test:payments:browser": "node scripts/qa/payments-browser.js",
     "test:manual:browser": "node scripts/qa/manual-payments-browser.js",
+    "test:session:browser": "node scripts/qa/booking-session-browser.js",
     "test:batch:browser": "node scripts/qa/batch-payments-browser.js",
     "test:stripe:batch": "node scripts/qa/stripe-batch-sandbox.js",
     "test:admin:browser": "node scripts/qa/admin-browser.js",

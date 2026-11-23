@@ -220,6 +220,7 @@ if (root) {
   const paymentsEnabled = form.dataset.paymentsEnabled === 'true';
   let requestKey = saved.requestKey || crypto.randomUUID();
   let checkoutRef = saved.checkoutRef || '';
+  let attemptKey = saved.attemptKey || '';
   const error = (message) => {
     $('booking-error').textContent = message;
     $('booking-error').hidden = !message;
@@ -302,6 +303,7 @@ if (root) {
       ...selection(),
       requestKey,
       checkoutRef,
+      attemptKey,
       size: size.value,
       startAt,
       date,
@@ -727,6 +729,21 @@ if (root) {
     let phone = form.elements.phone.value.replace(/[\s().-]/g, '');
     if (/^\d{10}$/.test(phone)) phone = '+1' + phone;
     if (/^1\d{10}$/.test(phone)) phone = '+' + phone;
+    // Retrying the same visit reuses its hold and checkout, so nobody pays twice.
+    // Any other visit must never inherit an earlier one.
+    const visit = JSON.stringify([
+      selection(),
+      startAt,
+      form.elements.name.value.trim().toLowerCase(),
+      form.elements.email.value.trim().toLowerCase(),
+      phone,
+    ]);
+    if ((checkoutRef || attemptKey) && attemptKey !== visit) {
+      checkoutRef = '';
+      requestKey = crypto.randomUUID();
+    }
+    attemptKey = visit;
+    persist();
     const payload = {
       ...selection(),
       requestKey,
@@ -864,6 +881,20 @@ if (root) {
   startAt = params.get('startAt') || saved.startAt || '';
   date = params.get('date') || saved.date || '';
   if (/^\d{4}-\d{2}/.test(date)) month = date.slice(0, 7);
+  // A page restored by the Back button keeps old checkout state in memory.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) location.reload();
+  });
+  try {
+    const pending = sessionStorage.getItem('mado-payment-pending');
+    if (/^cs_[a-zA-Z0-9_]+$/.test(pending || '')) {
+      $('booking-pending-link').href =
+        '/book/success?session_id=' + encodeURIComponent(pending);
+      $('booking-pending').hidden = false;
+    }
+  } catch {
+    /* storage is optional */
+  }
   async function initialize() {
     const resume = params.get('resume');
     if (resume && paymentsEnabled) {
