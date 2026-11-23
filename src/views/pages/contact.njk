@@ -13,21 +13,21 @@
   <div>
     <p class="eyebrow">Let’s talk hair</p>
     <h2>Have a <em>question?</em></h2>
-    <p>{% if contactEnabled %}Send a message below, or call <a{% else %}For now, call <a{% endif %} class="text-link" href="tel:{{ business.phone }}">{{ phoneDisplay }}</a>.{% if not contactEnabled %} Our online enquiry form is being prepared.{% endif %}</p>
+    <p>{% if contactEnabled %}Send a message below, or call <a{% else %}Call <a{% endif %} class="text-link" href="tel:{{ business.phone }}">{{ phoneDisplay }}</a>.</p>
   </div>
   <form action="/contact" method="post" aria-describedby="contact-status" class="form-card">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     {% if contactError %}<p class="field-error" role="alert">{{ contactError }}</p>{% endif %}
     {% if contactSent %}<p class="notice" role="status">Your message has been received. We will reply by email.</p>{% endif %}
-    <p id="contact-status" class="notice" {% if contactUnavailable %}role="alert"{% endif %}>{% if contactEnabled %}Send your question to the studio. Please use the booking page to reserve an appointment.{% else %}Online messages are not being sent yet. Please call the studio; nothing entered here is saved.{% endif %}</p>
+    <p id="contact-status" class="notice" {% if contactUnavailable %}role="alert"{% endif %}>{% if contactEnabled %}Send your question to the studio. Please use the booking page to reserve an appointment.{% else %}Online messages are unavailable right now, so nothing entered here is sent or saved. Please call the studio.{% endif %}</p>
     {% if turnstileSiteKey %}<div class="cf-turnstile" data-sitekey="{{ turnstileSiteKey }}" data-action="contact" data-size="flexible"></div>{% endif %}
     <div class="booking-honeypot" aria-hidden="true"><label for="contact-website">Website</label><input id="contact-website" name="website" tabindex="-1" autocomplete="off"></div>
     <fieldset {% if not contactEnabled %}disabled{% endif %}>
-      <legend class="sr-only">Enquiry form preview</legend>
+      <legend class="sr-only">Send us a message</legend>
       <label for="contact-name">Name</label><input id="contact-name" name="name" autocomplete="name" placeholder="Your name">
       <label for="contact-email">Email</label><input id="contact-email" type="email" name="email" autocomplete="email" placeholder="you@example.com">
       <label for="contact-message">Your question</label><textarea id="contact-message" name="message" rows="4" placeholder="Tell us what you have in mind"></textarea>
-      <button class="button" type="submit">{% if contactEnabled %}Send message{% else %}Online messages coming soon{% endif %}</button>
+      <button class="button" type="submit">{% if contactEnabled %}Send message{% else %}Messages unavailable{% endif %}</button>
     </fieldset>
   </form>
 </section>

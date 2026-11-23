@@ -118,7 +118,7 @@ describe('protected contact preview', () => {
       .post('/contact')
       .send({ _csrf: csrf, 'cf-turnstile-response': 'valid-once' })
       .expect(503);
-    expect(response.text).toContain('nothing entered here is saved');
+    expect(response.text).toContain('nothing entered here is sent or saved');
     expect(fetchMock).toHaveBeenCalledOnce();
   });
   it('rejects honeypot fields and rate limits repeated submissions', async () => {

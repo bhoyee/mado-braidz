@@ -77,7 +77,7 @@ export const publicSettings = {
         {
           question: 'Can I reschedule?',
           answer:
-            'The working policy allows one free reschedule at least 48 hours before your appointment. Deposits are non-refundable. Call the studio to make changes.',
+            'You may reschedule once at no charge at least 48 hours before your appointment. Deposits are non-refundable. Call the studio to make changes.',
         },
         {
           question: 'How long will I be in the chair?',

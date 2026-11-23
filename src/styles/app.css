@@ -2894,14 +2894,121 @@ figcaption {
   color: var(--color-violet-deep);
   font-weight: 600;
 }
-.legal h1 {
-  margin-bottom: 28px;
-  font-size: clamp(40px, 6vw, 72px);
+.legal-head {
+  padding-block: clamp(40px, 6vw, 72px);
 }
-.legal hr {
-  margin: 40px 0;
-  border: 0;
+.legal-head h1 {
+  margin-bottom: 14px;
+  font-size: clamp(36px, 5vw, 60px);
+}
+.legal-updated {
+  margin-top: 14px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.legal-layout {
+  display: grid;
+  gap: 32px;
+}
+.legal-contents h2 {
+  margin-bottom: 10px;
+  font-size: 18px;
+}
+.legal-contents ul {
   border-top: 1px solid var(--line);
+  list-style: none;
+  padding: 0;
+}
+.legal-contents a {
+  display: block;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--color-violet-deep);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.legal-contents a:hover {
+  text-decoration: underline;
+}
+.legal section[id] {
+  scroll-margin-top: 130px;
+}
+.legal section + section h2,
+.legal-facts + section h2,
+.legal .lead + section h2 {
+  margin-top: 36px;
+}
+.legal section h2 {
+  margin-bottom: 12px;
+  font-size: clamp(23px, 2.4vw, 29px);
+}
+.legal ul {
+  padding-left: 22px;
+  list-style: disc;
+}
+.legal li {
+  margin-bottom: 8px;
+}
+.legal li strong {
+  color: var(--color-night);
+}
+.legal-facts {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--color-mist);
+}
+.legal-facts div {
+  display: grid;
+  gap: 2px;
+  padding: 14px 20px;
+}
+.legal-facts div + div {
+  border-top: 1px solid var(--line);
+}
+.legal-facts dt {
+  font-size: 14px;
+  color: var(--muted);
+}
+.legal-facts dd {
+  margin: 0;
+  font-weight: 700;
+}
+.legal-owner-text {
+  white-space: pre-line;
+}
+.legal-contact {
+  margin-top: 44px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.legal-contact address {
+  font-style: normal;
+  line-height: 1.7;
+}
+.legal-related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 24px;
+}
+@media (min-width: 640px) {
+  .legal-facts div {
+    grid-template-columns: 180px 1fr;
+    align-items: baseline;
+    gap: 20px;
+  }
+}
+@media (min-width: 960px) {
+  .legal-layout {
+    grid-template-columns: 250px minmax(0, 720px);
+    gap: 72px;
+    align-items: start;
+  }
+  .legal-contents {
+    position: sticky;
+    top: 140px;
+  }
 }
 
 /* Contact & forms */

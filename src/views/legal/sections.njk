@@ -1,0 +1,88 @@
+{% macro policies() %}
+<dl class="legal-facts">
+  <div><dt>Deposit</dt><dd>{{ booking.depositCents | money }}, applied to your total</dd></div>
+  <div><dt>Deposit refunds</dt><dd>{% if policy.depositRefundable %}Contact the studio{% else %}Non-refundable{% endif %}</dd></div>
+  <div><dt>Rescheduling</dt><dd>{% if policy.freeReschedules %}{{ policy.freeReschedules }} free with {{ policy.rescheduleHours }} hours of notice{% else %}Call the studio{% endif %}</dd></div>
+  <div><dt>Hair</dt><dd>50% human hair included</dd></div>
+</dl>
+<section id="booking"><h2>Booking and confirmation</h2>
+<p>Choose your style, extras, date and time on our <a href="/book">booking page</a>. Your chair is held for a limited time while you pay, and the hold ends automatically if payment is not completed.</p>
+<p>A card booking is confirmed once your payment is successfully received. {% if manualMethods and manualMethods.length %}A booking paid by {% for method in manualMethods %}{{ method.name }}{% if not loop.last %} or {% endif %}{% endfor %} is confirmed after the studio checks that the money has arrived and approves it. Uploading a payment screenshot does not confirm your booking.{% endif %} We email your appointment details when your booking is confirmed.</p>
+<p>Please make sure your name, email and phone number are correct so we can reach you.</p></section>
+<section id="deposit"><h2>Deposit</h2>
+<p>A {{ booking.depositCents | money }} deposit is required to reserve your chair, unless you choose to pay in full. The deposit is applied to your appointment total and is not an extra fee.</p>
+<p>{% if policy.depositRefundable %}Please contact the studio about a deposit refund for your appointment.{% else %}The deposit is non-refundable, except where we are unable to provide the time you paid for or where the law requires a refund.{% endif %}</p></section>
+<section id="payment"><h2>Payment and balance</h2>
+<p>The price of your style and extras is shown before you pay. All prices are in US dollars.</p>
+<p>Any remaining balance can be paid on our <a href="/pay">payment page</a> or at the studio. The payment methods available for your balance are shown with your booking.</p>
+<p>For styles priced on consultation, your deposit reserves the appointment and the final price is agreed with you.</p></section>
+<section id="changes"><h2>Rescheduling</h2>
+<p>{% if policy.freeReschedules %}You may reschedule {% if policy.freeReschedules == 1 %}once{% else %}up to {{ policy.freeReschedules }} times{% endif %} at no charge with at least {{ policy.rescheduleHours }} hours of notice before your appointment.{% else %}Please contact the studio as early as possible to ask about a change.{% endif %} New dates and times depend on availability.</p>
+<p>To reschedule, call us at <a href="tel:{{ business.phone }}">{{ phoneDisplay }}</a> with your booking code.</p></section>
+<section id="cancellations"><h2>Cancellations and no-shows</h2>
+<p>If you cannot make your appointment, please call us as early as you can so the time can be offered to someone else.</p>
+{% if not policy.depositRefundable %}<p>Your deposit is forfeited if you cancel late or do not arrive for your appointment.</p>{% endif %}
+<p>If you paid more than the deposit, contact the studio about your payment.</p></section>
+<section id="late"><h2>Arriving late</h2>
+<p>If you are running late, please call us right away at <a href="tel:{{ business.phone }}">{{ phoneDisplay }}</a>. We will let you know whether your appointment can go ahead as planned or needs a new time.</p></section>
+<section id="preparation"><h2>Preparing your hair</h2>
+<ul><li>Arrive with your hair washed and detangled, unless you added a head wash to your booking.</li><li>Tell us about any scalp sensitivity, allergy or recent hair treatment before your appointment.</li><li>Bring or upload a photo if you have a particular look in mind.</li><li>Most styles reserve {{ booking.defaultDurationMin / 60 }} hours. Your booking confirmation shows your start and end time.</li></ul></section>
+<section id="hair"><h2>Hair and extras</h2>
+<p>Hair with 50% human hair is included in the price of your style. {% if humanHairUpgrade %}You can upgrade to 100% human hair for {{ humanHairUpgrade.priceCents | money }}.{% endif %} Other extras and their prices are shown when you book.</p></section>
+<section id="studio"><h2>If we need to make a change</h2>
+<p>If we have to move or cancel your appointment, we will contact you using the details on your booking to arrange another time.</p>
+<p>If a card payment arrives after your held time has ended and the chair is no longer available, the payment for that booking is returned to you.</p></section>
+{% if policy.text %}<section id="more"><h2>More from the studio</h2><p class="legal-owner-text">{{ policy.text }}</p></section>{% endif %}
+{% endmacro %}
+
+{% macro privacy() %}
+<p class="lead">This policy explains how {{ business.name }} handles personal information when you visit this website, book an appointment or contact us. You can browse styles and prices without an account.</p>
+<section id="collect"><h2>Information we collect</h2>
+<ul><li><strong>Booking details:</strong> your name, email, phone number, chosen style, extras, appointment time and any note you add.</li><li><strong>Photos you send:</strong> an optional inspiration photo, and a payment screenshot if you pay by transfer.</li><li><strong>Payment records:</strong> the amount, method, date and status of your payments.</li><li><strong>Messages:</strong> the name, email and message you send through our contact form.</li><li><strong>Technical information:</strong> details such as your IP address and pages requested, recorded for security and to fix problems.</li></ul></section>
+<section id="use"><h2>How we use it</h2>
+<ul><li>To hold, confirm, change and provide your appointment.</li><li>To process and check payments and refunds.</li><li>To send confirmations, reminders, receipts and updates about your visit.</li><li>To answer your questions.</li><li>To keep the website secure and prevent misuse.</li><li>To send salon news and offers, only if you choose to receive them.</li></ul>
+<p>We do not sell your personal information.</p></section>
+<section id="share"><h2>Who we share it with</h2>
+<p>We use service providers that handle information to help us run the website and your booking:</p>
+<ul><li><strong>Stripe</strong> for card payments.</li><li><strong>Brevo</strong> to deliver email.</li><li><strong>Cloudflare Turnstile</strong> to protect our forms from automated misuse.</li><li><strong>Our hosting provider</strong> to store the website and its records.</li><li><strong>Messaging and notification services</strong>, where we use them, to alert the studio about bookings.</li><li><strong>Google Maps</strong> when you load the interactive map or open directions.</li></ul>
+<p>These providers handle information under their own terms and privacy policies. We may also share information when the law requires it.</p></section>
+<section id="payments"><h2>Payment information</h2>
+<p>Card payments are completed on Stripe’s secure checkout. Your full card number is not sent to or stored on our website.</p>
+<p>Payment screenshots are stored privately and are used by the studio to check a transfer. Please hide any information in a screenshot that is not needed to confirm the payment.</p></section>
+<section id="cookies"><h2>Cookies and browser storage</h2>
+<p>We use an essential session cookie to keep forms and bookings secure. Your browser’s session storage keeps your booking choices and contact details in the open tab while you book. This is normally cleared when you finish the checkout or close the tab.</p>
+<p>We do not use advertising trackers on this website. Cloudflare Turnstile, Stripe and Google may use their own cookies or similar technology when you use their services.</p></section>
+<section id="marketing"><h2>Marketing emails</h2>
+<p>Salon news and offers are optional, and the box on the booking form is not ticked for you. Each of these emails has an unsubscribe link. Unsubscribing does not stop messages about your appointments and payments.</p></section>
+<section id="keep"><h2>Keeping information</h2>
+<p>We keep booking and payment records for as long as we need them to run the studio, resolve questions and meet our legal and accounting responsibilities. Technical logs are removed on a regular schedule.</p>
+<p>We use reasonable safeguards to protect your information, including encrypted connections and restricted access. No online service can be guaranteed to be completely secure.</p></section>
+<section id="choices"><h2>Your choices</h2>
+<p>You can contact us to ask about the personal information we hold about you, to correct it, or to request that it be deleted. We may need to confirm your identity, and we may need to keep some records where the law or our accounting responsibilities require it.</p></section>
+<section id="updates"><h2>Updates to this policy</h2>
+<p>We may update this policy as our services change. The date at the top of the page shows when it was last updated.</p></section>
+{% endmacro %}
+
+{% macro terms() %}
+<p class="lead">These terms apply to your use of this website and to appointments booked with {{ business.name }}. Please read them together with our <a href="/policies">appointment policies</a> and <a href="/privacy">privacy policy</a>.</p>
+<section id="agreement"><h2>Using this website</h2>
+<p>By using this website or booking an appointment, you agree to these terms. Please do not misuse the website, interfere with its security or submit false booking or payment information.</p></section>
+<section id="services"><h2>Services and prices</h2>
+<p>Published prices are in US dollars and include the braiding service and hair with 50% human hair. {% if humanHairUpgrade %}The optional 100% human hair upgrade is {{ humanHairUpgrade.priceCents | money }}.{% endif %} Styles priced on consultation need a final price agreed with the studio.</p>
+<p>Prices and availability may change. A published price change does not alter the agreed price of an existing booking. If you ask for a different style or extras, the price may change.</p>
+<p>Photos on this website show examples of styles. Your result depends on your hair, the length and size you choose, and other factors.</p></section>
+<section id="appointments"><h2>Appointments</h2>
+<p>Choosing a time does not confirm an appointment. Your appointment is confirmed after your payment is received and, for transfers, approved by the studio. Unpaid holds end automatically.</p></section>
+<section id="payments"><h2>Payments</h2>
+<p>Card payments are processed by Stripe. The amount due is shown before you pay. {% if not policy.depositRefundable %}Deposits are non-refundable as described in our <a href="/policies#deposit">deposit policy</a>.{% endif %} Any remaining balance is due as agreed for your appointment.</p></section>
+<section id="changes"><h2>Changes and cancellations</h2>
+<p>Rescheduling, cancellations, no-shows and late arrivals are covered by our <a href="/policies#changes">appointment policies</a>.</p></section>
+<section id="responsibilities"><h2>Your responsibilities</h2>
+<ul><li>Give accurate contact and booking details.</li><li>Tell us about allergies, scalp conditions or recent hair treatments that could affect your service.</li><li>Send only photos and screenshots that you have the right to share.</li></ul></section>
+<section id="content"><h2>Website content</h2>
+<p>The text, photos, videos, logo and design on this website belong to {{ business.name }} or are used with permission. Please ask us before copying or using them.</p></section>
+<section id="links"><h2>Other websites</h2>
+<p>Our website links to services such as Stripe, Google Maps and social media. Those services have their own terms, and we are not responsible for their content.</p></section>
+<section id="updates"><h2>Updates to these terms</h2>
+<p>We may update these terms as our services change. The date at the top of the page shows when they were last updated. Nothing in these terms limits rights you have under the law.</p></section>
+{% endmacro %}

@@ -72,11 +72,11 @@ describe('Milestone 2 public pages', () => {
     const generated = await request(makeApp())
       .get('/styles/boho-bob')
       .expect(200);
-    expect(generated.text).toContain('AI-generated style reference');
+    expect(generated.text).toContain('not a photograph of a client');
     const supplied = await request(makeApp())
       .get('/styles/knotless-braids')
       .expect(200);
-    expect(supplied.text).not.toContain('AI-generated style reference');
+    expect(supplied.text).not.toContain('not a photograph of a client');
   });
   it('serves both responsive sizes for each style reference', async () => {
     const data = decorateCatalog(await fixtureCatalog().load());
@@ -316,7 +316,7 @@ describe('Milestone 2 public pages', () => {
       .type('form')
       .send({ _csrf: token, name: 'Example' })
       .expect(503);
-    expect(response.text).toContain('not being sent yet');
+    expect(response.text).toContain('nothing entered here is sent or saved');
   });
   it('returns an unavailable response when database access fails', async () => {
     await request(
@@ -444,4 +444,42 @@ it('loads the approved shared capacity, start interval and hair upgrade without 
   expect(
     data.addons.find((addon) => addon.slug === 'head-wash').priceCents,
   ).toBe(2500);
+});
+describe('published legal pages', () => {
+  it.each([
+    ['/policies', 'Appointment policies'],
+    ['/privacy', 'Privacy policy'],
+    ['/terms', 'Terms of service'],
+  ])(
+    '%s is complete, linked and free of draft wording',
+    async (path, title) => {
+      const { text } = await request(makeApp()).get(path).expect(200);
+      const main = text.match(/<main[\s\S]*<\/main>/)[0];
+      expect(main).toContain(`<h1>${title}</h1>`);
+      expect(main).not.toMatch(
+        /draft|owner review|before launch|not available yet|coming soon|AI-generated/i,
+      );
+      const ids = [...main.matchAll(/href="#([a-z]+)"/g)].map((m) => m[1]);
+      expect(ids.length).toBeGreaterThan(8);
+      for (const id of ids) expect(main).toContain(`id="${id}"`);
+    },
+  );
+  it('follows the owner settings and shows extra policy text safely', async () => {
+    const data = await fixtureCatalog().load();
+    data.settings.booking.depositCents = 4500;
+    data.settings.policy = {
+      ...data.settings.policy,
+      freeReschedules: 2,
+      rescheduleHours: 24,
+      depositRefundable: false,
+      text: 'Children welcome <b>by arrangement</b>',
+    };
+    const { text } = await request(makeApp({ load: async () => data }))
+      .get('/policies')
+      .expect(200);
+    expect(text).toContain('$45');
+    expect(text).toContain('up to 2 times');
+    expect(text).toContain('24 hours of notice');
+    expect(text).toContain('&lt;b&gt;by arrangement');
+  });
 });

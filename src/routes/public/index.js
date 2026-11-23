@@ -590,7 +590,7 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
     render('message', 'Your appointment', {
       heading: 'Let’s check your appointment.',
       message:
-        'Online payment confirmation is not available yet. If you have arranged an appointment, call the studio to confirm its details.',
+        'We could not check this payment online. Please call the studio to confirm your appointment.',
       call: true,
     }),
   );
@@ -599,17 +599,16 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
       title: 'Manage your appointment',
       heading: 'Need to change your appointment?',
       message:
-        'Online appointment management is not available yet. Please call the studio for help. This page does not confirm an appointment.',
+        'We could not open this appointment online. Please call the studio for help.',
       call: true,
     }),
   );
-  for (const page of ['policies', 'privacy', 'terms'])
-    router.get(
-      `/${page}`,
-      render('legal', page[0].toUpperCase() + page.slice(1), {
-        legalPage: page,
-      }),
-    );
+  for (const [page, title] of [
+    ['policies', 'Appointment policies'],
+    ['privacy', 'Privacy policy'],
+    ['terms', 'Terms of service'],
+  ])
+    router.get(`/${page}`, render('legal', title, { legalPage: page }));
   router.get('/areas/:town', (req, res, next) => {
     const area = Object.hasOwn(areas, req.params.town)
       ? areas[req.params.town]

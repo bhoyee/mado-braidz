@@ -18,7 +18,7 @@
     </div>
     <figure class="detail-photo">
       <div class="arch-frame">{% if displayPhoto %}{{ photo(displayPhoto,style.name,true) }}{% else %}<img src="{{ media('braid-detail.webp') }}" width="478" height="500" alt="A closer look at braiding technique in the studio" fetchpriority="high">{% endif %}</div>
-      {% if displayPhoto and displayPhoto.generated %}<figcaption>AI-generated style reference. This illustrates the hairstyle; it is not a photograph of a client.</figcaption>{% elif not displayPhoto %}<figcaption>Inside the studio · a look at the craft</figcaption>{% endif %}
+      {% if displayPhoto and displayPhoto.generated %}<figcaption>Illustrative style image, not a photograph of a client.</figcaption>{% elif not displayPhoto %}<figcaption>Inside the studio · a look at the craft</figcaption>{% endif %}
     </figure>
   </div>
 </section>

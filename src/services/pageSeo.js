@@ -9,7 +9,8 @@ const descriptions = {
   '/book':
     'Choose your braiding style, pick a date and time, and book your chair in Lanham, Maryland.',
   '/pay': 'Find your appointment and make a payment to the studio.',
-  '/policies': 'Deposits, rescheduling and what to know before your visit.',
+  '/policies':
+    'Deposits, rescheduling, cancellations and how to prepare for your braiding appointment in Lanham, Maryland.',
   '/privacy': 'How the studio handles your personal information.',
   '/terms': 'Terms for using this website and booking with the studio.',
 };
