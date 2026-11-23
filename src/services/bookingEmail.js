@@ -1,0 +1,459 @@
+// Builds the content of booking emails. Amounts and times come from the stored
+// booking; rendering and escaping happen in src/views/emails/booking.html.njk.
+import { DateTime } from 'luxon';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { publicSettings } from '../db/public-defaults.js';
+
+const oneLine = (value) =>
+  String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+export const usd = (cents) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
+    (cents || 0) / 100,
+  );
+const et = (value, format) =>
+  DateTime.fromJSDate(new Date(value), { zone: 'America/New_York' })
+    .setLocale('en-US')
+    .toFormat(format);
+const LONG = 'cccc, LLLL d, yyyy',
+  SHORT = "ccc LLL d 'at' h:mm a",
+  STAMP = "ccc, LLL d 'at' h:mm a";
+const sizes = { medium: 'Medium', semi_medium: 'Semi-medium', small: 'Small' };
+const lengths = {
+  shoulder: 'shoulder',
+  mid_back: 'mid-back',
+  waist: 'waist',
+  top_butt: 'top butt',
+  butt: 'butt',
+  under_butt: 'under butt',
+};
+const methods = {
+  card: 'card',
+  cash: 'cash',
+  zelle: 'Zelle',
+  cashapp: 'Cash App',
+};
+const violet = { badge: '#cdb6f2', ground: '#f4eefb', text: '#5f2d9e' },
+  amber = { badge: '#e0b26a', ground: '#fbf1de', text: '#7a4a00' };
+const GOOD = '#2f7d4f',
+  WARN = '#7a4a00';
+
+function ordinal(n) {
+  const tail = n % 100;
+  return (
+    n +
+    (tail >= 11 && tail <= 13
+      ? 'th'
+      : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')
+  );
+}
+const firstName = (client) => oneLine(client?.name).split(' ')[0] || '';
+const cap = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+
+function styleSection(snapshot, title = 'Style') {
+  const look = [sizes[snapshot.size], lengths[snapshot.length]].filter(Boolean);
+  const extras = (snapshot.addons || []).map((a) => oneLine(a.name));
+  return {
+    title,
+    lead: oneLine(snapshot.styleName) || 'Booked hairstyle',
+    lines: [
+      look.length && { text: cap(look.join(', ')) },
+      extras.length && { text: 'Extras: ' + extras.join(', ') },
+    ].filter(Boolean),
+  };
+}
+const time = (booking) =>
+  booking.endAt
+    ? `${et(booking.startAt, 'h:mm a')} to ${et(booking.endAt, 'h:mm a')} Eastern`
+    : `${et(booking.startAt, 'h:mm a')} Eastern`;
+function paidLabel(booking, payments, owner) {
+  const received = (payments || []).filter((p) => p.type !== 'refund');
+  // Only name a method when one payment accounts for the whole amount.
+  if (
+    received.length === 1 &&
+    received[0].amountCents === booking.paidCents &&
+    methods[received[0].method]
+  ) {
+    const by = ` by ${methods[received[0].method]}`;
+    const kind = { deposit: 'deposit', full: 'in full' }[received[0].type];
+    if (received[0].type === 'deposit')
+      return owner ? `Paid: deposit${by}` : `Deposit paid${by}`;
+    return kind ? `Paid ${kind}${by}` : `Paid${by}`;
+  }
+  return 'Paid so far';
+}
+function paymentSection(booking, snapshot, payments, owner, refundCents) {
+  const consultation = Boolean(snapshot.consultation);
+  const total =
+    booking.subtotalCents ??
+    snapshot.subtotalCents ??
+    booking.paidCents + booking.balanceCents;
+  const rows = [
+    {
+      label: 'Total',
+      value: consultation ? 'Agreed at consultation' : usd(total),
+      wrap: consultation,
+    },
+    {
+      label: paidLabel(booking, payments, owner),
+      value: usd(booking.paidCents),
+      color: booking.paidCents > 0 ? GOOD : undefined,
+      strong: true,
+    },
+  ];
+  if (Number.isSafeInteger(refundCents))
+    rows.push({ label: 'Refund', value: usd(refundCents), strong: true });
+  // Nothing is collected for an appointment that is no longer going ahead.
+  if (['pending_payment', 'confirmed', 'completed'].includes(booking.status))
+    rows.push({
+      label:
+        !consultation && booking.balanceCents <= 0
+          ? owner
+            ? 'Nothing to collect'
+            : 'Nothing left to pay'
+          : owner
+            ? 'Balance to collect'
+            : 'Balance remaining',
+      value: consultation
+        ? 'Agreed at consultation'
+        : usd(Math.max(0, booking.balanceCents)),
+      wrap: consultation,
+      total: true,
+    });
+  return { title: 'Payment', rows };
+}
+function clientSection(client, visits) {
+  const phone = parsePhoneNumberFromString(client?.phoneE164 || '');
+  return {
+    title: 'Client',
+    lead: oneLine(client?.name) || 'Client',
+    lines: [
+      phone && {
+        text:
+          phone.country === 'US'
+            ? phone.formatNational()
+            : phone.formatInternational(),
+        href: 'tel:' + phone.number,
+      },
+      client?.email && {
+        text: oneLine(client.email),
+        href:
+          'mailto:' +
+          encodeURIComponent(oneLine(client.email)).replace('%40', '@'),
+      },
+      Number.isSafeInteger(visits) && {
+        text:
+          visits > 0
+            ? `Returning client, ${ordinal(visits + 1)} visit`
+            : 'First recorded visit',
+      },
+    ].filter(Boolean),
+  };
+}
+function noteSection(booking) {
+  const note = String(booking.clientNotes || '').trim();
+  const photo = booking.inspirationMediaId
+    ? 'An inspiration photo was sent. Sign in to see it.'
+    : '';
+  if (!note && !photo) return null;
+  return note
+    ? { title: 'Client’s note', note, after: photo }
+    : { title: 'Inspiration photo', lines: [{ text: photo }] };
+}
+
+// Owner alert, or null when the booking has moved on and the short generic
+// alert is more accurate.
+export function ownerBookingMail(kind, detail, extras = {}, appUrl, payload) {
+  const { booking, client } = detail || {};
+  if (!booking || !client) return null;
+  const snapshot = booking.priceSnapshot || {};
+  const proof = extras.proof;
+  const allowed = {
+    booking_confirmed: booking.status === 'confirmed',
+    booking_rescheduled: booking.status === 'confirmed',
+    booking_cancelled: booking.status === 'cancelled',
+    payment_review: proof?.status === 'pending',
+  }[kind];
+  if (!allowed) return null;
+  const name = oneLine(client.name) || 'Client';
+  const when = et(booking.startAt, SHORT);
+  const portal =
+    appUrl +
+    (payload?.url?.startsWith('/admin')
+      ? payload.url
+      : `/admin/bookings/${booking.id}`);
+  const phone = parsePhoneNumberFromString(client.phoneE164 || '');
+  const call = phone && {
+    label: `Call ${firstName(client) || 'client'}`,
+    href: 'tel:' + phone.number,
+  };
+  const people = clientSection(client, extras.visits);
+  const style = styleSection(snapshot);
+  const note = noteSection(booking);
+  const look = [style.lead, ...style.lines.map((l) => l.text)].join(', ');
+  const origin =
+    booking.createdAt &&
+    `${booking.source === 'admin' ? 'Added by the studio' : 'Booked online'} ${et(booking.createdAt, STAMP)} Eastern.`;
+  const footer = [`Booking code ${oneLine(booking.ref)}.`, origin]
+    .filter(Boolean)
+    .join(' ');
+  if (kind === 'payment_review') {
+    const method = methods[proof.method] || 'payment';
+    const balance = proof.paymentType === 'balance';
+    const deadline =
+      !balance && booking.status === 'pending_payment' && booking.holdExpiresAt;
+    const total = booking.subtotalCents ?? snapshot.subtotalCents ?? 0;
+    const after = balance
+      ? Math.max(0, booking.balanceCents - proof.amountCents)
+      : Math.max(0, total - proof.amountCents);
+    return {
+      subject: `Review ${method} payment: ${name}, ${usd(proof.amountCents)}`,
+      preview: deadline
+        ? `Not confirmed yet. Chair held until ${et(booking.holdExpiresAt, SHORT)}`
+        : `${balance ? 'Balance payment' : 'Payment'} for ${when}`,
+      badge: 'Review payment',
+      tone: amber,
+      kicker: balance
+        ? 'Balance payment not recorded yet'
+        : 'Not confirmed yet',
+      heading: `Check your ${method} for ${usd(proof.amountCents)}`,
+      subheading: deadline
+        ? `Review by ${et(booking.holdExpiresAt, STAMP)} Eastern`
+        : '',
+      intro:
+        'The client uploaded a payment screenshot. Make sure the money reached your account before you approve.' +
+        (deadline
+          ? ' The chair is released if you don’t review it in time.'
+          : ''),
+      sections: [
+        {
+          title: 'Payment',
+          rows: [
+            { label: 'Method', value: method, strong: true },
+            {
+              label: 'Total',
+              value: snapshot.consultation
+                ? 'Agreed at consultation'
+                : usd(total),
+              wrap: Boolean(snapshot.consultation),
+            },
+            {
+              label: balance
+                ? 'Balance to verify'
+                : proof.paymentType === 'full'
+                  ? 'Full payment to verify'
+                  : 'Deposit to verify',
+              value: usd(proof.amountCents),
+              strong: true,
+              color: WARN,
+            },
+            {
+              label: 'Balance after approval',
+              value: snapshot.consultation
+                ? 'Agreed at consultation'
+                : usd(after),
+              wrap: Boolean(snapshot.consultation),
+              total: true,
+            },
+          ],
+        },
+        {
+          title: balance ? 'Appointment' : 'Requested appointment',
+          lead: et(booking.startAt, LONG),
+          lines: [{ text: time(booking) }],
+        },
+        people,
+        style,
+        note,
+      ].filter(Boolean),
+      actions: [{ label: 'Review payment', href: portal }, call].filter(
+        Boolean,
+      ),
+      footer:
+        'Sign in to see the screenshot and approve or reject it. ' + footer,
+    };
+  }
+  const copy = {
+    booking_confirmed: ['New booking', 'Confirmed', violet],
+    booking_rescheduled: ['Rescheduled', 'New date and time', violet],
+    booking_cancelled: ['Cancelled', 'This appointment is cancelled', amber],
+  }[kind];
+  const pay = paymentSection(booking, snapshot, extras.payments, true);
+  const reason = oneLine(booking.cancelReason);
+  return {
+    subject: `${copy[0]}: ${name}, ${when}`,
+    preview: [
+      look,
+      `paid ${usd(booking.paidCents)}`,
+      kind !== 'booking_cancelled' &&
+        !snapshot.consultation &&
+        `balance ${usd(Math.max(0, booking.balanceCents))}`,
+    ]
+      .filter(Boolean)
+      .join(', '),
+    badge: copy[0],
+    tone: copy[2],
+    kicker: copy[1],
+    heading: et(booking.startAt, LONG),
+    subheading: time(booking),
+    intro: '',
+    sections: [
+      people,
+      style,
+      pay,
+      kind === 'booking_cancelled' && reason
+        ? { title: 'Reason', note: reason }
+        : null,
+      note,
+    ].filter(Boolean),
+    actions: [call, { label: 'Open booking', href: portal }].filter(Boolean),
+    footer,
+  };
+}
+
+const customer = {
+  'booking-confirmation': { badge: 'Confirmed', prep: true, where: true },
+  'booking-rescheduled': { badge: 'Rescheduled', prep: true, where: true },
+  'reminder-48': { badge: 'Reminder', prep: true, where: true },
+  'reminder-morning': { badge: 'Today', where: true },
+  'booking-cancelled': { badge: 'Cancelled', tone: amber },
+  'payment-conflict': { badge: 'Action needed', tone: amber },
+  'refund-receipt': { badge: 'Refund' },
+  'balance-receipt': { badge: 'Receipt' },
+  'payment-receipt': { badge: 'Receipt' },
+  'deposit-payment': { badge: 'Payment due', tone: amber, where: true },
+  'balance-payment': { badge: 'Payment due', tone: amber, where: true },
+  'thank-you': { badge: 'Thank you', noPayment: true },
+};
+const dated = new Set([
+  'booking-confirmation',
+  'booking-rescheduled',
+  'booking-cancelled',
+  'reminder-48',
+  'reminder-morning',
+]);
+const kickers = {
+  'booking-confirmation': 'your chair is booked',
+  'booking-rescheduled': 'your appointment has changed',
+  'booking-cancelled': 'your appointment is cancelled',
+  'reminder-48': 'your appointment is coming up',
+  'reminder-morning': 'see you today',
+  'thank-you': 'thank you for visiting',
+};
+
+export function customerBookingMail(
+  template,
+  { booking, client },
+  extras = {},
+  { subject, intro, customSubject, action, business, settings, directions },
+  payload = {},
+) {
+  const kind = customer[template];
+  if (!kind) return null;
+  const snapshot = booking.priceSnapshot || {};
+  const policy = { ...publicSettings.policy, ...settings.policy };
+  const prep = [];
+  if (kind.prep) {
+    if (!(snapshot.addons || []).some((a) => /head wash/i.test(a.name)))
+      prep.push('Arrive with your hair washed and detangled.');
+    prep.push('Running late? Please call us.');
+    prep.push(
+      policy.freeReschedules > 0
+        ? `Need another time? ${policy.freeReschedules === 1 ? 'One free reschedule' : `${policy.freeReschedules} free reschedules`} with at least ${policy.rescheduleHours} hours of notice. Call to request it.`
+        : 'Need another time? Call us to ask about a change.',
+    );
+    if (booking.paidCents > 0)
+      prep.push(
+        policy.depositRefundable
+          ? 'Your deposit goes toward your total.'
+          : 'Your deposit goes toward your total and is non-refundable.',
+      );
+  }
+  const name = firstName(client);
+  const line = kickers[template];
+  let message = intro;
+  if (template === 'booking-confirmation')
+    message += ' A calendar file is attached so you can save the date.';
+  if (template === 'payment-conflict')
+    message +=
+      booking.paymentStatus === 'refunded'
+        ? ' Refund recorded.'
+        : ' Refund is processing.';
+  if (
+    template === 'deposit-payment' &&
+    booking.status === 'pending_payment' &&
+    booking.holdExpiresAt
+  )
+    message += ` Your chair is held until ${et(booking.holdExpiresAt, STAMP)} Eastern.`;
+  const style = styleSection(snapshot, 'Your style');
+  return {
+    subject:
+      dated.has(template) && !customSubject
+        ? `${subject}: ${et(booking.startAt, SHORT)}`
+        : subject,
+    preview: dated.has(template)
+      ? [
+          style.lead,
+          ...style.lines.map((l) => l.text),
+          kind.where && business.street,
+        ]
+          .filter(Boolean)
+          .join(', ')
+      : intro,
+    badge: kind.badge,
+    tone: kind.tone || violet,
+    kicker:
+      customSubject || !line ? subject : cap(name ? `${name}, ${line}` : line),
+    heading: et(booking.startAt, LONG),
+    subheading: time(booking),
+    intro: message,
+    sections: [
+      style,
+      !kind.noPayment &&
+        paymentSection(
+          booking,
+          snapshot,
+          extras.payments,
+          false,
+          template === 'refund-receipt' ? payload.amountCents : undefined,
+        ),
+      kind.where && {
+        title: 'Where to find us',
+        lead: business.street,
+        lines: [
+          {
+            text: `${business.city}, ${business.region} ${business.postalCode}`,
+          },
+          { text: 'Get directions', href: directions },
+        ],
+      },
+      prep.length && { title: 'Before you come', items: prep },
+    ].filter(Boolean),
+    actions: [
+      action,
+      { label: 'Call the studio', href: 'tel:' + business.phone },
+    ],
+    footer: `Booking code ${oneLine(booking.ref)}. Keep it to find your booking. Questions? Reply to this email or call the studio.`,
+  };
+}
+
+export function bookingMailText(mail) {
+  const out = [mail.subject, '', mail.kicker, mail.heading, mail.subheading];
+  if (mail.intro) out.push('', mail.intro);
+  for (const s of mail.sections) {
+    out.push('', s.title.toUpperCase());
+    if (s.lead) out.push(s.lead);
+    for (const l of s.lines || [])
+      out.push(l.href?.startsWith('http') ? `${l.text}: ${l.href}` : l.text);
+    for (const r of s.rows || []) out.push(`${r.label}: ${r.value}`);
+    if (s.note) out.push(s.note);
+    if (s.after) out.push(s.after);
+    for (const i of s.items || []) out.push('- ' + i);
+  }
+  out.push('');
+  for (const a of mail.actions)
+    out.push(`${a.label}: ${a.href.replace(/^tel:/, '')}`);
+  out.push('', mail.footer);
+  return out.join('\n');
+}

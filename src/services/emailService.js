@@ -4,6 +4,11 @@ import nunjucks from 'nunjucks';
 import { DateTime } from 'luxon';
 import { emailTemplates } from './emailTemplates.js';
 import { accessToken, tokenHash } from './bookingService.js';
+import {
+  bookingMailText,
+  customerBookingMail,
+  ownerBookingMail,
+} from './bookingEmail.js';
 import { seedData } from '../db/seed-data.js';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 export const escapeHtml = (value) =>
@@ -63,7 +68,13 @@ export function calendarAttachment(booking, business, appUrl) {
     ContentType: 'text/calendar',
   };
 }
-export async function renderEmail(config, payload, detail, settings = {}) {
+export async function renderEmail(
+  config,
+  payload,
+  detail,
+  settings = {},
+  { alert, ...extras } = {},
+) {
   const def = emailTemplates[payload.template];
   if (!def) throw new Error('Unknown email template');
   const custom = settings.emailTemplates?.[payload.template] || {};
@@ -169,14 +180,46 @@ export async function renderEmail(config, payload, detail, settings = {}) {
         ? 'Your deposit is applied to your total. Contact the studio if you need help with your visit.'
         : 'Questions? Reply to this email or call the studio.',
   };
+  const customSubject = Boolean(
+    custom.subject && custom.subject !== def.subject,
+  );
+  const mail =
+    payload.template === 'admin-alert'
+      ? alert &&
+        ownerBookingMail(alert.kind, alert.detail, extras, appUrl, payload)
+      : booking
+        ? customerBookingMail(
+            payload.template,
+            detail,
+            extras,
+            {
+              subject: vars.subject,
+              intro: vars.intro,
+              customSubject,
+              action: { label: actionLabel, href: actionUrl },
+              business,
+              settings,
+              directions: directionsUrl,
+            },
+            payload,
+          )
+        : null;
   const template = await readFile(
-    new URL('../views/emails/layout.html.njk', import.meta.url),
+    new URL(
+      mail
+        ? '../views/emails/booking.html.njk'
+        : '../views/emails/layout.html.njk',
+      import.meta.url,
+    ),
     'utf8',
   );
   const html = new nunjucks.Environment(null, {
     autoescape: true,
-  }).renderString(template, vars);
-  const body = `${vars.subject}\n\n${vars.intro}\n\n${text}\n${actionLabel}: ${actionUrl}\n\n${vars.footer}\n${vars.businessName}\n${address}\n${vars.phone}${marketing ? '\nUnsubscribe: ' + preferencesUrl : ''}`;
+  }).renderString(template, { ...vars, mail });
+  if (mail) vars.subject = mail.subject;
+  const body = mail
+    ? `${bookingMailText(mail)}\n${vars.businessName}\n${address}\n${vars.phone}`
+    : `${vars.subject}\n\n${vars.intro}\n\n${text}\n${actionLabel}: ${actionUrl}\n\n${vars.footer}\n${vars.businessName}\n${address}\n${vars.phone}${marketing ? '\nUnsubscribe: ' + preferencesUrl : ''}`;
   return {
     subject: vars.subject,
     html,

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">
+<title>{{ mail.subject }}</title>
+<style>
+:root { color-scheme: light only; }
+body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; }
+@media only screen and (max-width: 479px) {
+  .pad { padding-left: 20px !important; padding-right: 20px !important; }
+  .brand-name { font-size: 15px !important; }
+  .badge { font-size: 12px !important; padding: 4px 7px !important; }
+  .heading { font-size: 24px !important; }
+  .subheading { font-size: 17px !important; }
+  .action { display: block !important; width: 100% !important; padding: 0 0 10px !important; }
+}
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#fbf7f2">
+<div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#fbf7f2">{{ mail.preview }}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fbf7f2"><tr><td align="center" style="padding:16px 8px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background-color:#ffffff;border-radius:8px;border-collapse:separate;overflow:hidden;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1c0f26;text-align:left">
+<tr><td class="pad" style="background-color:#1c0f26;padding:14px 28px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td width="44"><a href="{{ appUrl }}"><img src="{{ logoUrl }}" width="40" height="40" alt="Mado African Braids" style="display:block;border:0;border-radius:20px;background-color:#ffffff"></a></td>
+<td class="brand-name" style="padding-left:10px;font-family:Georgia,'Times New Roman',serif;font-size:17px;font-weight:bold;line-height:1.2;color:#fbf7f2">{{ businessName }}</td>
+<td align="right" style="padding-left:10px"><span class="badge" style="display:inline-block;white-space:nowrap;background-color:{{ mail.tone.badge }};color:#1c0f26;border-radius:4px;padding:4px 9px;font-size:13px;font-weight:bold">{{ mail.badge }}</span></td>
+</tr></table></td></tr>
+<tr><td class="pad" style="background-color:{{ mail.tone.ground }};padding:24px 28px">
+<p style="margin:0;font-weight:bold;color:{{ mail.tone.text }}">{{ mail.kicker }}</p>
+<h1 class="heading" style="margin:4px 0;font-family:Georgia,'Times New Roman',serif;font-size:29px;line-height:1.2;font-weight:bold;color:#1c0f26">{{ mail.heading }}</h1>
+{% if mail.subheading %}<p class="subheading" style="margin:0;font-size:20px;line-height:1.35;font-weight:bold;color:#1c0f26">{{ mail.subheading }}</p>{% endif %}
+{% if mail.intro %}<p style="margin:10px 0 0;color:#1c0f26;white-space:pre-line">{{ mail.intro }}</p>{% endif %}
+</td></tr>
+{% for section in mail.sections %}<tr><td class="pad" style="padding:20px 28px;border-top:1px solid #e3d9ee">
+<h2 style="margin:0 0 6px;font-size:13px;line-height:1.4;color:#62596b">{{ section.title }}</h2>
+{% if section.lead %}<p style="margin:0;font-size:19px;line-height:1.35;font-weight:bold;word-break:break-word">{{ section.lead }}</p>{% endif %}
+{% for line in section.lines %}<p style="margin:2px 0 0;word-break:break-word">{% if line.href %}<a href="{{ line.href }}" style="display:inline-block;padding:6px 0;color:#5f2d9e">{{ line.text }}</a>{% else %}{{ line.text }}{% endif %}</p>{% endfor %}
+{% if section.rows %}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">{% for row in section.rows %}<tr>
+<td style="padding:{{ '12px 0 0' if row.total else '4px 0' }};{% if row.total %}border-top:1px solid #e3d9ee;font-size:18px;{% endif %}{% if row.strong or row.total %}font-weight:bold;{% endif %}color:{{ row.color or '#1c0f26' }}">{{ row.label }}</td>
+<td align="right" style="padding:{{ '12px 0 0 12px' if row.total else '4px 0 4px 12px' }};{% if row.total %}border-top:1px solid #e3d9ee;font-size:18px;{% endif %}{% if row.strong or row.total %}font-weight:bold;{% endif %}{% if not row.wrap %}white-space:nowrap;{% endif %}color:{{ row.color or '#1c0f26' }}">{{ row.value }}</td>
+</tr>{% if row.total and not loop.last %}<tr><td colspan="2" height="6"></td></tr>{% endif %}{% endfor %}</table>{% endif %}
+{% if section.note %}<p style="margin:0;padding:12px 14px;background-color:#f4eefb;border-radius:6px;white-space:pre-line;word-break:break-word">{{ section.note }}</p>{% endif %}
+{% if section.after %}<p style="margin:10px 0 0">{{ section.after }}</p>{% endif %}
+{% if section.items %}<ul style="margin:0;padding-left:20px">{% for item in section.items %}<li style="margin:0 0 7px">{{ item }}</li>{% endfor %}</ul>{% endif %}
+</td></tr>{% endfor %}
+<tr><td class="pad" style="padding:20px 28px;border-top:1px solid #e3d9ee">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>{% for action in mail.actions %}<td class="action" width="{{ 100 / mail.actions.length }}%" style="padding:{{ '0 5px 0 0' if loop.first and not loop.last else ('0 0 0 5px' if not loop.first else '0') }}"><a href="{{ action.href }}" style="display:block;box-sizing:border-box;text-align:center;text-decoration:none;font-weight:bold;padding:14px 12px;border-radius:6px;border:2px solid #7b3fc4;{% if loop.first %}background-color:#7b3fc4;color:#ffffff{% else %}background-color:#ffffff;color:#5f2d9e{% endif %}">{{ action.label }}</a></td>{% endfor %}</tr></table>
+<p style="margin:14px 0 0;font-size:13px;color:#62596b;word-break:break-word">{{ mail.footer }}</p>
+</td></tr>
+</table>
+<p style="margin:16px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:#62596b;text-align:center">{{ address }}<br><a href="tel:{{ phoneHref }}" style="color:#62596b;text-decoration:none">Tel: {{ phone }}</a></p>
+</td></tr></table>
+</body>
+</html>

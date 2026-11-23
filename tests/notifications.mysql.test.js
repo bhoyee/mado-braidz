@@ -155,6 +155,41 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         }),
       ).toBe(1);
     });
+    it('loads payments and only the pending proof for a booking email', async () => {
+      await db.insert(s.payments).values({
+        bookingId: 90,
+        type: 'full',
+        provider: 'manual',
+        method: 'zelle',
+        amountCents: 18000,
+      });
+      await db.insert(s.paymentProofs).values([
+        {
+          bookingId: 90,
+          method: 'zelle',
+          paymentType: 'full',
+          amountCents: 18000,
+          path: 'old',
+          status: 'approved',
+        },
+        {
+          bookingId: 90,
+          method: 'cashapp',
+          paymentType: 'balance',
+          amountCents: 500,
+          path: 'new',
+        },
+      ]);
+      const found = await repo.emailContext(90);
+      expect(found.payments.map((p) => p.method)).toEqual(['zelle']);
+      expect(found.proof).toMatchObject({
+        method: 'cashapp',
+        amountCents: 500,
+      });
+      expect((await repo.emailContext(91)).proof).toBeUndefined();
+      await db.delete(s.payments).where(eq(s.payments.bookingId, 90));
+      await db.delete(s.paymentProofs).where(eq(s.paymentProofs.bookingId, 90));
+    });
     it('keeps future reminders eligible across activation without releasing old confirmations', async () => {
       const now = new Date(),
         cutoff = new Date(+now - 60000),

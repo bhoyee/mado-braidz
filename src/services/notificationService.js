@@ -79,6 +79,28 @@ export function createNotificationService(
       ),
     ];
   }
+  async function mailExtras(p, detail, state) {
+    if (p.template !== 'admin-alert')
+      return detail
+        ? ((await repository.emailContext?.(detail.booking.id)) ?? {})
+        : {};
+    const notification =
+      p.notificationId && (await repository.notification(p.notificationId));
+    if (!notification) return {};
+    const id = Number(
+      /^\/admin\/bookings\/(\d+)$/.exec(notification.url || '')?.[1],
+    );
+    const linked = state.bookings.find(
+      (b) => b.id === id || b.ref === notification.body?.split(':')[0],
+    );
+    const linkedDetail = linked && (await repository.detail(linked.id));
+    if (!linkedDetail?.client) return {};
+    return {
+      ...(await repository.emailContext?.(linked.id)),
+      visits: await repository.completedVisitsBefore?.(linkedDetail.booking),
+      alert: { kind: notification.type, detail: linkedDetail },
+    };
+  }
   async function eligible(job, state) {
     const p = decode(job.payload);
     if (p.expiresAt && new Date(p.expiresAt) <= clock()) return false;
@@ -448,6 +470,7 @@ export function createNotificationService(
               p,
               detail,
               state.settings,
+              await mailExtras(p, detail, state),
             );
             for (const recipient of recipients) {
               if (await repository.suppressed(recipient)) continue;

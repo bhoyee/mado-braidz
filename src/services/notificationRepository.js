@@ -61,6 +61,23 @@ export function createNotificationRepository(db) {
         client,
       };
     },
+    async emailContext(bookingId) {
+      const [payments, proofs] = await Promise.all([
+        db.select().from(s.payments).where(eq(s.payments.bookingId, bookingId)),
+        db
+          .select()
+          .from(s.paymentProofs)
+          .where(
+            and(
+              eq(s.paymentProofs.bookingId, bookingId),
+              eq(s.paymentProofs.status, 'pending'),
+            ),
+          )
+          .orderBy(desc(s.paymentProofs.id))
+          .limit(1),
+      ]);
+      return { payments, proof: proofs[0] };
+    },
     async client(id) {
       return (await db.select().from(s.clients).where(eq(s.clients.id, id)))[0];
     },
