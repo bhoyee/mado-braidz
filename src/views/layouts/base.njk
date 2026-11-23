@@ -5,8 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1c0f26">
   <title>{{ title }}</title>
-  <meta name="description" content="{{ description or 'Braids, twists and locs in Lanham, Maryland. Explore styles, lengths and clear prices at Mado African Braidz.' }}">
-  {% if isDesign %}<meta name="robots" content="noindex,nofollow">{% endif %}
+  <meta name="description" content="{{ description or (seo and seo.description) or 'Braids, twists and locs in Lanham, Maryland. Explore styles, lengths and clear prices.' }}">
+  {% if isDesign or not seo %}<meta name="robots" content="noindex,nofollow">{% else %}<link rel="canonical" href="{{ seo.canonical }}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ business.name }}">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="{{ title }}">
+  <meta property="og:description" content="{{ description or seo.description }}">
+  <meta property="og:url" content="{{ seo.canonical }}">
+  <meta property="og:image" content="{{ seo.image }}">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="{{ seo.imageAlt }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ title }}">
+  <meta name="twitter:description" content="{{ description or seo.description }}">
+  <meta name="twitter:image" content="{{ seo.image }}">
+  {% if seo.salon %}<script type="application/ld+json">{{ seo.salon | safe }}</script>{% endif %}{% endif %}
   <link rel="icon" href="/favicon.ico?v=7b36ba340846" sizes="16x16 32x32 48x48"><link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-mado-32.png?v=7b36ba340846"><link rel="icon" type="image/png" sizes="48x48" href="/img/favicon-mado-48.png?v=7b36ba340846"><link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon-mado.png?v=7b36ba340846">
   <link rel="preload" href="/fonts/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>

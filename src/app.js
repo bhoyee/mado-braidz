@@ -72,6 +72,7 @@ export function createApp({
     config.EMAIL_ENABLED &&
     (config.ADMIN_ALERT_EMAILS || config.ADMIN_EMAIL),
   );
+  app.locals.siteUrl = config.APP_URL;
   app.locals.ownerPortal = Boolean(adminRepository);
   const provider =
     stripeProvider === undefined
@@ -150,6 +151,14 @@ export function createApp({
     res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     res.sendFile(
       fileURLToPath(new URL('../public/img/email-logo.png', import.meta.url)),
+      { maxAge: '7d' },
+    );
+  });
+  // Social apps show this card from outside the website origin.
+  app.get('/img/share-card.jpg', (_req, res) => {
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.sendFile(
+      fileURLToPath(new URL('../public/img/share-card.jpg', import.meta.url)),
       { maxAge: '7d' },
     );
   });

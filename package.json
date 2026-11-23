@@ -22,6 +22,7 @@
     "test:video": "node scripts/qa/video.js",
     "images:prepare": "node scripts/prepare-style-images.js",
     "content:sync": "node scripts/sync-public-content.js",
+    "images:share": "node scripts/prepare-share-card.js",
     "images:guides": "node scripts/prepare-guides.js",
     "test:db": "node scripts/qa/booking-db.js",
     "test:booking:browser": "node scripts/qa/booking-browser.js",

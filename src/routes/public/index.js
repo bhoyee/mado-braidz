@@ -1,3 +1,4 @@
+import { pageSeo } from '../../services/pageSeo.js';
 import { publicSettings } from '../../db/public-defaults.js';
 import { studioVideos } from '../../services/studioVideos.js';
 import { Router } from 'express';
@@ -417,6 +418,12 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
       Object.assign(res.locals, decorateCatalog(await catalog.load()), {
         currentPath: req.path,
       });
+      res.locals.seo = pageSeo(
+        req.path,
+        res.locals,
+        req.app.locals.siteUrl || res.locals.business.url,
+        { areas, social: res.locals.business.social ?? publicSettings.social },
+      );
       const redirect = (res.locals.redirects || []).find(
         (r) => r.source === req.path,
       );
@@ -435,6 +442,17 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
         ...extra,
       });
   if (paymentRoutes) router.use(paymentRoutes);
+  router.get('/robots.txt', (req, res) => {
+    const root = (req.app.locals.siteUrl || res.locals.business.url).replace(
+      /\/$/,
+      '',
+    );
+    res
+      .type('text/plain')
+      .send(
+        `User-agent: *\nDisallow: /admin\nDisallow: /book/success\nDisallow: /booking/\nSitemap: ${root}/sitemap.xml\n`,
+      );
+  });
   router.get('/sitemap.xml', (_req, res) => {
     const escape = (value) =>
       String(value)

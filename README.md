@@ -56,6 +56,10 @@ npm run db:seed
 
 All 21 Section 9 foundation tables are included; Milestone 4 adds checkout_attempts (22 total). DATETIME(3) values use UTC, money uses integer cents. Sessions use the express-mysql-session schema with automatic table creation disabled. Section 10 seeds 13 styles, 30 price variants, six categories, Head wash and the 100% human hair upgrade, business/booking settings, and one owner. Seed runs in a transaction and preserves existing prices/settings/passwords on reruns, including nullable-length variants. Stop the app before running migrations. To change the existing owner email or password, edit ADMIN_EMAIL / ADMIN_PASSWORD in `.env` and run `npm run db:seed -- --update-owner`. This explicitly rotates the single owner account; ordinary seed reruns preserve its password. With more than one owner, `--update-owner` stops without changing anything; use the admin portal or "Forgot password" instead.
 
+### Search and social sharing
+
+`src/services/pageSeo.js` supplies descriptions, canonical URLs and sharing tags for public pages, using `APP_URL` as the site address. Private and unknown pages are `noindex`. After a logo or wording change, run `npm run images:share` (local Playwright only) and commit `public/img/share-card.jpg`.
+
 ### Add another owner
 
 `ADMIN_EMAIL` holds one address and is not a login list. To give another person full owner access, run this in the app root of the environment whose `.env` points to the right database:
