@@ -55,7 +55,7 @@ gh workflow run production.yml --ref main
 gh run list --workflow production.yml
 ```
 
-Inspect failed Actions steps and the private server deployment log before retrying. For a later code regression, revert its commit on `main` and let CI deploy the correction. Never automatically restore an older database over newer bookings. Database backups retain the existing 14-day policy; GitHub artifacts expire after seven days. Previous app snapshots/releases remain available for recovery; remove obsolete copies only after checking they are not referenced by the app root or a retained rollback snapshot.
+Inspect failed Actions steps and the private server deployment log before retrying. For a later code regression, revert its commit on `main` and let CI deploy the correction. Never automatically restore an older database over newer bookings. Database backups retain the existing 14-day policy; GitHub artifacts expire after seven days. After each verified deployment the script keeps the live release and two rollbacks, and removes older releases, their shortcut snapshots and day-old packages, because the host limits the number of files. Failed attempts stay for 24 hours. Cleanup deletes nothing when the live or rollback release is unclear and never fails a verified deployment. Older versions can be redeployed from GitHub.
 
 Direct SSH works from the owner's PC but timed out from tested Linux/Windows/macOS GitHub runner routes before login. The HTTPS session/API was verified with the supplied account login, allowing deployment without SSH connectivity from GitHub. The optional manually dispatched `ssh-connectivity.yml` workflow remains available for diagnostics and sends no credentials.
 

@@ -13,6 +13,12 @@ flock -n 9 || { echo 'Another deployment is running'; exit 1; }
 [[ -f "$app/.env" && -f "$archive" && ! -e "$release" ]]
 cd "$base/incoming"
 sha256sum -c "$revision.tar.gz.sha256"
+# The host limits the number of files as well as gigabytes.
+file_count=$(find "$base" 2>/dev/null | wc -l) || file_count=0
+echo "Deployment folder holds $file_count files"
+if (( file_count > 150000 )); then
+  echo 'WARNING: file count is high; check the hosting file limit and old releases'
+fi
 mkdir -p "$release"
 # Archives are produced from an explicit repository file list by trusted main CI.
 tar -xzf "$archive" -C "$release"
@@ -32,6 +38,71 @@ previous="$base/previous/$(date -u +%Y%m%dT%H%M%SZ)-$revision"
 mkdir -p "$previous"
 entries=(app.cjs package.json package-lock.json src scripts public node_modules release.json)
 changed=()
+# Remove superseded code copies once the new release is verified. Keeps the live
+# release and two rollbacks. Any doubt deletes nothing, and a problem here never
+# fails a good deployment. Uploads, backups, logs and .env are outside its reach.
+cleanup_old_copies() {
+  local releases snapshots live path name target kept='' kept_snapshots=''
+  local referenced='' rollbacks=0
+  releases=$(readlink -f "$base/releases") || return 1
+  snapshots=$(readlink -f "$base/previous") || return 1
+  live=$(dirname "$(readlink -f "$app/node_modules")")
+  if [[ "$live" != "$(readlink -f "$release")" || "$(dirname "$live")" != "$releases" || ! -f "$live/app.cjs" ]]; then
+    echo 'Cleanup skipped: live release is unclear'
+    return 1
+  fi
+  kept="$live"
+  # Snapshot names start with a UTC timestamp, so reverse order is newest first.
+  while IFS= read -r path; do
+    name=$(basename "$path")
+    [[ "$name" =~ ^[0-9]{8}T[0-9]{6}Z-[a-f0-9]{40}$ && ! -L "$path" ]] || continue
+    [[ -L "$path/node_modules" ]] || continue
+    target=$(dirname "$(readlink "$path/node_modules")")
+    [[ "$(dirname "$target")" == "$releases" ]] || continue
+    referenced="$referenced
+$target"
+    if (( rollbacks < 2 )) && [[ -f "$target/app.cjs" ]] && ! grep -Fxq -- "$target" <<< "$kept"; then
+      kept="$kept
+$target"
+      kept_snapshots="$kept_snapshots
+$path"
+      rollbacks=$((rollbacks + 1))
+    fi
+  done < <(find "$snapshots" -mindepth 1 -maxdepth 1 -type d | sort -r)
+  if (( rollbacks < 1 )); then
+    echo 'Cleanup skipped: no rollback release found'
+    return 1
+  fi
+  while IFS= read -r path; do
+    name=$(basename "$path")
+    [[ "$name" =~ ^[a-f0-9]{40}-[0-9]{8}T[0-9]{6}Z-[0-9]+$ ]] || continue
+    grep -Fxq -- "$path" <<< "$kept" && continue
+    # Never-live copies are failed attempts; keep them a day for diagnosis.
+    if ! grep -Fxq -- "$path" <<< "$referenced"; then
+      [[ -n "$(find "$path" -maxdepth 0 -mmin +1440)" ]] || continue
+    fi
+    rm -rf --one-file-system -- "$path" && echo "Removed old release $name"
+  done < <(find "$releases" -mindepth 1 -maxdepth 1 -type d)
+  while IFS= read -r path; do
+    name=$(basename "$path")
+    [[ "$name" =~ ^[0-9]{8}T[0-9]{6}Z-[a-f0-9]{40}$ ]] || continue
+    grep -Fxq -- "$path" <<< "$kept_snapshots" && continue
+    # Only shortcut folders are removed; anything holding real files is left.
+    [[ -z "$(find "$path" -mindepth 1 ! -type l -print -quit)" ]] || continue
+    rm -rf --one-file-system -- "$path"
+  done < <(find "$snapshots" -mindepth 1 -maxdepth 1 -type d)
+  while IFS= read -r path; do
+    name=$(basename "$path")
+    [[ "$name" =~ ^([a-f0-9]{40})\.tar\.gz(\.sha256)?$ ]] || continue
+    target=${BASH_REMATCH[1]}
+    [[ "$target" != "$revision" ]] || continue
+    compgen -G "$base/incoming/$target-*.request" > /dev/null && continue
+    rm -f -- "$path"
+  done < <(find "$base/incoming" -mindepth 1 -maxdepth 1 -type f -mmin +1440)
+  [[ "$(readlink -f "$app/node_modules")" == "$live/node_modules" && -f "$live/app.cjs" ]] || return 1
+  curl --fail --silent --show-error --max-time 15 https://madoafricanbraidz.com/health -o /dev/null || return 1
+  echo "Cleanup finished: kept live and $rollbacks rollback release(s)"
+}
 restart() {
   python3 - "$app" <<'PY'
 import os, signal, subprocess, sys
@@ -89,3 +160,6 @@ fi
 trap - ERR
 printf '{"gitRevision":"%s","release":"%s","previous":"%s"}\n' "$revision" "$release" "$previous" > "$base/ci-release.json"
 echo "Production verified at revision $revision"
+if ! cleanup_old_copies; then
+  echo 'WARNING: old copies were not fully cleaned; the verified release stays live'
+fi

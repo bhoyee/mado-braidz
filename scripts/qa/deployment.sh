@@ -94,4 +94,71 @@ bash "$fixture/queue.sh"
 grep -q '"state":"failed"' "$fixture/base/status/$fifth-123-1.json"
 grep -q "$fourth" "$fixture/app/release.json"
 [[ $(wc -l < "$fixture/backups") -eq 4 ]]
-echo 'Deployment checks passed: cutover, backups, migration failure, rollback, env preservation, queued deployment and corrupt archive rejection.'
+
+# Cleanup: keep live plus two rollbacks, and touch nothing else.
+releases="$fixture/base/releases"
+has() { compgen -G "$releases/$1-*" > /dev/null; }
+# Everything so far is recent: the failed attempts must still be there.
+has "$second" && has "$third" && has "$first" && has "$fourth"
+mkdir -p "$fixture/uploads" "$fixture/backups-dir" "$releases/keep-me" "$fixture/outside"
+echo receipt > "$fixture/uploads/payment.webp"
+echo dump > "$fixture/backups-dir/db.sql.gz"
+echo precious > "$fixture/outside/file"
+fake=9999999999999999999999999999999999999999
+ln -s "$fixture/outside" "$releases/$fake-20200101T000000Z-1"
+touch -d '3 days ago' "$releases/keep-me"
+touch -d '3 days ago' "$releases/$second"-* "$releases/$third"-*
+mkdir "$fixture/base/previous/20200101T000000Z-$fake"
+echo 'original code' > "$fixture/base/previous/20200101T000000Z-$fake/app.cjs"
+touch -d '3 days ago' "$fixture/base/incoming/$second.tar.gz" "$fixture/base/incoming/$third.tar.gz"
+touch "$fixture/base/incoming/$third-123-9.request.hold"
+touch "$fixture/base/incoming/unrelated.txt"
+touch -d '3 days ago' "$fixture/base/incoming/unrelated.txt"
+for code in 6 7 8; do
+  next=$(printf "$code%.0s" {1..40})
+  archive "$next"
+  sleep 1
+  bash "$fixture/deploy.sh" "$next" > "$fixture/deploy.log"
+done
+grep -q 'Cleanup finished: kept live and 2 rollback' "$fixture/deploy.log"
+sixth=$(printf '6%.0s' {1..40}); seventh=$(printf '7%.0s' {1..40}); eighth=$(printf '8%.0s' {1..40})
+has "$sixth" && has "$seventh" && has "$eighth"
+for gone in "$first" "$second" "$third" "$fourth"; do
+  if has "$gone"; then echo "Old release $gone was kept"; exit 1; fi
+done
+[[ $(cat "$fixture/app/.env") == private-env-must-survive ]]
+[[ $(cat "$fixture/uploads/payment.webp") == receipt && $(cat "$fixture/backups-dir/db.sql.gz") == dump ]]
+[[ $(cat "$fixture/outside/file") == precious && -L "$releases/$fake-20200101T000000Z-1" ]]
+[[ -d "$releases/keep-me" && -f "$fixture/base/incoming/unrelated.txt" ]]
+[[ -f "$fixture/base/previous/20200101T000000Z-$fake/app.cjs" ]]
+[[ ! -e "$fixture/base/incoming/$second.tar.gz" && -f "$fixture/base/incoming/$eighth.tar.gz" ]]
+[[ -f "$fixture/app/app.cjs" && -d "$fixture/app/node_modules" ]]
+grep -q "$eighth" "$fixture/app/release.json"
+# Both kept rollbacks are complete and reachable through their snapshots.
+for old in "$sixth" "$seventh"; do
+  snapshot=$(grep -l "$old" "$fixture"/base/previous/*/release.json)
+  [[ -f "$(dirname "$snapshot")/app.cjs" && -d "$(dirname "$snapshot")/node_modules" ]]
+done
+
+# A failed cutover rolls back and cleans nothing.
+ninth=$(printf 'a%.0s' {1..40})
+archive "$ninth"
+touch "$fixture/fail-health"
+before=$(ls "$releases" | grep -v "^$ninth" | sort)
+if bash "$fixture/deploy.sh" "$ninth" > /dev/null 2>&1; then exit 1; fi
+rm "$fixture/fail-health"
+[[ $(ls "$releases" | grep -v "^$ninth" | sort) == "$before" ]]
+grep -q "$eighth" "$fixture/app/release.json"
+
+# If no rollback can be identified, nothing is removed and the deploy succeeds.
+mv "$fixture/base/previous" "$fixture/base/previous-away"
+tenth=$(printf 'b%.0s' {1..40})
+archive "$tenth"
+rm "$fixture/app/node_modules" && mkdir "$fixture/app/node_modules"
+before=$(ls "$releases" | sort)
+bash "$fixture/deploy.sh" "$tenth" > "$fixture/deploy.log"
+grep -q 'Cleanup skipped: no rollback release found' "$fixture/deploy.log"
+grep -q 'the verified release stays live' "$fixture/deploy.log"
+[[ $(ls "$releases" | grep -v "^$tenth" | sort) == "$before" ]]
+grep -q "$tenth" "$fixture/app/release.json"
+echo 'Deployment checks passed: cutover, backups, migration failure, rollback, env preservation, queued deployment, corrupt archive rejection and safe cleanup.'
