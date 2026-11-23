@@ -34,8 +34,8 @@ describe('search and social sharing tags', () => {
     const json = JSON.parse(
       text.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)[1],
     );
-    expect(json['@type']).toBe('HairSalon');
-    expect(json.openingHoursSpecification.length).toBeGreaterThan(0);
+    const salon = json['@graph'].find((n) => n['@type'] === 'HairSalon');
+    expect(salon.openingHoursSpecification.length).toBeGreaterThan(0);
   });
   it('describes each style and ignores query strings in the canonical link', async () => {
     const { text } = await request(makeApp())

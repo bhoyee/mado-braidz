@@ -1,4 +1,4 @@
-import { pageSeo } from '../../services/pageSeo.js';
+import { pageSeo, siteGuide } from '../../services/pageSeo.js';
 import { publicSettings } from '../../db/public-defaults.js';
 import { studioVideos } from '../../services/studioVideos.js';
 import { Router } from 'express';
@@ -457,6 +457,16 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
         `User-agent: *\nDisallow: /admin\nDisallow: /book/success\nDisallow: /booking/\nSitemap: ${root}/sitemap.xml\n`,
       );
   });
+  router.get('/llms.txt', (req, res) =>
+    res
+      .type('text/plain')
+      .send(
+        siteGuide(
+          res.locals,
+          req.app.locals.siteUrl || res.locals.business.url,
+        ),
+      ),
+  );
   router.get('/sitemap.xml', (_req, res) => {
     const escape = (value) =>
       String(value)

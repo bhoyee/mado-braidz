@@ -66,7 +66,7 @@ Signed Stripe webhooks remain the normal confirmation path. If one is missed, `s
 
 ### Search and social sharing
 
-`src/services/pageSeo.js` supplies descriptions, canonical URLs and sharing tags for public pages, using `APP_URL` as the site address. Private and unknown pages are `noindex`. After a logo or wording change, run `npm run images:share` (local Playwright only) and commit `public/img/share-card.jpg`.
+Owners edit page titles, descriptions and tool verification tags at `/admin/seo` (stored in `settings.search`; scripts are rejected). `/llms.txt` summarises published facts for AI assistants. `src/services/pageSeo.js` supplies structured data, descriptions, canonical URLs and sharing tags for public pages, using `APP_URL` as the site address. Private and unknown pages are `noindex`. After a logo or wording change, run `npm run images:share` (local Playwright only) and commit `public/img/share-card.jpg`.
 
 ### Add another owner
 

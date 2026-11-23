@@ -206,6 +206,31 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       ).toBe(false);
       await service.removeMedia(id, actor);
     });
+    it('saves owner search wording and verification, and rejects scripts', async () => {
+      const page = await agent.get('/admin/seo').expect(200);
+      expect(page.text).toContain('Search &amp; AI');
+      const save = (values) =>
+        agent
+          .post('/admin/seo')
+          .set('Accept', 'application/json')
+          .send({ _csrf: token, ...values });
+      await save({
+        'title:/styles': 'Test braid prices',
+        google: '<meta name="google-site-verification" content="test-code_1">',
+      }).expect(200);
+      const styles = await request(app).get('/styles').expect(200);
+      expect(styles.text).toContain('<title>Test braid prices</title>');
+      const home = await request(app).get('/').expect(200);
+      expect(home.text).toContain('content="test-code_1"');
+      const bad = await save({ other: '<script>alert(1)</script>' });
+      expect(bad.status).toBe(400);
+      expect(bad.body.message).toContain('verification tag');
+      const kept = await request(app).get('/styles');
+      expect(kept.text).toContain('Test braid prices');
+      await save({}).expect(200);
+      const reset = await request(app).get('/styles');
+      expect(reset.text).toContain('Braiding styles &amp; prices');
+    });
     it('creates a published style and its first priced size and length in one save', async () => {
       const response = await agent
         .post('/admin/styles/save')

@@ -946,3 +946,7 @@ More than one `owner` account is allowed, replacing the one-owner limit of the M
 ## Owner amendment — payment recovery and name (November 23, 2026)
 
 The signed webhook stays the primary confirmation. As a backup, the server may retrieve a stored Checkout session directly from Stripe with the secret key; only a complete and paid session is applied, through the same bookingService validation, locks and duplicate protection. The browser is never trusted. The public salon name is "Mado African Braids"; the domain keeps its spelling.
+
+## Owner amendment — search and AI tools (November 23, 2026)
+
+Tool-neutral SEO: owner-editable page titles and descriptions, verification meta tags (name and code only, never scripts), Service/Offer, BreadcrumbList and FAQPage data matching visible content, and `/llms.txt`. No third-party SEO script is loaded and no tool may change the site automatically.

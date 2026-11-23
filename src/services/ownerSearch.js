@@ -36,6 +36,11 @@ const pages = [
     'availability working week time off holidays blocked times',
   ],
   [
+    'Search & AI',
+    '/admin/seo',
+    'seo google bing titles descriptions verification settings',
+  ],
+  [
     'Sign-in & security',
     '/admin/settings?tab=security',
     'password login account security',

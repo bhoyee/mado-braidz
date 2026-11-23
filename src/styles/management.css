@@ -902,3 +902,24 @@
 .owner-notification.unread {
   border-left: 3px solid var(--color-violet);
 }
+.seo-page {
+  margin: 0 0 20px;
+  padding: 18px 20px 4px;
+  border: 1px solid #ded3e3;
+  border-radius: 8px;
+}
+.seo-page legend {
+  padding: 0 8px;
+  font-weight: 700;
+}
+.seo-page .owner-field {
+  margin-bottom: 14px;
+}
+.seo-links {
+  padding: 0;
+  list-style: none;
+}
+.seo-links li {
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}

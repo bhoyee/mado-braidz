@@ -11,6 +11,7 @@ import { prepareCatalogImage } from '../../services/catalogImages.js';
 import { prepareCatalogVideo } from '../../services/catalogVideos.js';
 import { publicSettings } from '../../db/public-defaults.js';
 import { ManagementError } from '../../services/managementErrors.js';
+import { seoPages, verificationTag } from '../../services/pageSeo.js';
 import { photoPlacement } from '../../services/photoPlacement.js';
 
 const optionalId = (v) => (v ? entityId.parse(v) : null);
@@ -423,6 +424,64 @@ export function managementRouter(service, config) {
         actor(req, res),
       );
       finish(req, res, '/admin/clients/' + id);
+    }),
+  );
+  router.get(
+    '/seo',
+    run(async (req, res) => {
+      const { settings } = await service.all();
+      const search = settings.search || {};
+      const tag = (name) =>
+        (search.verification || []).find((item) => item.name === name);
+      const known = ['google-site-verification', 'msvalidate.01'];
+      const other = (search.verification || []).find(
+        (item) => !known.includes(item.name),
+      );
+      res.render('admin/manage/seo', {
+        settings,
+        search,
+        seoPages,
+        siteUrl: config.APP_URL.replace(/\/$/, ''),
+        tags: {
+          google: tag(known[0])?.content || '',
+          bing: tag(known[1])?.content || '',
+          other: other
+            ? `<meta name="${other.name}" content="${other.content}">`
+            : '',
+        },
+      });
+    }),
+  );
+  router.post(
+    '/seo',
+    run(async (req, res) => {
+      const pages = {};
+      for (const path of Object.keys(seoPages)) {
+        const line = (value, max) =>
+          text(max).parse(value).replace(/\s+/g, ' ');
+        const title = line(req.body['title:' + path], 120),
+          description = line(req.body['description:' + path], 300);
+        if (title || description) pages[path] = { title, description };
+      }
+      let verification;
+      try {
+        verification = [
+          verificationTag(
+            text(400).parse(req.body.google),
+            'google-site-verification',
+          ),
+          verificationTag(text(400).parse(req.body.bing), 'msvalidate.01'),
+          verificationTag(text(400).parse(req.body.other)),
+        ].filter(Boolean);
+      } catch (error) {
+        if (error instanceof z.ZodError) throw error;
+        throw new ManagementError(error.message);
+      }
+      await service.saveSettings(
+        { search: { pages, verification } },
+        actor(req, res),
+      );
+      finish(req, res, '/admin/seo');
     }),
   );
   router.get(
