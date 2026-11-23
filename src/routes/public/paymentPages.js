@@ -41,6 +41,9 @@ export function paymentPages(repository, config, payments, catalog) {
         appointment: row,
         price,
         pendingProof,
+        balanceAfterReview: pendingProof
+          ? Math.max(0, row.balanceCents - pendingProof.amountCents)
+          : row.balanceCents,
         manualMethods: manualMethods(
           config,
           row.status === 'pending_payment' ? {} : options,

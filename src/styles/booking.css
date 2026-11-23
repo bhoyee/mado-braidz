@@ -564,6 +564,12 @@
 .appointment-paid dd {
   color: var(--color-gold);
 }
+.payment-pending-label {
+  display: block;
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--color-gold);
+}
 .appointment-balance {
   border-top: 1px solid var(--color-plum);
   margin-top: 18px;

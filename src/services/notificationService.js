@@ -122,6 +122,14 @@ export function createNotificationService(
         booking.startAt > clock() &&
         +clock() - +job.runAt < 2 * 3600000
       );
+    // Reviewed before this was sent: the result email replaces it.
+    if (p.template === 'payment-submitted')
+      return (
+        (await repository.emailContext?.(p.bookingId))?.proof?.id === p.proofId
+      );
+    // The owner may have confirmed the client another way in the meantime.
+    if (p.template === 'payment-rejected')
+      return p.paymentType === 'balance' || booking.status !== 'confirmed';
     if (p.template === 'thank-you') return booking.status === 'completed';
     if (['booking-confirmation', 'booking-rescheduled'].includes(p.template))
       return booking.status === 'confirmed';

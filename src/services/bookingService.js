@@ -239,6 +239,13 @@ function paymentLifecycle(repository, clock) {
           body: `${booking.ref}: ${input.method} payment submitted. Verify receipt before approval.`,
           url: '/admin/payment-reviews',
         });
+        await tx.queueJob({
+          type: 'email',
+          payload: { bookingId: id, template: 'payment-submitted', proofId },
+          dedupeKey: `payment-submitted:${proofId}`,
+          runAt: now.toJSDate(),
+          status: 'pending',
+        });
         return { id: proofId, status: 'pending', amountCents };
       });
     },
@@ -319,6 +326,19 @@ function paymentLifecycle(repository, clock) {
             booking.status === 'pending_payment'
           )
             await change(tx, booking, 'cancelled', now);
+          await tx.queueJob({
+            type: 'email',
+            payload: {
+              bookingId: booking.id,
+              template: 'payment-rejected',
+              method: current.method,
+              paymentType: current.paymentType,
+              amountCents: current.amountCents,
+            },
+            dedupeKey: `payment-rejected:${proofId}`,
+            runAt: now.toJSDate(),
+            status: 'pending',
+          });
         } else
           throw new BookingError('INVALID_INPUT', 'Choose approve or reject.');
         const status = decision === 'approve' ? 'approved' : 'rejected';

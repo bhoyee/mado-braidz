@@ -1,3 +1,4 @@
+import { bookingPaymentSource } from '../../services/adminAppointment.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { DateTime } from 'luxon';
@@ -678,8 +679,15 @@ export function adminRouter(
     asyncRoute(async (req, res) => {
       const data = await admins.detail(id.parse(req.params.id));
       if (!data) throw new BookingError('NOT_FOUND', 'Booking not found.', 404);
+      const proofs = await repository.proofs(data.booking.id);
       res.render('admin/detail', {
         ...data,
+        paymentSource: bookingPaymentSource(
+          data.booking,
+          data.payments,
+          proofs,
+        ),
+        pendingProof: proofs.find((p) => p.status === 'pending'),
         audits: data.audits.map((entry) => ({
           ...entry,
           changes: auditChanges(entry),
@@ -689,7 +697,7 @@ export function adminRouter(
         refundJobs: (await repository.bookingJobs(data.booking.id)).filter(
           (j) => j.type === 'refundConflict',
         ),
-        proofs: await repository.proofs(data.booking.id),
+        proofs,
       });
     }),
   );
@@ -825,13 +833,23 @@ export function adminRouter(
   router.post(
     '/payment-reviews/:id',
     asyncRoute(async (req, res) => {
+      const proofId = id.parse(req.params.id);
+      const decision = z.enum(['approve', 'reject']).parse(req.body.decision);
       await bookings.reviewPaymentProof(
-        id.parse(req.params.id),
-        z.enum(['approve', 'reject']).parse(req.body.decision),
+        proofId,
+        decision,
         actor(req, res),
         text.parse(req.body.note),
       );
-      finish(req, res, '/admin/payment-reviews', 'Payment review saved.');
+      const proof = await repository.proof(proofId);
+      finish(
+        req,
+        res,
+        req.body.from === 'booking'
+          ? `/admin/bookings/${proof.bookingId}`
+          : '/admin/payment-reviews',
+        decision === 'approve' ? 'Payment approved.' : 'Payment rejected.',
+      );
     }),
   );
   router.use((error, req, res, next) => {

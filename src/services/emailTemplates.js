@@ -8,15 +8,25 @@ export const emailTemplates = {
     subject: 'Your chair is booked',
     intro: 'Your appointment is confirmed. We look forward to welcoming you.',
   },
+  'payment-submitted': {
+    subject: 'We received your payment screenshot',
+    intro:
+      'Thank you. The studio is checking your transfer and will email you once it is verified. Please do not pay again.',
+  },
+  'payment-rejected': {
+    subject: 'We could not verify your payment',
+    intro:
+      'The studio checked your transfer but could not verify it. If you sent the money, please call us with your transfer confirmation. Please do not pay again until you have spoken to us.',
+  },
   'reminder-48': {
     subject: 'Your appointment is coming up',
     intro:
-      'Here is a reminder of your upcoming visit. Please arrive with your hair washed and detangled, unless you added a head wash.',
+      'We are looking forward to seeing you. Here is everything you need for your visit.',
   },
   'reminder-morning': {
     subject: 'See you today',
     intro:
-      'Your chair is ready for you today. Check your time and directions below.',
+      'We are looking forward to seeing you today. Here are your time and directions.',
   },
   'thank-you': {
     subject: 'Thank you for visiting Mado',

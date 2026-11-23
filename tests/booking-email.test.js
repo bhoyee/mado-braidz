@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { bookingPaymentSource } from '../src/services/adminAppointment.js';
 import { renderEmail } from '../src/services/emailService.js';
 import { createNotificationService } from '../src/services/notificationService.js';
 import {
@@ -238,4 +239,149 @@ it('sends the detailed alert from a queued notification', async () => {
   expect(sent).toEqual([
     ['one@example.test', 'New booking: Ade Bola, Sat Dec 5 at 10:00 AM'],
   ]);
+});
+describe('transfer awaiting verification', () => {
+  it('tells the client what they sent without confirming the booking', async () => {
+    const mail = await customer(
+      'payment-submitted',
+      sampleDetail(awaitingReview),
+      {},
+      { payments: [], proof: proofOf('cashapp') },
+    );
+    expect(mail.subject).toBe('We received your payment screenshot');
+    for (const text of [
+      'Cash App payment sent (awaiting verification)',
+      '$30.00',
+      'Balance after verification',
+      '$190.00',
+      'not confirmed yet',
+      'held until Tue, Nov 24 at 7:20 PM Eastern',
+    ])
+      expect(mail.html).toContain(text);
+    expect(mail.html).not.toContain('$0.00');
+    expect(mail.html).not.toContain('Your appointment is confirmed');
+    expect(mail.attachments).toEqual([]);
+  });
+  it('does not call a confirmed booking unconfirmed for a balance payment', async () => {
+    const mail = await customer(
+      'payment-submitted',
+      sampleDetail(),
+      {},
+      {
+        proof: proofOf('zelle', { paymentType: 'balance', amountCents: 19000 }),
+      },
+    );
+    expect(mail.html).not.toContain('not confirmed yet');
+    expect(mail.html).toContain('Paid so far');
+  });
+});
+describe('booking payment source', () => {
+  it.each([
+    [[], [{ id: 1, method: 'zelle', status: 'pending' }], 'Zelle'],
+    [[], [{ id: 1, method: 'cashapp', status: 'pending' }], 'Cash App'],
+    [
+      [{ id: 1, type: 'deposit', method: 'card', provider: 'stripe' }],
+      [],
+      'Stripe / card',
+    ],
+    [
+      [{ id: 1, type: 'deposit', method: 'zelle', provider: 'manual' }],
+      [{ id: 1, method: 'zelle', status: 'approved' }],
+      'Zelle',
+    ],
+    [[], [], 'Not recorded'],
+  ])('%j %j is %s', (payments, proofs, expected) => {
+    expect(bookingPaymentSource({}, payments, proofs)).toBe(expected);
+  });
+});
+describe('transfer that could not be verified', () => {
+  const send = (detail, paymentType) =>
+    renderEmail(
+      config,
+      {
+        template: 'payment-rejected',
+        method: 'zelle',
+        paymentType,
+        amountCents: 3000,
+      },
+      detail,
+    );
+  it('tells a new client the time was released and to call', async () => {
+    const mail = await send(
+      sampleDetail({ status: 'cancelled', paidCents: 0 }),
+      'deposit',
+    );
+    for (const text of [
+      'Zelle payment not verified',
+      'has been released',
+      'do not pay again',
+      'Call the studio',
+      'https://salon.example/book"',
+    ])
+      expect(mail.html).toContain(text);
+    expect(mail.html).not.toContain('still confirmed');
+  });
+  it('keeps a confirmed client’s appointment for a balance payment', async () => {
+    const mail = await send(sampleDetail(), 'balance');
+    expect(mail.html).toContain('still confirmed');
+    expect(mail.html).toContain('$190.00');
+    expect(mail.html).not.toContain('has been released');
+  });
+});
+describe('appointment reminders', () => {
+  const remind = (template, now, booking = {}, settings = {}) =>
+    customer(
+      template,
+      sampleDetail({ paymentStatus: 'deposit_paid', ...booking }),
+      settings,
+      { payments: cardDeposit, now: new Date(now) },
+    );
+  it.each([
+    ['2026-12-03T15:00:00Z', 'in 2 days'],
+    ['2026-12-05T02:00:00Z', 'tomorrow'],
+  ])('sent %s says %s', async (now, label) => {
+    const mail = await remind('reminder-48', now);
+    expect(mail.subject).toBe(
+      `Your appointment is ${label}: Sat Dec 5 at 10:00 AM`,
+    );
+    expect(mail.html).toContain(`Ade, your appointment is ${label}`);
+  });
+  it('covers the visit, balance and changes without a promise it cannot keep', async () => {
+    const mail = await remind('reminder-48', '2026-12-03T15:00:00Z');
+    for (const text of [
+      '10:00 AM to 2:00 PM Eastern',
+      'Get directions',
+      'washed and detangled',
+      '$190.00 balance ready, or <a href="https://salon.example/pay"',
+      '>pay it online</a> before you arrive.',
+      'View visit &amp; pay balance',
+      'Free rescheduling needs at least 48 hours',
+    ])
+      expect(mail.html).toContain(text);
+    expect(mail.html).not.toContain('One free reschedule');
+    expect(mail.text).toContain('pay it online (https://salon.example/pay)');
+  });
+  it('is short and clear on the day, and silent about a paid balance', async () => {
+    const mail = await remind('reminder-morning', '2026-12-05T12:00:00Z', {
+      paidCents: 22000,
+      balanceCents: 0,
+      paymentStatus: 'paid_in_full',
+    });
+    expect(mail.subject).toBe('See you today at 10:00 AM');
+    expect(mail.html).toContain('Ade, see you today');
+    expect(mail.html).toContain('Call us as soon as possible.');
+    expect(mail.html).not.toContain('Free rescheduling');
+    expect(mail.html).not.toContain('balance ready');
+    expect(mail.html).not.toContain('pay balance');
+  });
+  it('does not offer online payment when the owner turned it off', async () => {
+    const mail = await remind(
+      'reminder-48',
+      '2026-12-03T15:00:00Z',
+      {},
+      { balanceOptions: { online: false } },
+    );
+    expect(mail.html).toContain('$190.00 balance ready.');
+    expect(mail.html).not.toContain('pay it online');
+  });
 });

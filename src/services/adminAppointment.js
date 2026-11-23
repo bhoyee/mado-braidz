@@ -1,3 +1,28 @@
+const methods = {
+  zelle: 'Zelle',
+  cashapp: 'Cash App',
+  cash: 'Cash',
+  card: 'Card',
+  other: 'Other',
+};
+export const methodName = (method) => methods[method] || 'Other';
+export function paymentSourceLabel(method, provider) {
+  if (method === 'card')
+    return provider === 'stripe' ? 'Stripe / card' : 'Card (in person)';
+  return methods[method] || 'Not recorded';
+}
+// Same order as the appointment lists: proof under review, latest payment,
+// then an opened card checkout.
+export function bookingPaymentSource(booking, payments = [], proofs = []) {
+  const latest = (rows) => [...rows].sort((a, b) => b.id - a.id)[0];
+  const proof = latest(proofs.filter((p) => p.status === 'pending'));
+  if (proof) return paymentSourceLabel(proof.method, 'manual');
+  const payment = latest(payments.filter((p) => p.type !== 'refund'));
+  if (payment) return paymentSourceLabel(payment.method, payment.provider);
+  return booking.stripeCheckoutSessionId
+    ? paymentSourceLabel('card', 'stripe')
+    : paymentSourceLabel();
+}
 export function presentAppointment(row) {
   let snapshot = row.booking.priceSnapshot;
   if (typeof snapshot === 'string') {
@@ -19,7 +44,6 @@ export function presentAppointment(row) {
     butt: 'Butt',
     under_butt: 'Under butt',
   };
-  const method = row.paymentMethod;
   return {
     ...row,
     styleName:
@@ -29,14 +53,7 @@ export function presentAppointment(row) {
         .filter(Boolean)
         .map((value) => labels[value] || value)
         .join(' · ') || 'Standard service',
-    paymentSource:
-      method === 'card'
-        ? row.paymentProvider === 'stripe'
-          ? 'Stripe / card'
-          : 'Card (in person)'
-        : { zelle: 'Zelle', cashapp: 'Cash App', cash: 'Cash', other: 'Other' }[
-            method
-          ] || 'Not recorded',
+    paymentSource: paymentSourceLabel(row.paymentMethod, row.paymentProvider),
     paymentReview: Boolean(Number(row.paymentReview)),
   };
 }

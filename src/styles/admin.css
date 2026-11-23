@@ -727,3 +727,37 @@
     width: 100%;
   }
 }
+.proof-review {
+  display: grid;
+  gap: 24px;
+  border-color: #e0b26a;
+  background: #fdf6e9;
+  scroll-margin-top: 24px;
+}
+.proof-review details {
+  margin-top: 18px;
+}
+.proof-review summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #5f2d9e;
+}
+.proof-image {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  font-weight: 700;
+  color: #5f2d9e;
+}
+.proof-image img {
+  width: auto;
+  max-width: 100%;
+  max-height: 340px;
+  border: 1px solid #ded3e3;
+  border-radius: 6px;
+}
+@media (min-width: 800px) {
+  .proof-review {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+}

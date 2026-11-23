@@ -231,6 +231,52 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       const reset = await request(app).get('/styles');
       expect(reset.text).toContain('Braiding styles &amp; prices');
     });
+    it('reviews a Zelle payment from the booking page and confirms the client', async () => {
+      const hold = await bookings.createHold(validHold);
+      const proof = await bookings.submitPaymentProof(hold.id, {
+        method: 'zelle',
+        path: 'payment-' + 'a'.repeat(48) + '.webp',
+      });
+      const templates = async () =>
+        (await db.select().from(s.jobs))
+          .map((j) =>
+            typeof j.payload === 'string' ? JSON.parse(j.payload) : j.payload,
+          )
+          .filter((p) => p.bookingId === hold.id)
+          .map((p) => p.template);
+      expect(await templates()).toContain('payment-submitted');
+      const detail = await agent.get('/admin/bookings/' + hold.id).expect(200);
+      for (const text of [
+        'Verify $30 by Zelle',
+        '/admin/payment-reviews/' + proof.id + '/image',
+        '<dt>Payment source</dt><dd>Zelle</dd>',
+        '<dt>Booked through</dt><dd>Website</dd>',
+        '$30 Zelle awaiting verification',
+      ])
+        expect(detail.text).toContain(text);
+      const list = await agent.get('/admin/bookings').expect(200);
+      expect(list.text).toContain(
+        '/admin/bookings/' + hold.id + '#payment-review',
+      );
+      const result = await agent
+        .post('/admin/payment-reviews/' + proof.id)
+        .set('Accept', 'application/json')
+        .send({ _csrf: token, decision: 'approve', from: 'booking' })
+        .expect(200);
+      expect(result.body).toEqual({
+        url: '/admin/bookings/' + hold.id,
+        message: 'Payment approved.',
+      });
+      expect(await templates()).toContain('booking-confirmation');
+      const after = await agent.get('/admin/bookings/' + hold.id).expect(200);
+      expect(after.text).not.toContain('id="payment-review"');
+      expect(after.text).toContain('<dt>Payment source</dt><dd>Zelle</dd>');
+      const [row] = await db
+        .select()
+        .from(s.bookings)
+        .where(eq(s.bookings.id, hold.id));
+      expect(row).toMatchObject({ status: 'confirmed', paidCents: 3000 });
+    });
     it('creates a published style and its first priced size and length in one save', async () => {
       const response = await agent
         .post('/admin/styles/save')

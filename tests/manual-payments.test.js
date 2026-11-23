@@ -5,7 +5,10 @@ import argon2 from 'argon2';
 import { mkdtemp, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createBookingService } from '../src/services/bookingService.js';
+import {
+  createBookingService,
+  accessToken,
+} from '../src/services/bookingService.js';
 import { createPaymentService } from '../src/services/paymentService.js';
 import { createApp } from '../src/app.js';
 import { parseEnv } from '../src/config/env.js';
@@ -83,6 +86,17 @@ describe('manual payment review', () => {
       'Transfer not received',
     );
     expect(repo.rows[0]).toMatchObject({ status: 'cancelled', paidCents: 0 });
+    await service.reviewPaymentProof(proof.id, 'reject', owner);
+    const emails = repo.jobRows.filter(
+      (j) => j.payload.template === 'payment-rejected',
+    );
+    expect(emails).toHaveLength(1);
+    expect(emails[0].payload).toMatchObject({
+      method: 'cashapp',
+      paymentType: 'deposit',
+      amountCents: 3000,
+    });
+    expect(JSON.stringify(emails)).not.toContain('Transfer not received');
   });
   it('does not confirm a late proof if the time filled, and does not record money', async () => {
     const { repo, service, hold, advance } = await setup();
@@ -313,6 +327,20 @@ describe('public pay lookup and private proof routes', () => {
         .attach('proof', image, 'proof.png')
         .expect(200);
       expect(repo.rows[0].paidCents).toBe(0);
+      expect(
+        repo.jobRows.filter((j) => j.payload.template === 'payment-submitted'),
+      ).toHaveLength(1);
+      const visit = await agent
+        .get('/booking/' + accessToken(hold.ref, paymentConfig.SESSION_SECRET))
+        .expect(200);
+      const summary = visit.text.match(
+        /aria-label="Your payment summary"[\s\S]*?<\/aside>/,
+      )[0];
+      expect(summary).toContain('Zelle payment sent');
+      expect(summary).toContain('Awaiting verification');
+      expect(summary).toContain('$30');
+      expect(summary).not.toContain('$0');
+      expect(summary).toContain('$150');
       expect(await readdir(uploadDir)).toHaveLength(1);
       await agent
         .post(`/api/bookings/${hold.ref}/checkout`)

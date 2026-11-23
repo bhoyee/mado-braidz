@@ -83,6 +83,66 @@ function paidLabel(booking, payments, owner) {
   }
   return 'Paid so far';
 }
+function rejectedSection(booking, snapshot, payload) {
+  const rows = [
+    {
+      label: `${methods[payload.method] || 'Transfer'} payment not verified`,
+      value: usd(payload.amountCents),
+      color: WARN,
+      strong: true,
+    },
+  ];
+  if (payload.paymentType === 'balance')
+    rows.push({
+      label: 'Balance remaining',
+      value: snapshot.consultation
+        ? 'Agreed at consultation'
+        : usd(Math.max(0, booking.balanceCents)),
+      wrap: Boolean(snapshot.consultation),
+      total: true,
+    });
+  return { title: 'Payment', rows };
+}
+// Whole Eastern calendar days, so a late-evening reminder still says tomorrow.
+function dayLabel(startAt, now) {
+  const day = (value) =>
+    DateTime.fromJSDate(new Date(value), { zone: 'America/New_York' }).startOf(
+      'day',
+    );
+  const days = Math.round(day(startAt).diff(day(now), 'days').days);
+  return days <= 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`;
+}
+function submittedSection(booking, snapshot, proof) {
+  const consultation = Boolean(snapshot.consultation);
+  const rows = [
+    {
+      label: 'Total',
+      value: consultation
+        ? 'Agreed at consultation'
+        : usd(booking.subtotalCents ?? snapshot.subtotalCents),
+      wrap: consultation,
+    },
+  ];
+  if (booking.paidCents > 0)
+    rows.push({ label: 'Paid so far', value: usd(booking.paidCents) });
+  rows.push(
+    {
+      label: `${methods[proof.method]} payment sent (awaiting verification)`,
+      value: usd(proof.amountCents),
+      color: WARN,
+      strong: true,
+    },
+    {
+      label: 'Balance after verification',
+      value: consultation
+        ? 'Agreed at consultation'
+        : usd(Math.max(0, booking.balanceCents - proof.amountCents)),
+      wrap: consultation,
+      total: true,
+    },
+  );
+  return { title: 'Payment', rows };
+}
 function paymentSection(booking, snapshot, payments, owner, refundCents) {
   const consultation = Boolean(snapshot.consultation);
   const total =
@@ -314,9 +374,11 @@ export function ownerBookingMail(kind, detail, extras = {}, appUrl, payload) {
 
 const customer = {
   'booking-confirmation': { badge: 'Confirmed', prep: true, where: true },
+  'payment-submitted': { badge: 'Awaiting verification', tone: amber },
+  'payment-rejected': { badge: 'Not verified', tone: amber },
   'booking-rescheduled': { badge: 'Rescheduled', prep: true, where: true },
   'reminder-48': { badge: 'Reminder', prep: true, where: true },
-  'reminder-morning': { badge: 'Today', where: true },
+  'reminder-morning': { badge: 'Today', prep: true, where: true },
   'booking-cancelled': { badge: 'Cancelled', tone: amber },
   'payment-conflict': { badge: 'Action needed', tone: amber },
   'refund-receipt': { badge: 'Refund' },
@@ -337,8 +399,6 @@ const kickers = {
   'booking-confirmation': 'your chair is booked',
   'booking-rescheduled': 'your appointment has changed',
   'booking-cancelled': 'your appointment is cancelled',
-  'reminder-48': 'your appointment is coming up',
-  'reminder-morning': 'see you today',
   'thank-you': 'thank you for visiting',
 };
 
@@ -346,24 +406,59 @@ export function customerBookingMail(
   template,
   { booking, client },
   extras = {},
-  { subject, intro, customSubject, action, business, settings, directions },
+  {
+    subject,
+    intro,
+    customSubject,
+    action,
+    business,
+    settings,
+    directions,
+    bookUrl,
+    payUrl,
+  },
   payload = {},
 ) {
   const kind = customer[template];
   if (!kind) return null;
   const snapshot = booking.priceSnapshot || {};
   const policy = { ...publicSettings.policy, ...settings.policy };
+  const reminder = template.startsWith('reminder-');
+  const online =
+    settings.balanceOptions?.online !== false &&
+    booking.balanceCents > 0 &&
+    !snapshot.consultation &&
+    booking.paymentStatus === 'deposit_paid';
+  const when = dayLabel(booking.startAt, extras.now || new Date());
   const prep = [];
   if (kind.prep) {
     if (!(snapshot.addons || []).some((a) => /head wash/i.test(a.name)))
       prep.push('Arrive with your hair washed and detangled.');
+    if (reminder && booking.balanceCents > 0 && !snapshot.consultation)
+      prep.push(
+        online
+          ? {
+              before: `Have your ${usd(booking.balanceCents)} balance ready, or `,
+              text: 'pay it online',
+              href: payUrl,
+              after: ' before you arrive.',
+            }
+          : `Have your ${usd(booking.balanceCents)} balance ready.`,
+      );
     prep.push('Running late? Please call us.');
-    prep.push(
-      policy.freeReschedules > 0
-        ? `Need another time? ${policy.freeReschedules === 1 ? 'One free reschedule' : `${policy.freeReschedules} free reschedules`} with at least ${policy.rescheduleHours} hours of notice. Call to request it.`
-        : 'Need another time? Call us to ask about a change.',
-    );
-    if (booking.paidCents > 0)
+    if (reminder)
+      prep.push(
+        policy.freeReschedules > 0 && when !== 'today'
+          ? `Can’t make it? Call us as soon as possible. Free rescheduling needs at least ${policy.rescheduleHours} hours of notice.`
+          : 'Can’t make it? Call us as soon as possible.',
+      );
+    else
+      prep.push(
+        policy.freeReschedules > 0
+          ? `Need another time? ${policy.freeReschedules === 1 ? 'One free reschedule' : `${policy.freeReschedules} free reschedules`} with at least ${policy.rescheduleHours} hours of notice. Call to request it.`
+          : 'Need another time? Call us to ask about a change.',
+      );
+    if (booking.paidCents > 0 && !reminder)
       prep.push(
         policy.depositRefundable
           ? 'Your deposit goes toward your total.'
@@ -371,10 +466,24 @@ export function customerBookingMail(
       );
   }
   const name = firstName(client);
-  const line = kickers[template];
+  const call = { label: 'Call the studio', href: 'tel:' + business.phone };
+  const rejected = template === 'payment-rejected';
+  const line = reminder
+    ? when === 'today'
+      ? 'see you today'
+      : `your appointment is ${when}`
+    : kickers[template];
   let message = intro;
   if (template === 'booking-confirmation')
     message += ' A calendar file is attached so you can save the date.';
+  const submitted = template === 'payment-submitted' && extras.proof;
+  if (submitted && submitted.paymentType !== 'balance')
+    message += ` Your booking is not confirmed yet.${booking.holdExpiresAt ? ` Your chair is held until ${et(booking.holdExpiresAt, STAMP)} Eastern.` : ''}`;
+  if (rejected)
+    message +=
+      payload.paymentType === 'balance'
+        ? ' Your appointment is still confirmed and your balance remains due.'
+        : ' Your appointment is not confirmed and the time we held for you has been released.';
   if (template === 'payment-conflict')
     message +=
       booking.paymentStatus === 'refunded'
@@ -389,9 +498,13 @@ export function customerBookingMail(
   const style = styleSection(snapshot, 'Your style');
   return {
     subject:
-      dated.has(template) && !customSubject
-        ? `${subject}: ${et(booking.startAt, SHORT)}`
-        : subject,
+      reminder && !customSubject
+        ? when === 'today'
+          ? `See you today at ${et(booking.startAt, 'h:mm a')}`
+          : `Your appointment is ${when}: ${et(booking.startAt, SHORT)}`
+        : dated.has(template) && !customSubject
+          ? `${subject}: ${et(booking.startAt, SHORT)}`
+          : subject,
     preview: dated.has(template)
       ? [
           style.lead,
@@ -410,7 +523,11 @@ export function customerBookingMail(
     intro: message,
     sections: [
       style,
+      rejected && rejectedSection(booking, snapshot, payload),
+      submitted && submittedSection(booking, snapshot, submitted),
       !kind.noPayment &&
+        !submitted &&
+        !rejected &&
         paymentSection(
           booking,
           snapshot,
@@ -430,10 +547,19 @@ export function customerBookingMail(
       },
       prep.length && { title: 'Before you come', items: prep },
     ].filter(Boolean),
-    actions: [
-      action,
-      { label: 'Call the studio', href: 'tel:' + business.phone },
-    ],
+    actions: rejected
+      ? [
+          call,
+          payload.paymentType === 'balance'
+            ? action
+            : { label: 'Book another time', href: bookUrl },
+        ]
+      : [
+          reminder && online
+            ? { ...action, label: 'View visit & pay balance' }
+            : action,
+          call,
+        ],
     footer: `Booking code ${oneLine(booking.ref)}. Keep it to find your booking. Questions? Reply to this email or call the studio.`,
   };
 }
@@ -449,7 +575,10 @@ export function bookingMailText(mail) {
     for (const r of s.rows || []) out.push(`${r.label}: ${r.value}`);
     if (s.note) out.push(s.note);
     if (s.after) out.push(s.after);
-    for (const i of s.items || []) out.push('- ' + i);
+    for (const i of s.items || [])
+      out.push(
+        '- ' + (i.href ? `${i.before}${i.text} (${i.href})${i.after}` : i),
+      );
   }
   out.push('');
   for (const a of mail.actions)

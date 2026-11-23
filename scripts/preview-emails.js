@@ -74,6 +74,8 @@ await save(
   ),
 );
 for (const template of [
+  'payment-submitted',
+  'payment-rejected',
   'booking-confirmation',
   'booking-rescheduled',
   'booking-cancelled',
@@ -87,8 +89,12 @@ for (const template of [
   'thank-you',
 ]) {
   const detail = sampleDetail({
-    ...(template === 'deposit-payment' ? awaitingReview : {}),
-    ...(template === 'booking-cancelled' ? { status: 'cancelled' } : {}),
+    ...(['deposit-payment', 'payment-submitted'].includes(template)
+      ? awaitingReview
+      : {}),
+    ...(['booking-cancelled', 'payment-rejected'].includes(template)
+      ? { status: 'cancelled' }
+      : {}),
     ...(template === 'payment-conflict' ? { status: 'payment_conflict' } : {}),
   });
   detail.booking.manageTokenHash = tokenHash(
@@ -97,9 +103,18 @@ for (const template of [
   await save(
     'customer-' + template,
     'Customer: ' + emailTemplates[template].subject,
-    { template, amountCents: 3000 },
+    { template, amountCents: 3000, method: 'zelle', paymentType: 'deposit' },
     detail,
-    { payments: template === 'deposit-payment' ? [] : cardDeposit },
+    template === 'payment-submitted'
+      ? { payments: [], proof: proofOf('zelle') }
+      : {
+          payments: template === 'deposit-payment' ? [] : cardDeposit,
+          now: new Date(
+            template === 'reminder-morning'
+              ? '2026-12-05T12:00:00Z'
+              : '2026-12-03T15:00:00Z',
+          ),
+        },
   );
 }
 await writeFile(

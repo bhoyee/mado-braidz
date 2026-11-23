@@ -200,6 +200,8 @@ export async function renderEmail(
               business,
               settings,
               directions: directionsUrl,
+              bookUrl: appUrl + '/book',
+              payUrl: appUrl + '/pay',
             },
             payload,
           )
