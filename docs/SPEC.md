@@ -970,3 +970,9 @@ The appointment book opens on upcoming visits, nearest first, with Today, Upcomi
 ## Owner amendment — styles, prices and extras (November 24, 2026)
 
 A style's details and all of its prices save together from a size and length grid; a cleared price is switched off, never deleted. A published style must always have an active price or be priced on consultation; every path enforces this in the save transaction. Owners can publish or feature from the list, duplicate a style (the copy stays hidden), order styles (kept in the `catalog` setting; until saved, newest first), manage categories (web addresses never change on rename) and see price history from the audit log. Extras keep their internal name once created. Suggested descriptions use only facts already on the form and are never saved without the owner.
+
+## Owner amendment — photo library and Our Work (November 24, 2026)
+
+Library labels come from the public page itself, so they always match what clients see, and saving a photo never changes its Our Work place unless the owner asks. Photos can be hidden (kept, but on no page) or removed (restorable for 7 days, then deleted; the existing cleanup removes files). Several photos upload one after another with progress and retry; the browser shrinks, rotates and crops before sending, and the server still validates and resizes. A focus point is stored in tenths. One Our Work order (`ourWork` setting) covers photos and films; unplaced items come first. Uploaded videos can be removed and any video's cover changed. The public Our Work page adds filters and a larger view, and keeps working without JavaScript. Reference photos stay labelled after rotating or cropping.
+
+A style page shows all of its photos in one gallery beside the details: thumbnails, arrows, swipe, keyboard and a larger view. The chosen size's photo comes first. It swipes and the thumbnails work without JavaScript.

@@ -1,4 +1,5 @@
 import { optionLabel } from './adminAppointment.js';
+import { isShown } from './photoState.js';
 
 export const SIZES = [null, 'medium', 'semi_medium', 'small'];
 export const LENGTHS = [
@@ -61,7 +62,7 @@ export function styleSummary(style, { variants, media, categories }) {
     .filter((v) => v.styleId === style.id && v.active)
     .map((v) => v.priceCents);
   const photos = media.filter(
-    (m) => m.styleId === style.id && m.kind === 'style',
+    (m) => m.styleId === style.id && m.kind === 'style' && isShown(m),
   );
   const photo =
     photos.find((p) => !decode(p.variants)?.size) || photos[0] || null;
@@ -74,6 +75,7 @@ export function styleSummary(style, { variants, media, categories }) {
     ...style,
     category: categories.find((c) => c.id === style.categoryId)?.name || '',
     photo,
+    thumb: decode(photo?.variants)?.sizes?.[0]?.path || photo?.path,
     low: prices.length ? Math.min(...prices) : null,
     high: prices.length ? Math.max(...prices) : null,
     optionCount: prices.length,

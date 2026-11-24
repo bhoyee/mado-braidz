@@ -1,5 +1,6 @@
 import { pageSeo, siteGuide } from '../../services/pageSeo.js';
 import { publicSettings } from '../../db/public-defaults.js';
+import { focusClass, orderWork } from '../../services/photoState.js';
 import { studioVideos } from '../../services/studioVideos.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -100,6 +101,7 @@ export function safePhoto(photo) {
   return {
     ...photo,
     generated: variants?.origin === 'generated',
+    focusClass: focusClass({ variants }),
     origin: variants?.origin || 'supplied',
     variants,
     srcset: uniqueSizes.map((item) => `${item.path} ${item.width}w`).join(', '),
@@ -186,19 +188,46 @@ export const galleryLabel = (item) => {
   );
 };
 // Photos and films mixed into one portfolio: a film, two photos, a film...
-export function workItems(suppliedStyles, gallery, videos = studioVideos()) {
+// The chosen size first, then the style's own photos, then its size photos.
+export function styleGallery(style, selectedGroup = null) {
+  const seen = new Set();
+  return [
+    selectedGroup?.photo,
+    style.photo,
+    ...(style.photos || []),
+    // Illustrations belong to the size choice, not among real work.
+    ...style.groups
+      .map((group) => group.photo)
+      .filter((photo) => photo && !photo.generated),
+  ].filter((photo) => {
+    if (!photo || seen.has(photo.path)) return false;
+    seen.add(photo.path);
+    return true;
+  });
+}
+export function workItems(
+  suppliedStyles,
+  gallery,
+  videos = studioVideos(),
+  order = null,
+) {
+  const key = (photo) => (photo.id ? `photo:${photo.id}` : undefined);
   const photos = [
     ...suppliedStyles
       .filter((style) => style.photo?.variants?.showInWork !== false)
       .map((style) => ({
         type: 'photo',
+        key: key(style.photo),
         photo: style.photo,
         label: style.name,
+        group: style.categoryName,
         href: `/styles/${style.slug}`,
       })),
     ...gallery.map((item) => ({
       type: 'photo',
+      key: key(item),
       photo: item,
+      group: item.categoryName,
       label:
         item.styleName ||
         (item.path.startsWith('/media/catalog/')
@@ -216,13 +245,19 @@ export function workItems(suppliedStyles, gallery, videos = studioVideos()) {
   photos.splice(0, photos.length, ...uniquePhotos);
   const films = videos
     .filter((v) => v.enabled && v.showInWork)
-    .map((v) => ({ type: 'film', ...v, name: v.id }));
+    .map((v) => ({
+      type: 'film',
+      ...v,
+      key: `film:${v.id}`,
+      group: 'Films',
+      name: v.id,
+    }));
   const items = [];
   while (photos.length || films.length) {
     if (films.length) items.push(films.shift());
     items.push(...photos.splice(0, films.length ? 2 : photos.length));
   }
-  return items;
+  return orderWork(items, order);
 }
 export function decorateCatalog(data) {
   const styles = data.styles.map((style) => {
@@ -372,6 +407,7 @@ export function decorateCatalog(data) {
     studioClips: Object.fromEntries(
       studioVideos(data.settings).map((v) => [v.id, v]),
     ),
+    workOrder: data.settings.ourWork?.order,
     styles,
     featuredStyles: styles.filter(
       (style) => style.featured && style.active !== false,
@@ -406,6 +442,8 @@ export function decorateCatalog(data) {
       .map((photo) => ({
         ...photo,
         styleName: styles.find((style) => style.id === photo.styleId)?.name,
+        categoryName: styles.find((style) => style.id === photo.styleId)
+          ?.categoryName,
       }))
       .map(safePhoto)
       .filter(Boolean),
@@ -577,6 +615,7 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
       selectedSize: invalidSize ? null : selectedSize,
       selectedGroup: invalidSize ? null : selectedGroup,
       invalidSize,
+      galleryPhotos: styleGallery(style, invalidSize ? null : selectedGroup),
       title:
         style.seoTitle ||
         `${style.name} in Lanham, MD | ${res.locals.business.name}`,
@@ -586,16 +625,19 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
   });
   router.get('/prices', (_req, res) => res.redirect(301, '/styles'));
   router.get('/gallery', (_req, res) => res.redirect(301, '/our-work'));
-  router.get('/our-work', (req, res) =>
+  router.get('/our-work', (req, res) => {
+    const items = workItems(
+      res.locals.suppliedStyles,
+      res.locals.gallery,
+      Object.values(res.locals.studioClips),
+      res.locals.workOrder,
+    );
     res.render('pages/gallery', {
       title: `Our Work | ${res.locals.business.name}`,
-      items: workItems(
-        res.locals.suppliedStyles,
-        res.locals.gallery,
-        Object.values(res.locals.studioClips),
-      ),
-    }),
-  );
+      items,
+      groups: [...new Set(items.map((item) => item.group).filter(Boolean))],
+    });
+  });
   router.get('/about', render('about', 'Meet Mado'));
   router.get('/book', (req, res) => {
     res.set('Cache-Control', 'no-store').render('pages/book', {

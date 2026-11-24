@@ -415,3 +415,440 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Photo library */
+.owner-app .library-undo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 12px 18px;
+  border-radius: 8px;
+  background: #f5e7cd;
+}
+.library-undo[hidden],
+.photo-card[hidden],
+.photo-pick[hidden],
+.select-bar[hidden],
+.add-all[hidden],
+.focus-dot[hidden],
+.library-dialog [hidden] {
+  display: none !important;
+}
+.library-undo p {
+  margin: 0;
+  font-weight: 600;
+}
+.library-missing {
+  margin-bottom: 16px;
+}
+.library-style-pick {
+  flex: 0 1 220px;
+}
+.owner-app .library .appointment-views {
+  margin-bottom: 12px;
+}
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 18px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.photo-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #ded5df;
+  border-radius: 10px;
+  background: #fffdfb;
+}
+.photo-card:hover {
+  border-color: #a88dbc;
+}
+.photo-card.is-dim .photo-open img {
+  opacity: 0.5;
+}
+.photo-open {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: #ece4ee;
+  cursor: pointer;
+}
+.photo-open:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.photo-open:focus-visible {
+  outline: 3px solid #5f2d9e;
+  outline-offset: -3px;
+}
+.photo-open img,
+.work-order-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: center 25%;
+}
+.photo-info {
+  padding: 12px 14px 8px;
+}
+.photo-info strong,
+.work-order strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.owner-app .photo-info p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-height: 24px;
+  margin: 6px 0;
+}
+.photo-tag {
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #e9e1f0;
+  color: #4e2b63;
+  font-size: 11px;
+  font-weight: 700;
+}
+.photo-tag.is-cover {
+  background: #e4eee5;
+  color: #1f5133;
+}
+.photo-tag.is-warn {
+  background: #ffe3cc;
+  color: #7d3206;
+}
+.owner-app .photo-info .button {
+  width: 100%;
+  margin: 0 0 6px;
+}
+.owner-app .photo-pick {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  place-items: center;
+  border-radius: 8px;
+  background: #fffdfb;
+  cursor: pointer;
+}
+.owner-app .photo-pick input {
+  width: 22px;
+  height: 22px;
+}
+.photo-card:has([data-pick]:checked) {
+  border-color: #5f2d9e;
+  box-shadow: 0 0 0 2px #5f2d9e;
+}
+.select-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 14px 20px;
+  border-radius: 8px;
+  background: #2e1640;
+  color: #fbf7f2;
+}
+.owner-app .select-bar p {
+  margin: 0;
+  font-weight: 700;
+}
+.owner-app .select-bar label,
+.owner-app .select-bar .button {
+  margin: 0;
+}
+.owner-app .select-bar .button.outline {
+  border-color: #cdb6f2;
+  background: #fffdfb;
+}
+.video-play {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  background: #2e1640;
+  color: #fff;
+  font-size: 14px;
+}
+.work-help {
+  flex: 1 1 320px;
+  margin: 0;
+}
+.work-order {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.work-order li {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 10px;
+  border: 1px solid #ded5df;
+  border-radius: 10px;
+  background: #fffdfb;
+  cursor: grab;
+}
+.work-order-image {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.work-order-image .photo-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+.owner-app .photos-add,
+.owner-app .photo-window {
+  width: min(900px, calc(100vw - 32px));
+}
+.owner-app .drop-zone {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0;
+  padding: 24px;
+  border: 2px dashed #a88dbc;
+  border-radius: 10px;
+  background: #f4eefb;
+  text-align: center;
+  cursor: pointer;
+}
+.drop-zone.is-over,
+.drop-zone:focus-within {
+  border-color: #5f2d9e;
+  background: #e9ddf6;
+}
+.drop-zone span {
+  color: #51445a;
+  font-size: 13px;
+  font-weight: 400;
+}
+.owner-app .drop-zone input {
+  width: auto;
+  max-width: 100%;
+  margin: 8px auto 0;
+  background: #fff;
+}
+.add-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.add-row {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid #ded5df;
+  border-radius: 10px;
+}
+.add-row.is-done {
+  border-color: #7fae8c;
+  background: #eef6ef;
+}
+.add-preview canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 200px;
+  margin: 0 auto 8px;
+  border-radius: 6px;
+}
+.add-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.owner-app .add-tools button,
+.owner-app .add-tools .photo-swap-pick {
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid #a88dbc;
+  border-radius: 6px;
+  background: #fffdfb;
+  color: #5f2d9e;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.owner-app .add-tools label {
+  margin: 0;
+}
+.owner-app .add-tools select {
+  min-height: 44px;
+  padding: 8px;
+  font-size: 13px;
+}
+.photo-swap-pick {
+  position: relative;
+  overflow: hidden;
+}
+.owner-app .photo-swap-pick input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.photo-swap-pick:focus-within {
+  outline: 3px solid #5f2d9e;
+  outline-offset: 2px;
+}
+.add-fields .owner-field,
+.add-fields .add-status {
+  margin: 0 0 10px;
+}
+.add-where {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+}
+.add-fields progress {
+  width: 100%;
+  height: 10px;
+  accent-color: #5f2d9e;
+}
+.add-status {
+  font-size: 13px;
+  font-weight: 600;
+}
+.add-status.is-error {
+  color: #9c261f;
+}
+.photo-window-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 16px;
+}
+.focus-box {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  cursor: crosshair;
+}
+.focus-box canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 52vh;
+  border-radius: 8px;
+}
+.focus-dot {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #2e1640;
+  pointer-events: none;
+}
+.photo-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+.photo-window-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e2d9e8;
+}
+.owner-app .photo-window .button {
+  margin: 0;
+}
+.photo-window .owner-text-link {
+  min-height: 32px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .photo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .photo-info {
+    padding: 10px;
+  }
+  .photo-window-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .focus-box canvas {
+    max-height: 40vh;
+  }
+  .add-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .add-fields {
+    grid-column: 1 / -1;
+  }
+  .library-style-pick {
+    flex: 1 1 100%;
+  }
+  .work-order {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .select-bar {
+    margin-inline: -18px;
+    border-radius: 0;
+  }
+}
+.add-row {
+  position: relative;
+}
+@media (max-width: 760px) {
+  .add-row > .owner-extra-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
+  .select-bar .owner-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 4px;
+  }
+  .select-bar .owner-actions > * {
+    flex: none;
+  }
+  .owner-app .select-bar select {
+    width: auto;
+  }
+}

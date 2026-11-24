@@ -1,6 +1,7 @@
 import { eq, asc, desc, and } from 'drizzle-orm';
 import * as s from '../db/schema.js';
 import { orderStyles } from './styleSummary.js';
+import { isShown, photoVariants } from './photoState.js';
 export function createCatalogService(db) {
   return {
     async load() {
@@ -33,7 +34,11 @@ export function createCatalogService(db) {
           .from(s.addons)
           .where(eq(s.addons.active, true))
           .orderBy(asc(s.addons.sort), asc(s.addons.id)),
-        db.select().from(s.media).orderBy(asc(s.media.sort), asc(s.media.id)),
+        db
+          .select()
+          .from(s.media)
+          .orderBy(asc(s.media.sort), asc(s.media.id))
+          .then((rows) => rows.filter(isShown)),
         db.select().from(s.settings),
         db.select().from(s.redirects),
         db.select().from(s.addonStyles),
@@ -61,11 +66,7 @@ export function createCatalogService(db) {
         gallery: media.filter(
           (m) =>
             m.kind === 'gallery' ||
-            (m.kind === 'style' &&
-              (typeof m.variants === 'string'
-                ? JSON.parse(m.variants)
-                : m.variants
-              )?.showInWork === true),
+            (m.kind === 'style' && photoVariants(m).showInWork === true),
         ),
         settings: Object.fromEntries(
           settings.map((row) => [

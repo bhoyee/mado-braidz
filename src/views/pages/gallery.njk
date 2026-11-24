@@ -12,22 +12,23 @@
 <section class="wrap section">
   {# One portfolio: films (taller tiles) mixed in with photos. Labels sit on
      the picture and appear on hover; on touch screens they always show. #}
+  {% if groups.length > 1 %}<div class="work-filters" role="group" aria-label="Show" data-work-filters hidden><button type="button" class="chip" data-work-group="" aria-pressed="true">Everything</button>{% for group in groups %}<button type="button" class="chip" data-work-group="{{ group }}" aria-pressed="false">{{ group }}</button>{% endfor %}</div><p class="sr-only" role="status" data-work-status></p>{% endif %}
   <ul class="work-grid">
     {% for item in items %}
     {% if item.type == 'film' %}
-    <li class="work-tile work-film">
+    <li class="work-tile work-film" data-work-item="{{ item.group }}">
       {{ studioVideo(item.name, item.description, false, item.src, item.poster) }}
       <div class="work-caption" aria-hidden="true"><span class="work-kind">Film</span><strong>{{ item.title }}</strong><span class="work-sub">{{ item.label }}</span></div>
     </li>
     {% elif item.href %}
-    <li class="work-tile">
+    <li class="work-tile" data-work-item="{{ item.group or '' }}" data-work-photo="{{ item.photo.path }}" data-work-label="{{ item.label }}" data-work-href="{{ item.href or '' }}" data-work-alt="{{ item.photo.alt }}">
       <a href="{{ item.href }}" class="work-link">
         {{ photo(item.photo, item.label) }}
         <span class="work-caption"><span class="work-kind">Photo</span><strong>{{ item.label }}</strong><span class="work-sub">View style <span aria-hidden="true">→</span></span></span>
       </a>
     </li>
     {% else %}
-    <li class="work-tile">
+    <li class="work-tile" data-work-item="{{ item.group or '' }}" data-work-photo="{{ item.photo.path }}" data-work-label="{{ item.label }}" data-work-href="{{ item.href or '' }}" data-work-alt="{{ item.photo.alt }}">
       {{ photo(item.photo, item.label) }}
       <div class="work-caption" aria-hidden="true"><span class="work-kind">Photo</span><strong>{{ item.label }}</strong></div>
     </li>
@@ -40,4 +41,6 @@
     <a href="/styles" class="button">See styles &amp; prices</a>
   </div>
 </section>
+<dialog class="work-viewer" data-work-viewer aria-labelledby="work-viewer-title"><button type="button" class="work-viewer-close" data-viewer-close aria-label="Close photo">&times;</button><img data-viewer-image alt=""><div class="work-viewer-bar"><button type="button" data-viewer-step="-1" aria-label="Previous photo">←</button><div><h2 id="work-viewer-title" data-viewer-title></h2><a data-viewer-link href="/styles">View style <span aria-hidden="true">→</span></a></div><button type="button" data-viewer-step="1" aria-label="Next photo">→</button></div></dialog>
+<script defer src="/build/work.js"></script>
 {% endblock %}

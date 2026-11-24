@@ -1,7 +1,6 @@
 {% extends "layouts/base.njk" %}
 {% from "partials/components.njk" import photo %}
 {% block content %}
-{% set displayPhoto = selectedGroup.photo or style.photo %}
 <section class="style-hero">
   <div class="wrap style-detail">
     <div class="style-detail-copy">
@@ -16,10 +15,11 @@
         <a href="tel:{{ business.phone }}" class="button outline">Call {{ phoneDisplay }}</a>
       </div>
     </div>
-    <figure class="detail-photo">
-      <div class="arch-frame">{% if displayPhoto %}{{ photo(displayPhoto,style.name,true) }}{% else %}<img src="{{ media('braid-detail.webp') }}" width="478" height="500" alt="A closer look at braiding technique in the studio" fetchpriority="high">{% endif %}</div>
-      {% if displayPhoto and displayPhoto.generated %}<figcaption>Illustrative style image, not a photograph of a client.</figcaption>{% elif not displayPhoto %}<figcaption>Inside the studio · a look at the craft</figcaption>{% endif %}
-    </figure>
+    <div class="detail-photo{% if galleryPhotos.length > 1 %} has-thumbs{% endif %}" data-style-gallery>
+      {% if galleryPhotos.length > 1 %}<ol class="gallery-thumbs" aria-label="Choose a photo">{% for item in galleryPhotos %}<li><a href="#style-photo-{{ loop.index }}" data-gallery-thumb {% if loop.first %}aria-current="true"{% endif %}><img src="{{ item.variants.sizes[0].path if item.variants.sizes and item.variants.sizes.length else item.path }}"{% if item.focusClass %} class="{{ item.focusClass }}"{% endif %} alt="Photo {{ loop.index }}: {{ item.alt }}" width="72" height="90" loading="lazy" decoding="async"></a></li>{% endfor %}</ol>{% endif %}
+      <div class="gallery-main"><div class="arch-frame">{% if galleryPhotos.length %}<div class="gallery-track" data-gallery-track {% if galleryPhotos.length > 1 %}tabindex="0" role="group" aria-label="Photos of {{ style.name }}. Swipe or use the arrow keys."{% endif %}>{% for item in galleryPhotos %}<div class="gallery-slide" id="style-photo-{{ loop.index }}">{{ photo(item,style.name,loop.first) }}<button type="button" class="gallery-zoom" data-gallery-zoom hidden aria-label="Enlarge photo {{ loop.index }}"></button>{% if item.generated %}<span class="gallery-note">Illustrative style image, not a photograph of a client.</span>{% elif item.variants.size %}<span class="gallery-note">{{ [item.variants.size] | optionLabel }} size</span>{% endif %}</div>{% endfor %}</div>{% else %}<img src="{{ media('braid-detail.webp') }}" width="478" height="500" alt="A closer look at braiding technique in the studio" fetchpriority="high">{% endif %}</div>{% if galleryPhotos.length > 1 %}<button type="button" class="gallery-step" data-gallery-step="-1" aria-label="Previous photo" hidden>←</button><button type="button" class="gallery-step is-next" data-gallery-step="1" aria-label="Next photo" hidden>→</button><p class="gallery-count" data-gallery-count aria-hidden="true">1 / {{ galleryPhotos.length }}</p>{% endif %}</div>
+      {% if not galleryPhotos.length %}<p class="gallery-caption">Inside the studio · a look at the craft</p>{% endif %}
+    </div>
   </div>
 </section>
 
@@ -76,6 +76,6 @@
   <div><h2>Time in the chair</h2><p>We reserve {{ style.durationMin / 60 }} hours for this style. Your size and length may change that, so let’s talk it through before the day.</p></div>
 </section>
 {% if style.longHtml %}<div class="wrap prose section-tight">{{ style.longHtml | safe }}</div>{% endif %}
-{% if style.photos.length > 1 %}<div class="wrap gallery-grid section-tight">{% for item in style.photos %}{% if not loop.first %}<figure>{{ photo(item,item.alt) }}</figure>{% endif %}{% endfor %}</div>{% endif %}
 {% include "partials/faq.njk" %}
+{% if galleryPhotos.length %}<dialog class="work-viewer" data-style-viewer aria-label="{{ style.name }} photos"><button type="button" class="work-viewer-close" data-viewer-close aria-label="Close photo">&times;</button><img data-viewer-image alt=""><div class="work-viewer-bar"><button type="button" data-viewer-step="-1" aria-label="Previous photo">←</button><p data-viewer-count role="status"></p><button type="button" data-viewer-step="1" aria-label="Next photo">→</button></div></dialog><script defer src="/build/style-gallery.js"></script>{% endif %}
 {% endblock %}

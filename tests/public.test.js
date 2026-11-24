@@ -5,7 +5,11 @@ import argon2 from 'argon2';
 import { createApp } from '../src/app.js';
 import { parseEnv } from '../src/config/env.js';
 import { fixtureCatalog } from './fixtures/catalog.js';
-import { decorateCatalog, safePhoto } from '../src/routes/public/index.js';
+import {
+  decorateCatalog,
+  styleGallery,
+  safePhoto,
+} from '../src/routes/public/index.js';
 it('uses featured styles for the home signature section, including styles after the first six', async () => {
   const data = await fixtureCatalog().load();
   data.styles.forEach((style) => {
@@ -482,4 +486,39 @@ describe('published legal pages', () => {
     expect(text).toContain('24 hours of notice');
     expect(text).toContain('&lt;b&gt;by arrangement');
   });
+});
+it('shows every style photo in one gallery, the chosen size first, without repeats', () => {
+  const photo = (id, size) => ({ path: `/img/${id}.webp`, variants: { size } });
+  const cover = photo('cover'),
+    second = photo('second'),
+    small = photo('small', 'small');
+  const style = {
+    photo: cover,
+    photos: [cover, second],
+    groups: [{ key: 'medium' }, { key: 'small', photo: small }],
+  };
+  expect(styleGallery(style)).toEqual([cover, second, small]);
+  expect(styleGallery(style, style.groups[1])).toEqual([small, cover, second]);
+  const drawn = { ...photo('drawn', 'medium'), generated: true };
+  style.groups[0].photo = drawn;
+  expect(styleGallery(style)).not.toContain(drawn);
+  expect(styleGallery(style, style.groups[0])[0]).toBe(drawn);
+  expect(styleGallery({ groups: [], photos: [] })).toEqual([]);
+});
+it('gives a style with several photos thumbnails, and one photo none', async () => {
+  const data = await fixtureCatalog().load();
+  const style = data.styles.find((item) => item.slug === 'knotless-braids');
+  style.photos.push({
+    path: '/img/styles/boho-bob-960.webp',
+    alt: 'A second look',
+    variants: { origin: 'supplied' },
+  });
+  const app = createApp({ config, catalog: { load: async () => data } });
+  const many = await request(app).get('/styles/knotless-braids').expect(200);
+  expect(many.text).toContain('href="#style-photo-2"');
+  expect(many.text).toContain('A second look');
+  expect(many.text).not.toContain('gallery-grid');
+  const one = await request(makeApp()).get('/styles/boho-bob');
+  expect(one.text).toContain('data-gallery-track');
+  expect(one.text).not.toContain('data-gallery-thumb');
 });

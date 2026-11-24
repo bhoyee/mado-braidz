@@ -13,6 +13,8 @@ import { publicSettings } from '../../db/public-defaults.js';
 import { ManagementError } from '../../services/managementErrors.js';
 import { seoPages, verificationTag } from '../../services/pageSeo.js';
 import { photoPlacement } from '../../services/photoPlacement.js';
+import { isShown, libraryPhoto } from '../../services/photoState.js';
+import { decorateCatalog, workItems } from '../public/index.js';
 import {
   durationChoices,
   durationLabel,
@@ -39,13 +41,6 @@ export function managementRouter(service, config) {
       : res.redirect(303, url);
   const render = async (req, res, page, extra = {}) => {
     const data = await service.all();
-    if (page === 'gallery')
-      data.stylesWithoutPhotos = data.styles.filter(
-        (style) =>
-          !data.media.some(
-            (photo) => photo.kind === 'style' && photo.styleId === style.id,
-          ),
-      );
     data.settings.business.social ??= publicSettings.social;
     data.settings.emails ??= {
       reminderHours: 48,
@@ -97,6 +92,18 @@ export function managementRouter(service, config) {
     ),
     ownTimes: variants.some((v) => v.durationMin || v.label),
   });
+  const stylePhotos = async (id, data) => {
+    const workIds = await workPhotoIds();
+    return data.media
+      .filter((photo) => photo.styleId === id && photo.kind === 'style')
+      .map((photo) =>
+        libraryPhoto(photo, {
+          styles: data.styles,
+          media: data.media,
+          workIds,
+        }),
+      );
+  };
   router.get(
     '/styles/new',
     run((req, res) => {
@@ -119,9 +126,7 @@ export function managementRouter(service, config) {
         ...data,
         item,
         ...styleForm(variants, item),
-        photos: data.media.filter(
-          (photo) => photo.styleId === id && photo.kind === 'style',
-        ),
+        photos: await stylePhotos(id, data),
         lastEdit: await service.lastEdit(id),
         history: await service.priceHistory(id),
       });
@@ -361,9 +366,118 @@ export function managementRouter(service, config) {
       finish(req, res, '/admin/availability');
     }),
   );
+  // Exactly what clients see on Our Work, in order.
+  async function publicWork() {
+    const view = decorateCatalog(await service.publicCatalog());
+    return workItems(
+      view.suppliedStyles,
+      view.gallery,
+      Object.values(view.studioClips),
+      view.workOrder,
+    );
+  }
+  const workPhotoIds = async () =>
+    new Set(
+      (await publicWork())
+        .map((item) => Number(/^photo:(\d+)$/.exec(item.key || '')?.[1]))
+        .filter(Boolean),
+    );
   router.get(
     '/gallery',
-    run((req, res) => render(req, res, 'gallery')),
+    run(async (req, res) => {
+      await service.purgeRemovedMedia();
+      const [data, work] = await Promise.all([service.all(), publicWork()]);
+      const workIds = new Set(
+        work.map((item) => Number(/^photo:(\d+)$/.exec(item.key || '')?.[1])),
+      );
+      const context = { styles: data.styles, media: data.media, workIds };
+      const photos = data.media.map((photo) => libraryPhoto(photo, context));
+      const referenced = new Set(
+        photos
+          .filter((photo) => photo.cover && photo.reference)
+          .map((photo) => photo.styleId),
+      );
+      res.render('admin/manage/gallery', {
+        ...data,
+        photos,
+        removed: data.removedMedia.map((photo) => libraryPhoto(photo, context)),
+        stylesWithoutPhotos: data.styles.filter(
+          (style) =>
+            !data.media.some(
+              (photo) =>
+                photo.kind === 'style' &&
+                photo.styleId === style.id &&
+                isShown(photo),
+            ),
+        ),
+        referenceStyles: data.styles.filter((style) =>
+          referenced.has(style.id),
+        ),
+        work: work
+          .filter((item) => item.key)
+          .map((item) => ({
+            key: item.key,
+            film: item.type === 'film',
+            title: item.type === 'film' ? item.title : item.label,
+            image:
+              item.type === 'film'
+                ? item.poster
+                : item.photo.variants?.sizes?.[0]?.path || item.photo.path,
+            focusClass: item.photo?.focusClass || '',
+          })),
+      });
+    }),
+  );
+  const photoIds = z.array(entityId).min(1).max(200);
+  const photoChange = z.object({
+    styleId: z.union([entityId, z.null()]).optional(),
+    showOnStyle: z.boolean().optional(),
+    showInWork: z.boolean().optional(),
+  });
+  router.post(
+    '/gallery/place',
+    run(async (req, res) => {
+      const change = photoChange
+        .refine((v) => Object.values(v).some((x) => x !== undefined))
+        .parse({
+          styleId: req.body.styleId,
+          showOnStyle: req.body.showOnStyle,
+          showInWork: req.body.showInWork,
+        });
+      await service.placePhotos(
+        photoIds.parse(req.body.ids),
+        { ...change, workIds: await workPhotoIds() },
+        actor(req, res),
+      );
+      finish(req, res, '/admin/gallery');
+    }),
+  );
+  router.post(
+    '/gallery/trash',
+    run(async (req, res) => {
+      await service.trashMedia(photoIds.parse(req.body.ids), actor(req, res));
+      finish(req, res, '/admin/gallery');
+    }),
+  );
+  router.post(
+    '/gallery/restore',
+    run(async (req, res) => {
+      await service.restoreMedia(photoIds.parse(req.body.ids), actor(req, res));
+      finish(req, res, '/admin/gallery');
+    }),
+  );
+  router.post(
+    '/gallery/work-order',
+    run(async (req, res) => {
+      const order = z
+        .array(z.string().regex(/^(photo:\d+|film:[a-z0-9-]{3,80})$/))
+        .min(1)
+        .max(600)
+        .refine((keys) => new Set(keys).size === keys.length)
+        .parse(req.body.order);
+      await service.saveWorkOrder(order, actor(req, res));
+      finish(req, res, '/admin/gallery#work');
+    }),
   );
   router.post(
     '/gallery/reorder',
@@ -373,6 +487,7 @@ export function managementRouter(service, config) {
       finish(req, res, '/admin/gallery');
     }),
   );
+  const videoId = z.string().regex(/^[a-z0-9-]{3,80}$/);
   const videoInput = z.object({
     title: z.string().trim().min(1).max(120),
     description: z.string().trim().min(3).max(500),
@@ -439,10 +554,7 @@ export function managementRouter(service, config) {
   router.post(
     '/gallery/videos/:id',
     run(async (req, res) => {
-      const id = z
-        .string()
-        .regex(/^[a-z0-9-]{3,80}$/)
-        .parse(req.params.id);
+      const id = videoId.parse(req.params.id);
       await service.saveVideo(
         id,
         videoInput.parse(req.body),
@@ -522,6 +634,31 @@ export function managementRouter(service, config) {
     }),
   );
   router.post(
+    '/gallery/:id/details',
+    run(async (req, res) => {
+      const id = entityId.parse(req.params.id);
+      const change = photoChange
+        .extend({
+          alt: z
+            .string()
+            .trim()
+            .min(3, 'Describe the photo in a few words')
+            .max(500),
+          focus: z.object({
+            x: z.number().min(0).max(100),
+            y: z.number().min(0).max(100),
+          }),
+        })
+        .parse(req.body);
+      await service.savePhoto(
+        id,
+        { ...change, workIds: await workPhotoIds() },
+        actor(req, res),
+      );
+      finish(req, res, '/admin/gallery#photo-' + id);
+    }),
+  );
+  router.post(
     '/gallery/:id/replace',
     upload,
     run(async (req, res) => {
@@ -537,7 +674,12 @@ export function managementRouter(service, config) {
       );
       let updated;
       try {
-        updated = await service.replaceMediaImage(id, photo, actor(req, res));
+        updated = await service.replaceMediaImage(
+          id,
+          photo,
+          actor(req, res),
+          req.body.edited === '1',
+        );
       } catch (error) {
         await photo.cleanup();
         throw error;
@@ -577,8 +719,51 @@ export function managementRouter(service, config) {
   router.post(
     '/gallery/:id/remove',
     run(async (req, res) => {
-      await service.removeMedia(entityId.parse(req.params.id), actor(req, res));
+      await service.trashMedia(
+        [entityId.parse(req.params.id)],
+        actor(req, res),
+      );
       finish(req, res, returnPage(req));
+    }),
+  );
+  router.post(
+    '/gallery/videos/:id/flags',
+    run(async (req, res) => {
+      const flags = z
+        .object({ enabled: flag, showInWork: flag })
+        .refine((v) => Object.values(v).some((x) => x !== undefined))
+        .parse({
+          enabled: req.body.enabled,
+          showInWork: req.body.showInWork,
+        });
+      const id = videoId.parse(req.params.id);
+      await service.setVideoFlags(id, flags, actor(req, res));
+      finish(req, res, '/admin/gallery#videos');
+    }),
+  );
+  router.post(
+    '/gallery/videos/:id/cover',
+    upload,
+    run(async (req, res) => {
+      const id = videoId.parse(req.params.id);
+      const image = await prepareCatalogImage(
+        req.file?.buffer,
+        config.UPLOAD_DIR,
+      );
+      try {
+        await service.setVideoCover(id, image, actor(req, res));
+      } catch (error) {
+        await image.cleanup();
+        throw error;
+      }
+      finish(req, res, '/admin/gallery#video-' + id);
+    }),
+  );
+  router.post(
+    '/gallery/videos/:id/remove',
+    run(async (req, res) => {
+      await service.removeVideo(videoId.parse(req.params.id), actor(req, res));
+      finish(req, res, '/admin/gallery#videos');
     }),
   );
   router.get(

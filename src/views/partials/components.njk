@@ -1,5 +1,5 @@
 {% macro photo(item,name,hero=false) %}
-{% if item %}<picture>{% if item.avifSrcset %}<source type="image/avif" srcset="{{ item.avifSrcset }}" sizes="{% if hero %}(max-width:760px) 100vw, 50vw{% else %}(max-width:760px) 50vw, 33vw{% endif %}">{% endif %}<img src="{{ item.path }}" {% if item.srcset %}srcset="{{ item.srcset }}" sizes="{% if hero %}(max-width:760px) 100vw, 50vw{% else %}(max-width:760px) 50vw, 33vw{% endif %}"{% endif %} alt="{{ item.alt }}" width="{{ item.width or 800 }}" height="{{ item.height or 1000 }}" {% if hero %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async"></picture>{% else %}<div class="photo-empty"><span class="eyebrow">{{ name }}</span><span class="photo-caption">Ask Mado about this look.</span></div>{% endif %}
+{% if item %}<picture>{% if item.avifSrcset %}<source type="image/avif" srcset="{{ item.avifSrcset }}" sizes="{% if hero %}(max-width:760px) 100vw, 50vw{% else %}(max-width:760px) 50vw, 33vw{% endif %}">{% endif %}<img src="{{ item.path }}"{% if item.focusClass %} class="{{ item.focusClass }}"{% endif %} {% if item.srcset %}srcset="{{ item.srcset }}" sizes="{% if hero %}(max-width:760px) 100vw, 50vw{% else %}(max-width:760px) 50vw, 33vw{% endif %}"{% endif %} alt="{{ item.alt }}" width="{{ item.width or 800 }}" height="{{ item.height or 1000 }}" {% if hero %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async"></picture>{% else %}<div class="photo-empty"><span class="eyebrow">{{ name }}</span><span class="photo-caption">Ask Mado about this look.</span></div>{% endif %}
 {% endmacro %}
 
 {% macro card(style) %}
@@ -30,7 +30,7 @@
 {% macro studioVideo(name, description, hero=false, source='', poster='') %}
 {% set clip = studioClips[name] %}
 {% set videoSource = media(name + '.mp4') if clip.builtin else (clip.src or source or media(name + '.mp4')) %}
-{% set videoPoster = media(name + '.webp') if clip.builtin else (clip.poster or poster or media(name + '.webp')) %}
+{% set videoPoster = media(name + '.webp') if clip.builtin and not clip.customCover else (clip.poster or poster or media(name + '.webp')) %}
 {% if clip and not clip.enabled %}<div class="studio-video"><img src="/img/studio/office-entrance-960.webp" alt="The salon building at 7375 Executive Place" width="960" height="540"></div>{% else %}
 <div class="studio-video{% if hero %} hero-video{% endif %}" data-studio-player>
   <video id="film-{{ name }}" muted loop playsinline preload="none" poster="{{ videoPoster }}" aria-label="{{ clip.description or description }}" data-studio-video {% if hero %}data-hero-video{% endif %}><source data-src="{{ videoSource }}" type="video/mp4">Your browser does not support this video.</video>
@@ -55,6 +55,6 @@
 {% macro heroFilm(name, description) %}
 {% set clip = studioClips[name] %}
 {% if clip and not clip.enabled %}<img class="hero-clip" src="/img/studio/office-entrance-960.webp" alt="The salon building at 7375 Executive Place" width="960" height="540">{% else %}
-<video class="hero-clip" muted loop playsinline preload="none" disablepictureinpicture poster="{{ media(name + '.webp') }}" aria-label="{{ description }}" data-hero-video><source data-src="{{ media(name + '.mp4') }}" type="video/mp4"></video>
+<video class="hero-clip" muted loop playsinline preload="none" disablepictureinpicture poster="{{ clip.poster if clip.customCover else media(name + '.webp') }}" aria-label="{{ description }}" data-hero-video><source data-src="{{ media(name + '.mp4') }}" type="video/mp4"></video>
 {% endif %}
 {% endmacro %}

@@ -643,6 +643,193 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       ).rejects.toThrow('Refresh');
       for (const id of [a, b, other]) await service.removeMedia(id, actor);
     });
+    it('places, hides, removes and restores photos without changing what clients already see', async () => {
+      const add = (styleId, kind, variants) =>
+        service.saveMedia(
+          null,
+          {
+            path: '/img/styles/' + randomUUID() + '.webp',
+            alt: 'Library photo',
+            kind,
+            styleId,
+            sort: 0,
+            ...(variants ? { variants } : {}),
+          },
+          actor,
+        );
+      const styleId = await service.saveStyle(
+        null,
+        {
+          ...styleValues,
+          name: 'Library style',
+          slug: 'library-style',
+          priceOnConsultation: true,
+          active: true,
+        },
+        actor,
+      );
+      const cover = await add(styleId, 'style');
+      const post = (url, body) =>
+        agent
+          .post('/admin/gallery/' + url)
+          .set('Accept', 'application/json')
+          .send({ ...body, _csrf: token });
+      const refused = (r) => expect([400, 404, 409]).toContain(r.status);
+      const row = (id) => service.media(id);
+      const shown = async (id) => {
+        const text = (await request(app).get('/our-work')).text;
+        return text.includes((await row(id)).path);
+      };
+      const details = (id, body) =>
+        post(id + '/details', {
+          alt: 'A clear description',
+          focus: { x: 50, y: 50 },
+          ...body,
+        });
+      // A style cover shows on Our Work by default, and saving keeps it there.
+      expect(await shown(cover)).toBe(true);
+      expect((await agent.get('/admin/gallery')).text).toMatch(
+        new RegExp(`id="photo-${cover}"[^>]*data-in-work="yes"`),
+      );
+      await details(cover, { focus: { x: 22, y: 81 } }).expect(200);
+      expect(await shown(cover)).toBe(true);
+      expect((await row(cover)).variants.focus).toEqual({ x: 20, y: 80 });
+      expect((await request(app).get('/styles/library-style')).text).toContain(
+        'has-focus fx-20 fy-80',
+      );
+      await post('place', { ids: [cover], showInWork: false }).expect(200);
+      expect(await shown(cover)).toBe(false);
+      expect((await row(cover)).kind).toBe('style');
+
+      // Hidden photos leave every page but stay in the library.
+      await details(cover, { showOnStyle: false, showInWork: false }).expect(
+        200,
+      );
+      expect((await row(cover)).variants.hidden).toBe(true);
+      const path = (await row(cover)).path;
+      for (const url of ['/our-work', '/styles/library-style', '/styles'])
+        expect((await request(app).get(url)).text).not.toContain(path);
+      await details(cover, { showOnStyle: true, showInWork: false }).expect(
+        200,
+      );
+      expect((await request(app).get('/styles/library-style')).text).toContain(
+        path,
+      );
+
+      // Portfolio photos need a style before a style page can show them.
+      const loose = await add(null, 'gallery');
+      await post('place', { ids: [loose], showOnStyle: true }).expect(refused);
+      await post('place', { ids: [loose, cover], styleId }).expect(200);
+      expect((await row(loose)).styleId).toBe(styleId);
+      expect(await shown(loose)).toBe(true);
+      await post('place', { ids: [loose, 999999], showInWork: false }).expect(
+        refused,
+      );
+      expect(await shown(loose)).toBe(true);
+      await post('place', { ids: [loose] }).expect(refused);
+      await details(loose, { alt: 'x' }).expect(refused);
+      await details(loose, { styleId: 999999 }).expect(refused);
+
+      // Removing can be undone for a week.
+      await post('trash', { ids: [loose, cover] }).expect(200);
+      expect((await service.all()).media.some((m) => m.id === loose)).toBe(
+        false,
+      );
+      expect((await request(app).get('/our-work')).text).not.toContain(path);
+      await details(loose, {}).expect(refused);
+      await post('restore', { ids: [loose, cover] }).expect(200);
+      expect(await shown(loose)).toBe(true);
+      await post('restore', { ids: [loose] }).expect(refused);
+      await post('trash', { ids: [loose] }).expect(200);
+      expect(await service.purgeRemovedMedia()).toBe(0);
+      const later = createManagementService(db, () =>
+        now.plus({ days: 8 }).toJSDate(),
+      );
+      expect(await later.purgeRemovedMedia()).toBe(1);
+      await expect(service.media(loose)).rejects.toThrow('not found');
+
+      // A rotated reference photo is still a reference; a new photo is not.
+      const reference = await add(styleId, 'style', { origin: 'generated' });
+      await db
+        .update(s.media)
+        .set({ alt: 'AI hairstyle reference: long locs' })
+        .where(eq(s.media.id, reference));
+      const image = {
+        path: '/img/styles/new.webp',
+        width: 10,
+        height: 10,
+        variants: { origin: 'supplied', sizes: [] },
+      };
+      await service.replaceMediaImage(reference, image, actor, true);
+      expect(await row(reference)).toMatchObject({
+        alt: 'AI hairstyle reference: long locs',
+        variants: { origin: 'generated' },
+      });
+      await service.replaceMediaImage(reference, image, actor);
+      expect(await row(reference)).toMatchObject({
+        alt: 'long locs',
+        variants: { origin: 'supplied' },
+      });
+      for (const id of [cover, reference]) await service.removeMedia(id, actor);
+      await service.setStyleFlags(styleId, { active: false }, actor);
+    });
+    it('saves the Our Work order, and manages video switches, covers and removal', async () => {
+      const post = (url, body) =>
+        agent
+          .post('/admin/gallery/' + url)
+          .set('Accept', 'application/json')
+          .send({ ...body, _csrf: token });
+      const refused = (r) => expect([400, 404, 409]).toContain(r.status);
+      const films = async () =>
+        [
+          ...(await request(app).get('/our-work')).text.matchAll(
+            /id="film-([a-z0-9-]+)"/g,
+          ),
+        ].map((m) => m[1]);
+      const before = await films();
+      const wanted = [...before].reverse();
+      await post('work-order', {
+        order: wanted.map((id) => 'film:' + id),
+      }).expect(200);
+      expect(await films()).toEqual(wanted);
+      await post('work-order', { order: ['film:a', 'film:a'] }).expect(refused);
+      await post('work-order', { order: ['<script>'] }).expect(refused);
+      await db.delete(s.settings).where(eq(s.settings.key, 'ourWork'));
+
+      const id = before[0];
+      await post(`videos/${id}/flags`, { showInWork: false }).expect(200);
+      expect(await films()).not.toContain(id);
+      expect(
+        (await service.all()).videos.find((v) => v.id === id).enabled,
+      ).toBe(true);
+      await post(`videos/${id}/flags`, { showInWork: true }).expect(200);
+      expect(await films()).toContain(id);
+      await post(`videos/${id}/flags`, {}).expect(refused);
+      await post(`videos/${id}/remove`, {}).expect(refused);
+      const cover = {
+        path: '/media/catalog/cover.webp',
+        variants: { sizes: [] },
+      };
+      await service.setVideoCover(id, cover, actor);
+      expect((await request(app).get('/our-work')).text).toContain(
+        'poster="/media/catalog/cover.webp"',
+      );
+      const own = await service.saveVideo(
+        null,
+        {
+          title: 'Mine',
+          description: 'My own clip',
+          enabled: true,
+          showInWork: true,
+        },
+        { src: '/media/videos/x.mp4', poster: '/media/catalog/x.webp' },
+        actor,
+      );
+      expect(await films()).toContain(own.id);
+      await post(`videos/${own.id}/remove`, {}).expect(200);
+      expect(await films()).not.toContain(own.id);
+      await post(`videos/${own.id}/remove`, {}).expect(refused);
+    });
     it('creates a style with its cover photo in one save', async () => {
       const image = await sharp({
         create: { width: 700, height: 900, channels: 3, background: '#73489a' },

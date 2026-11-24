@@ -157,6 +157,7 @@ export function createOwnerSearch(db) {
           .where(
             and(
               inArray(s.media.kind, ['style', 'gallery']),
+              sql`JSON_EXTRACT(${s.media.variants}, '$.removedAt') IS NULL`,
               match(
                 sql`CONCAT_WS(' ',${s.media.alt},${s.styles.name},'photo image gallery')`,
               ),

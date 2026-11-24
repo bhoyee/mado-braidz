@@ -116,7 +116,14 @@ try {
       assert.ok((await page.locator('[data-video-id]').count()) >= 5);
       await accessible('Video library');
       const original = page.locator('[data-video-id="studio-knotless"]');
-      await save(original.getByRole('button', { name: /^Hide video/ }));
+      const flagSaved = () =>
+        page.waitForResponse((r) => r.url().endsWith('/flags'));
+      const setFlag = async (card, name, on) => {
+        const done = flagSaved();
+        await card.getByRole('switch', { name }).setChecked(on);
+        await done;
+      };
+      await setFlag(original, /^Published/, false);
       assert.ok(
         !(await (await fetch(origin + '/')).text()).includes(
           '/media/studio-knotless.mp4',
@@ -127,7 +134,7 @@ try {
           'film-studio-knotless',
         ),
       );
-      await save(original.getByRole('button', { name: /^Publish video/ }));
+      await setFlag(original, /^Published/, true);
       assert.ok(
         (await (await fetch(origin + '/')).text()).includes(
           '/media/studio-knotless.mp4',
@@ -189,12 +196,35 @@ try {
           'Updated video ' + width,
         ),
       );
-      await save(card.getByRole('button', { name: /^Hide video/ }));
+      await card.getByRole('button', { name: /^Manage video/ }).click();
+      const coverChoice = edit.locator('[data-cover-file]');
+      await Promise.all([
+        page.waitForEvent('framenavigated'),
+        coverChoice.setInputFiles({
+          name: 'cover.jpg',
+          mimeType: 'image/jpeg',
+          buffer: image,
+        }),
+      ]);
+      await page.waitForLoadState('networkidle');
+      assert.notEqual(
+        (await service.all()).videos.find((v) => v.id === record.id).poster,
+        record.poster,
+      );
+      await setFlag(card, /^Published/, false);
       assert.ok(
         !(await (await fetch(origin + '/our-work')).text()).includes(
           record.src,
         ),
       );
+      await card.getByRole('button', { name: /^Manage video/ }).click();
+      await edit.getByRole('button', { name: 'Remove video' }).click();
+      await save(
+        page
+          .locator('#owner-confirm-dialog')
+          .getByRole('button', { name: 'Remove video', exact: true }),
+      );
+      assert.equal(await card.count(), 0);
       const csrf = await page
         .locator('meta[name="csrf-token"]')
         .getAttribute('content');
@@ -245,12 +275,17 @@ try {
       ),
       false,
     );
-    assert.ok((await page.locator('[data-photo-id]').count()) > 1);
+    const cards = () => page.locator('[data-photo-id]:visible');
+    const total = await page.locator('[data-removed=""]').count();
+    assert.ok(total > 1);
+    assert.equal(await cards().count(), Math.min(20, total));
+    // Cards use small copies, never the full-size photo.
     assert.ok(
-      (await page
-        .locator('[data-photo-id]')
-        .first()
-        .getAttribute('data-photo-name')) !== 'Portfolio photo',
+      (
+        await page
+          .locator('[data-photo-id] img')
+          .evaluateAll((all) => all.map((i) => i.getAttribute('src')))
+      ).every((src) => !src.includes('-1600')),
     );
     await accessible('Photo library');
     await page.screenshot({
@@ -258,149 +293,242 @@ try {
       fullPage: true,
       timeout: 60000,
     });
-    await page
-      .getByLabel('Search photos', { exact: true })
-      .fill('no photo should match this phrase');
+    await page.getByLabel('Search photos').fill('no photo should match this');
     await page.locator('[data-library-empty]:not([hidden])').waitFor();
-    assert.equal(
-      await page.locator('[data-photo-id]:not([hidden])').count(),
-      0,
-    );
-    await page.getByLabel('Search photos', { exact: true }).fill('');
+    assert.equal(await cards().count(), 0);
+    await page.getByLabel('Search photos').fill('');
     const firstStyle = await page
-      .locator('[data-photo-id]')
+      .locator('[data-photo-id][data-style]:not([data-style=""])')
       .first()
-      .getAttribute('data-photo-style');
+      .getAttribute('data-style');
     await page.locator('[data-library-style]').selectOption(firstStyle);
     assert.ok(
       (
-        await page
-          .locator('[data-photo-id]:not([hidden])')
-          .evaluateAll((rows) => rows.map((r) => r.dataset.photoStyle))
+        await cards().evaluateAll((rows) => rows.map((r) => r.dataset.style))
       ).every((id) => id === firstStyle),
     );
     await page.locator('[data-library-style]').selectOption('');
-    await page.locator('.library-missing > summary').click();
+    // The Our Work tab is exactly what the public page shows.
+    const publicHtml = await (await fetch(origin + '/our-work')).text();
+    const inWork = await page
+      .locator('[data-in-work="yes"]')
+      .evaluateAll((rows) => rows.map((r) => r.dataset.full));
+    assert.ok(inWork.length > 0);
+    for (const path of inWork) assert.ok(publicHtml.includes(path), path);
+    // Upload several at once, one for a style without photos.
+    const file = (name, buffer = image) => ({
+      name,
+      mimeType: 'image/jpeg',
+      buffer,
+    });
+    const huge = await sharp({
+      create: { width: 5200, height: 3900, channels: 3, background: '#a06a80' },
+    })
+      .jpeg({ quality: 100 })
+      .toBuffer();
+    await page.locator('.library-missing > summary').first().click();
     await page.locator(`[data-missing-style="${missingId}"] button`).click();
-    const upload = page.locator('#library-upload-dialog');
+    const upload = page.locator('#photos-add');
+    await upload
+      .locator('[data-add-files]')
+      .setInputFiles([file('one.jpg'), file('two.jpg', huge)]);
+    await upload.locator('.add-row').nth(1).waitFor();
     assert.equal(
-      await upload.locator('[name=styleId]').inputValue(),
+      await upload.locator('[data-field="style"]').first().inputValue(),
       String(missingId),
     );
-    assert.equal(await upload.locator('[name=showOnStyle]').isChecked(), true);
-    assert.equal(await upload.locator('[name=showInWork]').isChecked(), false);
-    await upload.locator('[name=showInWork]').check();
-    await upload.locator('[name=photo]').setInputFiles({
-      name: 'style.jpg',
-      mimeType: 'image/jpeg',
-      buffer: image,
-    });
-    await save(
-      upload.getByRole('button', { name: 'Upload photo', exact: true }),
-    );
-    assert.equal(
-      (await service.all()).media.filter((photo) => photo.styleId === missingId)
-        .length,
-      1,
-    );
-    await page.getByRole('button', { name: 'Add photo', exact: true }).click();
-    await upload.locator('[name=photo]').setInputFiles({
-      name: 'portfolio.jpg',
-      mimeType: 'image/jpeg',
-      buffer: image,
-    });
-    assert.equal(
-      await upload.locator('[data-gallery-upload-preview]').isVisible(),
-      true,
-    );
+    await upload.locator('[data-rotate]').first().click();
+    await upload.locator('[data-crop]').nth(1).selectOption('1');
+    await upload.locator('[data-field="alt"]').first().fill('x');
+    await upload.locator('[data-add-upload]').click();
+    await upload.getByText('Describe this photo in a few words.').waitFor();
     await upload
-      .getByLabel('Photo description', { exact: true })
+      .locator('[data-field="alt"]')
+      .first()
       .fill('Gallery browser test ' + width);
     await accessible('Upload dialog');
-    await save(
-      upload.getByRole('button', { name: 'Upload photo', exact: true }),
+    await page.screenshot({
+      path: `tmp/qa/gallery-add-${width}.png`,
+      timeout: 60000,
+    });
+    // A failed photo can be tried again without sending the others twice.
+    await page.route(
+      '**/admin/gallery/upload',
+      (route) => route.fulfill({ status: 503, body: 'busy' }),
+      { times: 1 },
     );
-    const id = Number(new URL(page.url()).hash.replace('#photo-', ''));
-    assert.ok(id);
+    await upload.locator('[data-add-upload]').click();
+    await upload.getByText('1 did not upload').waitFor({ timeout: 60000 });
+    await save(upload.locator('[data-add-upload]'));
+    const added = (await service.all()).media.filter(
+      (photo) => photo.styleId === missingId,
+    );
+    assert.equal(added.length, 2);
+    const rotated = added.find((photo) => photo.alt.startsWith('Gallery'));
+    const square = added.find((photo) => photo !== rotated);
+    assert.ok(rotated.width > rotated.height, 'rotated');
+    assert.equal(square.width, square.height);
+    // The switch, the window and focus.
+    const id = rotated.id;
     const card = page.locator(`#photo-${id}`);
-    await page
-      .getByRole('button', { name: 'Style pages', exact: true })
-      .click();
-    assert.equal(await card.isVisible(), false);
-    await page.getByRole('button', { name: 'Our Work', exact: true }).click();
-    assert.equal(await card.isVisible(), true);
-    await card.getByRole('button', { name: /Manage photo/ }).click();
-    const edit = page.locator('#library-edit-dialog');
-    const form = edit.locator('[data-gallery-edit-form]');
-    await form.getByLabel('Photo description', { exact: true }).fill('x');
-    await form.getByRole('button', { name: 'Save photo details' }).click();
-    await form.locator('[data-owner-form-error]:not([hidden])').waitFor();
-    await form
-      .getByLabel('Photo description', { exact: true })
-      .fill('Updated portfolio ' + width);
-    await accessible('Manage photo dialog');
+    await page.getByLabel('Search photos').fill('Gallery browser test');
+    const placed = page.waitForResponse((r) => r.url().endsWith('/place'));
+    await card.getByRole('switch').check();
+    await placed;
+    assert.equal((await service.media(id)).variants.showInWork, true);
+    await card.locator('[data-photo-edit]').click();
+    const edit = page.locator('#photo-window');
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-window-image-status]').textContent === '',
+    );
+    assert.equal(
+      await edit.locator('[name="showInWork"]').isChecked(),
+      true,
+      'never silently unticked',
+    );
+    const box = await edit.locator('[data-window-canvas]').boundingBox();
+    await page.mouse.click(box.x + box.width * 0.2, box.y + box.height * 0.8);
+    await edit.locator('[name="alt"]').fill('Updated portfolio ' + width);
+    await accessible('Photo window');
     await page.screenshot({
       path: `tmp/qa/gallery-manage-${width}.png`,
       timeout: 60000,
     });
-    await save(form.getByRole('button', { name: 'Save photo details' }));
-    await card.getByRole('button', { name: /Manage photo/ }).click();
     const before = await service.media(id);
-    await edit.getByLabel('New photo', { exact: true }).setInputFiles({
+    await save(edit.getByRole('button', { name: 'Save photo', exact: true }));
+    let after = await service.media(id);
+    assert.equal(after.path, before.path);
+    assert.deepEqual(after.variants.focus, { x: 20, y: 80 });
+    assert.equal(after.variants.showInWork, true);
+    await page.getByLabel('Search photos').fill('Updated portfolio');
+    await card.locator('[data-photo-edit]').click();
+    await edit.locator('[data-window-file]').setInputFiles({
       name: 'replacement.png',
       mimeType: 'image/png',
       buffer: replacement,
     });
-    await save(
-      edit.getByRole('button', { name: 'Replace photo', exact: true }),
-    );
-    const after = await service.media(id);
+    await edit.getByText('New image chosen').waitFor();
+    await save(edit.getByRole('button', { name: 'Save photo', exact: true }));
+    after = await service.media(id);
     assert.notEqual(after.path, before.path);
-    for (const key of ['id', 'alt', 'styleId', 'kind', 'sort'])
+    for (const key of ['id', 'styleId', 'kind', 'sort'])
       assert.equal(after[key], before[key]);
+    // Next and previous, guarding unsaved work.
+    await page.getByLabel('Search photos').fill('');
+    await page.locator('[data-photo-view="all"]').click();
+    await page.locator('[data-photo-edit]').first().click();
+    assert.match(
+      await edit.locator('[data-window-position]').textContent(),
+      /^Photo 1 of /,
+    );
+    await edit.getByRole('button', { name: 'Next →' }).click();
+    assert.match(
+      await edit.locator('[data-window-position]').textContent(),
+      /^Photo 2 of /,
+    );
+    await edit.locator('[name="alt"]').fill('Not saved');
+    await edit.getByRole('button', { name: 'Next →' }).click();
+    assert.match(
+      await edit.locator('[data-window-position]').textContent(),
+      /^Photo 2 of /,
+    );
+    await page.keyboard.press('Escape');
+    // Select several, remove, undo.
     await page
-      .getByRole('button', { name: 'Reorder photos', exact: true })
-      .click();
-    const initial = await page
-      .locator('[data-photo-id]')
-      .evaluateAll((rows) => rows.map((r) => r.dataset.photoId));
-    await page.locator('[data-photo-move="1"]').first().click();
-    await page.locator('[data-photo-reorder-cancel]').click();
-    assert.deepEqual(
-      await page
-        .locator('[data-photo-id]')
-        .evaluateAll((rows) => rows.map((r) => r.dataset.photoId)),
-      initial,
-    );
-    await page
-      .getByRole('button', { name: 'Reorder photos', exact: true })
-      .click();
-    await page.locator('[data-photo-move="1"]').first().click();
-    const expected = await page
-      .locator('[data-photo-id]')
-      .evaluateAll((rows) => rows.map((r) => Number(r.dataset.photoId)));
-    await save(
-      page.getByRole('button', { name: 'Save photo order', exact: true }),
-    );
-    assert.deepEqual(
-      (await service.all()).media.map((r) => r.id),
-      expected,
-    );
-    await card.getByRole('button', { name: /Manage photo/ }).click();
-    await edit
-      .getByRole('button', { name: 'Remove photo', exact: true })
-      .click();
+      .getByLabel('Search photos')
+      .fill('Portfolio test style ' + width);
+    await page.getByRole('button', { name: 'Select several' }).click();
+    await page.getByRole('button', { name: 'Select all shown' }).click();
+    await accessible('Selecting photos');
+    await page.screenshot({
+      path: `tmp/qa/gallery-select-${width}.png`,
+      timeout: 60000,
+    });
+    await page.locator('[data-bulk="remove"]').click();
     const confirm = page.locator('#owner-confirm-dialog');
     await accessible('Remove confirmation');
-    await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
-    assert.equal(await edit.isVisible(), true);
-    await edit
-      .getByRole('button', { name: 'Remove photo', exact: true })
-      .click();
-    await save(
-      confirm.getByRole('button', { name: 'Remove photo', exact: true }),
+    await save(confirm.getByRole('button', { name: 'Remove photos' }));
+    const mine = async () =>
+      (await service.all()).media.filter((p) => p.styleId === missingId).length;
+    assert.equal(await mine(), 0);
+    await save(page.getByRole('button', { name: 'Undo', exact: true }));
+    assert.equal(await mine(), 2);
+    await service.trashMedia([square.id], actor);
+    await page.reload();
+    await page.locator('[data-photo-view="removed"]').click();
+    await save(page.locator(`[data-restore="${square.id}"]`));
+    assert.equal(await mine(), 2);
+    // Our Work order matches the public page before and after.
+    const publicKeys = async () => {
+      const visitor = await context.newPage();
+      await visitor.goto(origin + '/our-work');
+      const paths = await visitor
+        .locator('.work-tile')
+        .evaluateAll((tiles) =>
+          tiles.map(
+            (tile) =>
+              tile.dataset.workPhoto || tile.querySelector('video')?.id || '',
+          ),
+        );
+      await visitor.close();
+      return paths;
+    };
+    await page.goto(origin + '/admin/gallery#work');
+    await page.reload();
+    const ordered = await publicKeys();
+    assert.equal(await page.locator('[data-work-key]').count(), ordered.length);
+    await accessible('Our Work order');
+    await page.screenshot({
+      path: `tmp/qa/gallery-order-${width}.png`,
+      fullPage: true,
+      timeout: 60000,
+    });
+    await page.locator('[data-work-move="1"]').first().click();
+    const orderSaved = page.waitForResponse((r) =>
+      r.url().endsWith('/work-order'),
     );
-    assert.equal(await card.count(), 0);
+    await page.getByRole('button', { name: 'Save order' }).click();
+    await orderSaved;
+    const moved = await publicKeys();
+    assert.equal(moved[1], ordered[0]);
+    assert.equal(moved[0], ordered[1]);
+    // The public page: filters and the larger view.
+    const visitor = await context.newPage();
+    visitor.on('pageerror', (e) => errors.push(e.message));
+    await visitor.goto(origin + '/our-work');
+    await visitor.getByRole('button', { name: 'Films', exact: true }).click();
+    assert.equal(
+      await visitor.locator('.work-tile:visible').count(),
+      await visitor.locator('.work-film').count(),
+    );
+    await visitor.getByRole('button', { name: 'Everything' }).click();
+    const opener = visitor.locator('.work-tile[data-work-photo]').first();
+    await opener.click();
+    await visitor.locator('[data-work-viewer][open]').waitFor();
+    await visitor.getByRole('button', { name: 'Next photo' }).click();
+    await visitor.waitForTimeout(400);
+    assert.deepEqual(
+      (await new AxeBuilder({ page: visitor }).analyze()).violations.map(
+        (v) => v.id,
+      ),
+      [],
+      'Our Work viewer',
+    );
+    await visitor.screenshot({ path: `tmp/qa/our-work-viewer-${width}.png` });
+    await visitor.keyboard.press('Escape');
+    assert.equal(
+      await visitor.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      false,
+    );
+    await visitor.screenshot({
+      path: `tmp/qa/our-work-${width}.png`,
+      fullPage: true,
+      timeout: 60000,
+    });
+    await visitor.close();
     assert.equal(
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,
@@ -409,7 +537,7 @@ try {
     );
     assert.deepEqual(errors, []);
     console.log(
-      `PASS ${width}px: search, filters, missing-style upload, image preview, edit validation, replacement, reorder/cancel/save, confirmed removal and accessibility.`,
+      `PASS ${width}px: search, filters, multi-upload with retry, rotate, crop, focus, replacement, next/previous, bulk removal, undo, restore, Our Work order, public filters and viewer, accessibility.`,
     );
     await context.close();
   }

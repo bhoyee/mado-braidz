@@ -5,6 +5,13 @@ import { studioVideos } from './studioVideos.js';
 import { DateTime } from 'luxon';
 import * as s from '../db/schema.js';
 import { orderStyles, priceChanges, priceSort } from './styleSummary.js';
+import { createCatalogService } from './catalogService.js';
+import {
+  KEEP_REMOVED_DAYS,
+  cleanFocus,
+  isRemoved,
+  photoVariants,
+} from './photoState.js';
 import {
   styleInput,
   variantInput,
@@ -74,7 +81,8 @@ export function createManagementService(db, clock = () => new Date()) {
               .filter((l) => l.addonId === a.id)
               .map((l) => l.styleId),
           })),
-          media,
+          media: media.filter((row) => !isRemoved(row)),
+          removedMedia: media.filter(isRemoved),
           settings: Object.fromEntries(
             settings.map((r) => [
               r.key,
@@ -112,6 +120,69 @@ export function createManagementService(db, clock = () => new Date()) {
         message ||
           'Keep at least one price on, or hide the style from the website first.',
       );
+  }
+  async function lockPhotos(tx, ids, removed = false) {
+    const rows = await tx
+      .select()
+      .from(s.media)
+      .where(
+        and(
+          inArray(s.media.id, ids),
+          inArray(s.media.kind, ['style', 'gallery']),
+        ),
+      )
+      .for('update');
+    if (
+      rows.length !== new Set(ids).size ||
+      rows.some((row) => isRemoved(row) !== removed)
+    )
+      throw new ManagementError('Refresh the photos and try again');
+    return rows;
+  }
+  // `workIds` are the photos clients see on Our Work now, so a photo keeps its
+  // place there unless the owner changes it.
+  async function updatePhotos(ids, input, actor) {
+    const { alt, styleId, showOnStyle, showInWork, focus, workIds } = input;
+    return db.transaction(async (tx) => {
+      const rows = await lockPhotos(tx, ids);
+      if (styleId)
+        exists(
+          (
+            await tx
+              .select({ id: s.styles.id })
+              .from(s.styles)
+              .where(eq(s.styles.id, styleId))
+          )[0],
+        );
+      for (const row of rows) {
+        const before = photoVariants(row);
+        const tag = styleId === undefined ? row.styleId : styleId;
+        const style = showOnStyle ?? (row.kind === 'style' && !before.hidden);
+        const work = showInWork ?? workIds.has(row.id);
+        if (style && !tag)
+          throw new ManagementError(
+            'Choose a style to show a photo on a style page.',
+          );
+        const variants = { ...before, showInWork: work };
+        delete variants.hidden;
+        if (!style && !work) variants.hidden = true;
+        // A size photo belongs to one style only.
+        if (tag !== row.styleId) delete variants.size;
+        if (focus !== undefined) {
+          delete variants.focus;
+          const clean = cleanFocus(focus);
+          if (clean) variants.focus = clean;
+        }
+        const values = {
+          ...(alt === undefined ? {} : { alt }),
+          styleId: tag || null,
+          kind: style ? 'style' : work ? 'gallery' : row.kind,
+          variants,
+        };
+        await tx.update(s.media).set(values).where(eq(s.media.id, row.id));
+        await audit(tx, actor, 'media', row.id, row, values);
+      }
+    });
   }
   async function newSlug(tx, name, table, fallback) {
     const base =
@@ -290,7 +361,7 @@ export function createManagementService(db, clock = () => new Date()) {
             : row.variants,
       };
     },
-    async replaceMediaImage(id, image, actor) {
+    async replaceMediaImage(id, image, actor, edited = false) {
       return db.transaction(async (tx) => {
         const before = exists(
           (
@@ -311,15 +382,26 @@ export function createManagementService(db, clock = () => new Date()) {
             ? JSON.parse(before.variants)
             : before.variants;
         const patch = {
+          // A real photo is no longer described as a reference.
+          ...(edited
+            ? {}
+            : {
+                alt:
+                  before.alt.replace(/^AI hairstyle reference:\s*/i, '') ||
+                  before.alt,
+              }),
           path: image.path,
           width: image.width,
           height: image.height,
           variants: {
             ...image.variants,
+            // Rotating or cropping does not change what a photo is.
+            ...(edited && previous?.origin ? { origin: previous.origin } : {}),
             ...(previous?.size ? { size: previous.size } : {}),
             ...(typeof previous?.showInWork === 'boolean'
               ? { showInWork: previous.showInWork }
               : {}),
+            ...(previous?.hidden ? { hidden: true } : {}),
           },
         };
         await tx.update(s.media).set(patch).where(eq(s.media.id, id));
@@ -624,7 +706,8 @@ export function createManagementService(db, clock = () => new Date()) {
           .orderBy(asc(s.media.sort), asc(s.media.id))
           .for('update');
         const own = rows.filter(
-          (row) => row.styleId === styleId && row.kind === 'style',
+          (row) =>
+            row.styleId === styleId && row.kind === 'style' && !isRemoved(row),
         );
         if (
           new Set(ids).size !== ids.length ||
@@ -994,6 +1077,123 @@ export function createManagementService(db, clock = () => new Date()) {
           0,
           rows.map((r) => ({ id: r.id, sort: r.sort })),
           ids,
+        );
+      });
+    },
+    publicCatalog: () => createCatalogService(db).load(),
+    // One save for everything in the photo window.
+    async savePhoto(id, input, actor) {
+      return updatePhotos([id], input, actor);
+    },
+    async placePhotos(ids, input, actor) {
+      return updatePhotos(ids, input, actor);
+    },
+    async trashMedia(ids, actor) {
+      await db.transaction(async (tx) => {
+        const rows = await lockPhotos(tx, ids);
+        for (const row of rows) {
+          const variants = {
+            ...photoVariants(row),
+            removedAt: clock().toISOString(),
+          };
+          await tx
+            .update(s.media)
+            .set({ variants })
+            .where(eq(s.media.id, row.id));
+          await audit(tx, actor, 'media', row.id, row, { removed: true });
+        }
+      });
+    },
+    async restoreMedia(ids, actor) {
+      await db.transaction(async (tx) => {
+        for (const row of await lockPhotos(tx, ids, true)) {
+          const variants = { ...photoVariants(row) };
+          delete variants.removedAt;
+          await tx
+            .update(s.media)
+            .set({ variants })
+            .where(eq(s.media.id, row.id));
+          await audit(tx, actor, 'media', row.id, { removed: true }, variants);
+        }
+      });
+    },
+    // Photos removed more than a week ago are deleted; the cleanup job then
+    // removes their files.
+    async purgeRemovedMedia() {
+      const before = +clock() - KEEP_REMOVED_DAYS * 86400000;
+      const rows = await db
+        .select()
+        .from(s.media)
+        .where(inArray(s.media.kind, ['style', 'gallery']));
+      const old = rows.filter(
+        (row) =>
+          isRemoved(row) && +new Date(photoVariants(row).removedAt) < before,
+      );
+      if (old.length)
+        await db.delete(s.media).where(
+          inArray(
+            s.media.id,
+            old.map((row) => row.id),
+          ),
+        );
+      return old.length;
+    },
+    async saveWorkOrder(order, actor) {
+      await db.transaction((tx) => setting(tx, 'ourWork', { order }, actor));
+    },
+    async setVideoFlags(id, flags, actor) {
+      const video = exists((await all()).videos.find((v) => v.id === id));
+      return this.saveVideo(
+        id,
+        {
+          title: video.title,
+          description: video.description,
+          enabled: flags.enabled ?? video.enabled,
+          showInWork: flags.showInWork ?? Boolean(video.showInWork),
+        },
+        null,
+        actor,
+      );
+    },
+    async setVideoCover(id, image, actor) {
+      const video = exists((await all()).videos.find((v) => v.id === id));
+      return this.saveVideo(
+        id,
+        {
+          title: video.title,
+          description: video.description,
+          enabled: video.enabled,
+          showInWork: Boolean(video.showInWork),
+        },
+        {
+          poster: image.path,
+          posterVariants: image.variants,
+          customCover: true,
+        },
+        actor,
+      );
+    },
+    async removeVideo(id, actor) {
+      await db.transaction(async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(s.settings)
+          .where(eq(s.settings.key, 'videos'))
+          .for('update');
+        const value =
+          typeof row?.value === 'string' ? JSON.parse(row.value) : row?.value;
+        const video = exists(
+          studioVideos({ videos: value }).find((v) => v.id === id),
+        );
+        if (video.builtin)
+          throw new ManagementError(
+            'This video is part of the website. Hide it instead.',
+          );
+        await setting(
+          tx,
+          'videos',
+          { items: value.items.filter((v) => v.id !== id) },
+          actor,
         );
       });
     },

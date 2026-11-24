@@ -460,66 +460,6 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
   });
 });
 const savedMessage = sessionStorage.getItem('owner-message');
-const photoList = document.querySelector('[data-photo-list]');
-if (photoList) {
-  let dragged;
-  photoList.addEventListener('dragstart', (event) => {
-    dragged = event.target.closest('[data-photo-id]');
-  });
-  photoList.addEventListener('dragend', () => {
-    dragged = null;
-  });
-  photoList.addEventListener('dragover', (event) => {
-    if (dragged) event.preventDefault();
-  });
-  photoList.addEventListener('drop', (event) => {
-    if (!dragged) return;
-    event.preventDefault();
-    const target = event.target.closest('[data-photo-id]');
-    if (dragged && target && dragged !== target)
-      photoList.insertBefore(dragged, target);
-    dragged = null;
-  });
-  photoList.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-photo-move]');
-    if (!button) return;
-    const card = button.closest('[data-photo-id]');
-    if (button.dataset.photoMove === '-1' && card.previousElementSibling)
-      photoList.insertBefore(card, card.previousElementSibling);
-    if (button.dataset.photoMove === '1' && card.nextElementSibling)
-      photoList.insertBefore(card.nextElementSibling, card);
-  });
-  document
-    .querySelector('[data-save-photo-order]')
-    .addEventListener('click', async (event) => {
-      const button = event.currentTarget;
-      button.disabled = true;
-      try {
-        const response = await fetch('/admin/gallery/reorder', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'x-csrf-token': document.querySelector('meta[name="csrf-token"]')
-              .content,
-          },
-          body: JSON.stringify({
-            ids: [...photoList.querySelectorAll('[data-photo-id]')].map(
-              (card) => Number(card.dataset.photoId),
-            ),
-          }),
-        });
-        const result = await response.json();
-        if (!response.ok)
-          throw Error(result.message || 'Unable to save photo order');
-        sessionStorage.setItem('owner-message', 'Photo order saved.');
-        location.reload();
-      } catch (error) {
-        report(error.message);
-        button.disabled = false;
-      }
-    });
-}
 if (savedMessage) {
   sessionStorage.removeItem('owner-message');
   toast(savedMessage, true);

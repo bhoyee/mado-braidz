@@ -47,6 +47,8 @@ copyFileSync('src/client/admin-live.js', 'public/build/admin-live.js');
 copyFileSync('src/client/admin-guide.js', 'public/build/admin-guide.js');
 copyFileSync('src/client/admin-styles.js', 'public/build/admin-styles.js');
 copyFileSync('src/client/admin-search.js', 'public/build/admin-search.js');
+copyFileSync('src/client/style-gallery.js', 'public/build/style-gallery.js');
+copyFileSync('src/client/work.js', 'public/build/work.js');
 copyFileSync('src/client/admin-gallery.js', 'public/build/admin-gallery.js');
 copyFileSync('src/client/admin-videos.js', 'public/build/admin-videos.js');
 buildSync({
