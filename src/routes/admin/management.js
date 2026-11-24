@@ -13,6 +13,14 @@ import { publicSettings } from '../../db/public-defaults.js';
 import { ManagementError } from '../../services/managementErrors.js';
 import { seoPages, verificationTag } from '../../services/pageSeo.js';
 import { photoPlacement } from '../../services/photoPlacement.js';
+import {
+  durationChoices,
+  durationLabel,
+  lengthNames,
+  priceGrid,
+  sizeNames,
+  styleSummary,
+} from '../../services/styleSummary.js';
 
 const optionalId = (v) => (v ? entityId.parse(v) : null);
 const text = (max) => z.string().trim().max(max).default('');
@@ -47,18 +55,54 @@ export function managementRouter(service, config) {
     };
     res.render('admin/manage/' + page, { ...data, ...extra });
   };
+  const idList = z.array(entityId).max(500);
+  const flag = z.boolean().optional();
   router.get(
     '/styles',
-    run((req, res) => render(req, res, 'styles')),
+    run(async (req, res) => {
+      const data = await service.all();
+      res.render('admin/manage/styles', {
+        ...data,
+        styles: data.styles.map((style) => styleSummary(style, data)),
+        categories: data.categories.map((category) => ({
+          ...category,
+          count: data.styles.filter((style) => style.categoryId === category.id)
+            .length,
+        })),
+      });
+    }),
   );
+  const styleForm = (variants, item) => ({
+    grid: priceGrid(variants),
+    sizeNames,
+    lengthNames,
+    // Show the sizes and lengths in use; a new style starts with one price.
+    usedSizes: sizeNames
+      .filter(({ value }) =>
+        variants.length
+          ? variants.some((v) => (v.size || '') === value)
+          : value === '',
+      )
+      .map(({ value }) => value),
+    usedLengths: lengthNames
+      .filter(({ value }) =>
+        variants.length
+          ? variants.some((v) => (v.length || '') === value)
+          : value === '',
+      )
+      .map(({ value }) => value),
+    durations: durationChoices(
+      item.durationMin,
+      ...variants.map((v) => v.durationMin),
+    ),
+    ownTimes: variants.some((v) => v.durationMin || v.label),
+  });
   router.get(
     '/styles/new',
-    run((req, res) =>
-      render(req, res, 'style', {
-        item: { active: true, durationMin: 240 },
-        itemVariants: [],
-      }),
-    ),
+    run((req, res) => {
+      const item = { active: true, durationMin: 240 };
+      return render(req, res, 'style', { item, ...styleForm([], item) });
+    }),
   );
   router.get(
     '/styles/:id',
@@ -70,23 +114,154 @@ export function managementRouter(service, config) {
         return res
           .status(404)
           .render('admin/error', { error: 'Style not found.' });
+      const variants = data.variants.filter((r) => r.styleId === id);
       res.render('admin/manage/style', {
         ...data,
         item,
-        itemVariants: data.variants.filter((r) => r.styleId === id),
+        ...styleForm(variants, item),
+        photos: data.media.filter(
+          (photo) => photo.styleId === id && photo.kind === 'style',
+        ),
         lastEdit: await service.lastEdit(id),
+        history: await service.priceHistory(id),
       });
     }),
   );
+  // A new style can carry its first photo, so this form may be multipart.
+  const styleUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 8 * 1024 * 1024,
+      files: 1,
+      fields: 40,
+      fieldSize: 32 * 1024,
+    },
+  }).single('photo');
+  const priceRows = z
+    .array(
+      z.object({
+        id: z.union([entityId, z.literal(''), z.null()]).optional(),
+        size: z.string().max(20).nullish(),
+        length: z.string().max(20).nullish(),
+        label: z.string().max(255).nullish(),
+        price: z.string().max(12),
+        durationMin: z.union([z.string().max(4), z.number()]).nullish(),
+        active: z.boolean(),
+      }),
+    )
+    .max(60);
   router.post(
     '/styles/save',
+    (req, res, next) =>
+      styleUpload(req, res, (error) =>
+        next(error ? new ManagementError('Choose a photo under 8 MB.') : null),
+      ),
     run(async (req, res) => {
-      const id = await service.saveStyle(
+      const body = { ...req.body };
+      if (body.prices) {
+        try {
+          body.prices = JSON.parse(body.prices);
+        } catch {
+          throw new ManagementError('Refresh the page and try again.');
+        }
+        body.prices = priceRows.parse(body.prices);
+      } else delete body.prices;
+      const existing = optionalId(body.id);
+      const photo =
+        !existing && req.file
+          ? await prepareCatalogImage(req.file.buffer, config.UPLOAD_DIR)
+          : null;
+      let id;
+      try {
+        id = await service.saveStyle(
+          existing,
+          durationFromHours(body),
+          actor(req, res),
+        );
+        if (photo)
+          await service.saveMedia(
+            null,
+            {
+              path: photo.path,
+              width: photo.width,
+              height: photo.height,
+              variants: photo.variants,
+              alt: text(500).parse(body.photoAlt) || body.name + ' hairstyle',
+              kind: 'style',
+              styleId: id,
+              sort: 0,
+            },
+            actor(req, res),
+          );
+      } catch (error) {
+        await photo?.cleanup();
+        throw error;
+      }
+      finish(req, res, '/admin/styles/' + id);
+    }),
+  );
+  router.post(
+    '/styles/reorder',
+    run(async (req, res) => {
+      await service.reorderStyles(idList.parse(req.body.ids), actor(req, res));
+      finish(req, res, '/admin/styles');
+    }),
+  );
+  router.post(
+    '/styles/categories',
+    run(async (req, res) => {
+      await service.saveCategory(
         optionalId(req.body.id),
-        durationFromHours(req.body),
+        req.body.name,
+        actor(req, res),
+      );
+      finish(req, res, '/admin/styles');
+    }),
+  );
+  router.post(
+    '/styles/categories/:id/remove',
+    run(async (req, res) => {
+      await service.removeCategory(
+        entityId.parse(req.params.id),
+        actor(req, res),
+      );
+      finish(req, res, '/admin/styles');
+    }),
+  );
+  router.post(
+    '/styles/:id/flags',
+    run(async (req, res) => {
+      const flags = z
+        .object({ active: flag, featured: flag })
+        .refine((v) => Object.values(v).some((x) => x !== undefined))
+        .parse({ active: req.body.active, featured: req.body.featured });
+      for (const key of Object.keys(flags))
+        if (flags[key] === undefined) delete flags[key];
+      const id = entityId.parse(req.params.id);
+      await service.setStyleFlags(id, flags, actor(req, res));
+      finish(req, res, '/admin/styles');
+    }),
+  );
+  router.post(
+    '/styles/:id/duplicate',
+    run(async (req, res) => {
+      const id = await service.duplicateStyle(
+        entityId.parse(req.params.id),
         actor(req, res),
       );
       finish(req, res, '/admin/styles/' + id);
+    }),
+  );
+  router.post(
+    '/styles/:id/photos',
+    run(async (req, res) => {
+      const id = entityId.parse(req.params.id);
+      await service.reorderStylePhotos(
+        id,
+        idList.parse(req.body.ids),
+        actor(req, res),
+      );
+      finish(req, res, '/admin/styles/' + id + '#style-photos');
     }),
   );
   router.post(
@@ -104,7 +279,29 @@ export function managementRouter(service, config) {
   );
   router.get(
     '/addons',
-    run((req, res) => render(req, res, 'addons')),
+    run(async (req, res) => {
+      const data = await service.all();
+      const minutes = new Set([0, 15, 30, 45, 60, 90, 120]);
+      for (const item of data.addons) minutes.add(item.durationMin);
+      res.render('admin/manage/addons', {
+        ...data,
+        addons: data.addons.map((item) => ({
+          ...item,
+          time: item.durationMin
+            ? '+' + durationLabel(item.durationMin)
+            : 'No added time',
+          styleNames: item.styleIds
+            .map((id) => data.styles.find((style) => style.id === id)?.name)
+            .filter(Boolean),
+        })),
+        minutes: [...minutes]
+          .sort((a, b) => a - b)
+          .map((value) => ({
+            value,
+            label: value ? durationLabel(value) : 'No added time',
+          })),
+      });
+    }),
   );
   router.post(
     '/addons',
@@ -112,6 +309,24 @@ export function managementRouter(service, config) {
       await service.saveAddon(
         optionalId(req.body.id),
         req.body,
+        actor(req, res),
+      );
+      finish(req, res, '/admin/addons');
+    }),
+  );
+  router.post(
+    '/addons/reorder',
+    run(async (req, res) => {
+      await service.reorderAddons(idList.parse(req.body.ids), actor(req, res));
+      finish(req, res, '/admin/addons');
+    }),
+  );
+  router.post(
+    '/addons/:id/active',
+    run(async (req, res) => {
+      await service.setAddonActive(
+        entityId.parse(req.params.id),
+        z.boolean().parse(req.body.active),
         actor(req, res),
       );
       finish(req, res, '/admin/addons');
@@ -237,6 +452,12 @@ export function managementRouter(service, config) {
       finish(req, res, '/admin/gallery#videos');
     }),
   );
+  const returnPage = (req) =>
+    req.body.returnTo === 'style' && req.body.returnStyle
+      ? '/admin/styles/' +
+        entityId.parse(req.body.returnStyle) +
+        '#style-photos'
+      : '/admin/gallery';
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -295,7 +516,7 @@ export function managementRouter(service, config) {
         req,
         res,
         styleId && input.kind === 'style' && input.returnTo === 'style'
-          ? '/admin/styles/' + styleId
+          ? '/admin/styles/' + styleId + '#style-photos'
           : '/admin/gallery#photo-' + mediaId,
       );
     }),
@@ -350,14 +571,14 @@ export function managementRouter(service, config) {
         { ...v, styleId, showInWork: placement.showInWork },
         actor(req, res),
       );
-      finish(req, res, '/admin/gallery');
+      finish(req, res, returnPage(req));
     }),
   );
   router.post(
     '/gallery/:id/remove',
     run(async (req, res) => {
       await service.removeMedia(entityId.parse(req.params.id), actor(req, res));
-      finish(req, res, '/admin/gallery');
+      finish(req, res, returnPage(req));
     }),
   );
   router.get(

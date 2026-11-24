@@ -552,6 +552,10 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
     res.render('pages/styles', {
       title: `Braiding styles | ${res.locals.business.name}`,
       selected: category.data,
+      // A new, still empty category is not offered to clients.
+      chips: res.locals.categories.filter((c) =>
+        res.locals.styles.some((s) => s.category === c.slug),
+      ),
       query,
       filtered,
       matchCount: filtered.filter((s) => !s.searchHidden).length,

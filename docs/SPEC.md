@@ -966,3 +966,7 @@ Calendar colours match the portal status badges, and a submitted transfer shows 
 ## Owner amendment — appointment pages (November 24, 2026)
 
 The appointment book opens on upcoming visits, nearest first, with Today, Upcoming, Needs review, Balance due, Past, Cancelled and All tabs, 25 per page. New and edited appointments load free times automatically with chairs left, keep a live summary in view, and can fill in an existing client. The details page offers only actions that can succeed, confirms each in its own window, refreshes when something changes (never while the owner is typing), and shows one readable history and the client's other visits. Visits match by email or phone because each booking keeps its own client record. Booking rules stay in bookingService.
+
+## Owner amendment — styles, prices and extras (November 24, 2026)
+
+A style's details and all of its prices save together from a size and length grid; a cleared price is switched off, never deleted. A published style must always have an active price or be priced on consultation; every path enforces this in the save transaction. Owners can publish or feature from the list, duplicate a style (the copy stays hidden), order styles (kept in the `catalog` setting; until saved, newest first), manage categories (web addresses never change on rename) and see price history from the audit log. Extras keep their internal name once created. Suggested descriptions use only facts already on the form and are never saved without the owner.

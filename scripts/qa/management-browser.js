@@ -133,23 +133,84 @@ try {
       .getByLabel('Style name', { exact: true })
       .fill('Studio braids ' + width);
     assert.equal(await page.locator('input[name="slug"]').count(), 0);
-    await save(page.getByRole('button', { name: 'Save style', exact: true }));
+    // Published without a price is refused before anything is sent.
+    await page.getByRole('button', { name: 'Create style' }).click();
+    await page.locator('.owner-alert').waitFor({ state: 'visible' });
+    assert.match(page.url(), /styles\/new$/);
+    await page.locator('[data-size="medium"]').check();
+    await page.locator('[data-length="mid_back"]').check();
+    await page
+      .getByLabel('Medium, Mid back price', { exact: true })
+      .fill('195.50');
+    await page.getByRole('button', { name: 'Suggest text' }).click();
+    assert.match(
+      await page.getByLabel('Full description').inputValue(),
+      /Sizes: medium/,
+    );
+    await save(page.getByRole('button', { name: 'Create style' }));
     await page.waitForURL(/\/admin\/styles\/\d+$/);
     const editURL = page.url();
-    const option = page.locator('form[action$="/variants"]').last();
-    await option.getByLabel('Braid size').selectOption('medium');
-    await option.getByLabel('Length').selectOption('mid_back');
-    await option.getByLabel('Price (USD)', { exact: true }).fill('195.50');
-    await save(option.getByRole('button', { name: 'Save price option' }));
-    await page.waitForLoadState('networkidle');
-    await page.getByLabel('Published on the website').check();
-    await save(page.getByRole('button', { name: 'Save style', exact: true }));
-    await page.waitForLoadState('networkidle');
+    // Several prices, one save; a bulk change can be undone.
+    await page.locator('[data-section="prices"]').click();
+    await page.locator('[data-size="small"]').check();
+    await page.getByLabel('Small, Mid back price', { exact: true }).fill('240');
+    await page.locator('[data-bulk-amount]').fill('10');
+    await page.locator('[data-bulk-apply]').click();
+    assert.equal(
+      await page
+        .getByLabel('Small, Mid back price', { exact: true })
+        .inputValue(),
+      '250',
+    );
+    await page.locator('[data-bulk-undo]').click();
+    assert.equal(
+      await page
+        .getByLabel('Medium, Mid back price', { exact: true })
+        .inputValue(),
+      '195.5',
+    );
+    assert.equal(
+      await page.locator('[data-dirty-status]').textContent(),
+      'Unsaved changes',
+    );
+    await page.locator('[data-bulk-apply]').click();
+    await save(page.getByRole('button', { name: 'Save changes' }));
+    assert.deepEqual(
+      (await repo.catalog()).styles
+        .find((style) => style.slug === 'studio-braids-' + width)
+        .variants.map((v) => v.priceCents),
+      [20550, 25000],
+    );
+    await page.locator('.price-history summary').click();
+    assert.ok(
+      (await page.locator('.price-history').textContent()).includes(
+        '$195.50 → $205.50',
+      ),
+    );
+    for (const section of ['details', 'prices', 'search', 'photos']) {
+      await page.locator(`[data-section="${section}"]`).click();
+      assert.deepEqual(
+        (await new AxeBuilder({ page }).analyze()).violations.map((v) => v.id),
+        [],
+        section + ' accessibility at ' + width,
+      );
+      assert.ok(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+        section + ' overflow at ' + width,
+      );
+      await page.screenshot({
+        path: `tmp/qa/manage-style-${section}-${width}.png`,
+        fullPage: true,
+      });
+    }
     assert.equal(
       (await fetch(origin + '/styles/studio-braids-' + width)).status,
       200,
     );
-    const photo = page.locator('form[action="/admin/gallery/upload"]');
+    await page.getByRole('button', { name: 'Add photo', exact: true }).click();
+    const photo = page.locator('#photo-add form');
     const image = await sharp({
       create: { width: 700, height: 900, channels: 3, background: '#73489a' },
     })
@@ -164,8 +225,6 @@ try {
       .getByLabel('Describe the photo for visitors')
       .fill('A finished studio braid style for QA');
     await save(photo.getByRole('button', { name: 'Upload photo' }));
-    await page.waitForURL(editURL);
-    await page.waitForLoadState('networkidle');
     const publicPage = await fetch(origin + '/styles/studio-braids-' + width);
     assert.ok((await publicPage.text()).includes('/media/catalog/'));
     await page.goto(origin + '/admin/gallery');
@@ -255,9 +314,10 @@ try {
       1,
     );
     await page.goto(editURL + '#style-photos');
-    const styleReplacement = page.locator('form[action$="/replace"]').first();
+    await page.locator('[data-photo-edit]').first().click();
+    const styleReplacement = page.locator('#photo-edit [data-replace-form]');
     await styleReplacement
-      .getByLabel('New photo', { exact: true })
+      .getByLabel('Replace with another image', { exact: true })
       .setInputFiles({
         name: 'style-replacement.jpg',
         mimeType: 'image/jpeg',
@@ -280,17 +340,108 @@ try {
     await page.waitForLoadState('networkidle');
     await page.goto(origin + '/admin/addons');
     await page.getByRole('button', { name: 'Add extra', exact: true }).click();
-    const extra = page.locator('form[action="/admin/addons"]').last();
+    const extra = page.locator('#extra-dialog form');
     await extra.getByLabel('Name', { exact: true }).fill('Beads ' + width);
-    await extra
-      .getByLabel('Internal name', { exact: false })
-      .fill('beads-' + width);
     await extra.getByLabel('Price (USD)').fill('15');
     await save(extra.getByRole('button', { name: 'Save extra' }));
     await page.waitForLoadState('networkidle');
     assert.ok(
       (await repo.catalog()).addons.some((a) => a.slug === 'beads-' + width),
     );
+    const flagSaved = () =>
+      page.waitForResponse((r) => /\/(active|flags)$/.test(r.url()));
+    const beads = page
+      .locator('.extra-row')
+      .filter({ hasText: 'Beads ' + width });
+    let flagged = flagSaved();
+    await beads.getByRole('switch').uncheck();
+    await flagged;
+    assert.ok(
+      !(await repo.catalog()).addons.some((a) => a.slug === 'beads-' + width),
+    );
+    await page.screenshot({
+      path: `tmp/qa/manage-extras-${width}.png`,
+      fullPage: true,
+    });
+    await beads.getByRole('button', { name: /Edit/ }).click();
+    await page.waitForTimeout(300);
+    assert.equal(
+      await page
+        .locator('#extra-dialog')
+        .getByLabel('Available to book')
+        .isChecked(),
+      false,
+    );
+    await page.screenshot({ path: `tmp/qa/manage-extra-edit-${width}.png` });
+    // The styles list: search, switches and order.
+    await page.goto(origin + '/admin/styles');
+    await page.getByLabel('Search styles').fill('studio braids ' + width);
+    assert.equal(await page.locator('.style-row:visible').count(), 1);
+    flagged = flagSaved();
+    await page.locator('.style-row:visible [data-flag="featured"]').check();
+    await flagged;
+    await page.getByLabel('Search styles').fill('');
+    await page.getByRole('button', { name: 'Change order' }).click();
+    const firstName = await page.locator('.style-row h2').first().textContent();
+    await page.locator('[data-order-move="1"]').first().click();
+    await page.getByRole('button', { name: 'Save order' }).click();
+    await page.getByRole('button', { name: 'Change order' }).waitFor();
+    await page.reload();
+    assert.equal(
+      await page.locator('.style-row h2').nth(1).textContent(),
+      firstName,
+    );
+    assert.equal((await repo.catalog()).styles[1].name, firstName);
+    await page.screenshot({
+      path: `tmp/qa/manage-style-list-${width}.png`,
+      fullPage: true,
+    });
+    // Pages: 20 styles at a time, kept on reload; ordering shows every style.
+    const extraCopies = 25 - (await page.locator('.style-row').count());
+    await page.evaluate(async (copies) => {
+      const id = document.querySelector('.style-row').dataset.orderId;
+      for (let n = 0; n < copies; n++)
+        await fetch(`/admin/styles/${id}/duplicate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'x-csrf-token': document.querySelector('meta[name="csrf-token"]')
+              .content,
+          },
+          body: '{}',
+        });
+    }, extraCopies);
+    await page.reload();
+    const visible = () => page.locator('.style-row:visible').count();
+    const range = () => page.locator('[data-page-range]').textContent();
+    assert.equal(await visible(), 20);
+    assert.equal(await range(), '1–20 of 25');
+    await page.getByRole('button', { name: 'Next →' }).click();
+    assert.equal(await visible(), 5);
+    assert.equal(await range(), '21–25 of 25');
+    assert.deepEqual(
+      (await new AxeBuilder({ page }).analyze()).violations.map((v) => v.id),
+      [],
+    );
+    await page.screenshot({
+      path: `tmp/qa/manage-style-pages-${width}.png`,
+      fullPage: true,
+    });
+    await page.reload();
+    assert.equal(await range(), '21–25 of 25');
+    await page.getByRole('button', { name: /^Hidden/ }).click();
+    assert.equal(await visible(), extraCopies);
+    assert.equal(await page.locator('[data-style-pages]').isVisible(), false);
+    await page.getByRole('button', { name: 'Change order' }).click();
+    assert.equal(await visible(), 25);
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.getByRole('button', { name: 'Page 2', exact: true }).click();
+    assert.equal(await visible(), 5);
+    await pool.query(
+      "DELETE v FROM style_variants v JOIN styles s ON s.id = v.style_id WHERE s.slug LIKE '%-copy%'",
+    );
+    await pool.query("DELETE FROM styles WHERE slug LIKE '%-copy%'");
     await page.goto(origin + '/admin/availability');
     await page.getByLabel('Minimum advance notice (hours)').fill('12');
     await save(

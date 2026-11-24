@@ -19,7 +19,7 @@
   </form>
   <nav class="filter-bar" aria-label="Filter styles">
     <a href="/styles{% if query %}?q={{ query | urlencode }}{% endif %}" class="chip" {% if not selected %}aria-current="page"{% endif %}>All styles</a>
-    {% for category in categories %}<a class="chip" href="/styles?category={{ category.slug }}{% if query %}&amp;q={{ query | urlencode }}{% endif %}" {% if selected==category.slug %}aria-current="page"{% endif %}>{{ category.name }}</a>{% endfor %}
+    {% for category in chips %}<a class="chip" href="/styles?category={{ category.slug }}{% if query %}&amp;q={{ query | urlencode }}{% endif %}" {% if selected==category.slug %}aria-current="page"{% endif %}>{{ category.name }}</a>{% endfor %}
   </nav>
   <p class="result-count" role="status" data-result-count>{{ matchCount }} {% if matchCount == 1 %}style{% else %}styles{% endif %} to explore</p>
   <aside class="collection-note">

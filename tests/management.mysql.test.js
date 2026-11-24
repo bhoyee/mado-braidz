@@ -391,6 +391,288 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         ),
       ).toBe(false);
     });
+    it('saves a whole price grid at once and never leaves a published style without a price', async () => {
+      const send = (body) =>
+        agent
+          .post('/admin/styles/save')
+          .set('Accept', 'application/json')
+          .send({
+            ...styleValues,
+            slug: undefined,
+            name: 'Grid style',
+            priceOnConsultation: 'false',
+            durationMin: '240',
+            _csrf: token,
+            ...body,
+          });
+      const grid = (rows) => JSON.stringify(rows);
+      const refused = (response) =>
+        expect([400, 409]).toContain(response.status);
+      await send({ prices: '[]' }).expect(refused);
+      const made = await send({
+        prices: grid([
+          {
+            size: 'small',
+            length: 'waist',
+            price: '300',
+            active: true,
+            durationMin: '360',
+          },
+          { size: 'medium', length: 'waist', price: '200', active: true },
+          { size: 'medium', length: 'shoulder', price: '', active: false },
+        ]),
+      }).expect(200);
+      const id = Number(made.body.url.split('/').at(-1));
+      const load = async () =>
+        (await service.all()).variants.filter((v) => v.styleId === id);
+      let rows = await load();
+      expect(
+        rows.map((v) => [v.size, v.length, v.priceCents, v.durationMin]),
+      ).toEqual([
+        ['medium', 'waist', 20000, null],
+        ['small', 'waist', 30000, 360],
+      ]);
+      const [medium, small] = rows;
+      await send({
+        id,
+        prices: grid([
+          { id: medium.id, price: '210.50', active: true, durationMin: '' },
+          { id: small.id, price: '', active: false, durationMin: '360' },
+        ]),
+      }).expect(200);
+      rows = await load();
+      expect(rows[0].priceCents).toBe(21050);
+      // Cleared prices are switched off, not lost.
+      expect(rows[1]).toMatchObject({ priceCents: 30000, active: false });
+      const history = await service.priceHistory(id);
+      expect(history[0].switched || history[1].switched).toBe('switched off');
+      expect(history.some((h) => h.from === 20000 && h.to === 21050)).toBe(
+        true,
+      );
+
+      // Every way of removing the last price is refused and rolled back.
+      await send({
+        id,
+        prices: grid([{ id: medium.id, price: '210.50', active: false }]),
+      }).expect(refused);
+      await expect(
+        service.saveVariant(
+          id,
+          medium.id,
+          {
+            size: 'medium',
+            length: 'waist',
+            price: '210.50',
+            durationMin: '',
+            active: false,
+          },
+          actor,
+        ),
+      ).rejects.toThrow('at least one price');
+      expect((await load())[0].active).toBe(true);
+      // Another style's price cannot be changed through this one.
+      await send({
+        id,
+        prices: grid([{ id: 101, price: '1', active: true }]),
+      }).expect(refused);
+      await send({ id, prices: 'not json' }).expect(refused);
+      await send({
+        id,
+        prices: grid([{ id: medium.id, price: '-4', active: true }]),
+      }).expect(refused);
+      expect((await load())[0].priceCents).toBe(21050);
+
+      // Hiding first is fine; publishing again without a price is not.
+      const flags = (body) =>
+        agent
+          .post(`/admin/styles/${id}/flags`)
+          .set('Accept', 'application/json')
+          .send({ ...body, _csrf: token });
+      await flags({ active: false }).expect(200);
+      await send({
+        id,
+        active: undefined,
+        prices: grid([{ id: medium.id, price: '210.50', active: false }]),
+      }).expect(200);
+      await flags({ active: true }).expect(refused);
+      await flags({}).expect(refused);
+      await flags({ featured: 'yes' }).expect(refused);
+    });
+    it('orders, duplicates and groups styles without moving anything until asked', async () => {
+      const before = (await service.all()).styles.map((x) => x.id);
+      await expect(
+        service.reorderStyles(before.slice(1), actor),
+      ).rejects.toThrow('Refresh');
+      const wanted = [...before].reverse();
+      await service.reorderStyles(wanted, actor);
+      expect((await service.all()).styles.map((x) => x.id)).toEqual(wanted);
+      const shown = (await createCatalogService(db).load()).styles.map(
+        (x) => x.id,
+      );
+      expect(shown).toEqual(wanted.filter((id) => shown.includes(id)));
+
+      const copyId = await service.duplicateStyle(1, actor);
+      const data = await service.all();
+      expect(data.styles[0]).toMatchObject({
+        id: copyId,
+        active: false,
+        featured: false,
+      });
+      expect(data.variants.filter((v) => v.styleId === copyId).length).toBe(
+        data.variants.filter((v) => v.styleId === 1).length,
+      );
+      expect(
+        (await request(app).get('/styles/' + data.styles[0].slug)).status,
+      ).toBe(404);
+
+      const category = await service.saveCategory(null, 'Kids styles', actor);
+      const find = async () =>
+        (await service.all()).categories.find((c) => c.id === category);
+      expect((await find()).slug).toBe('kids-styles');
+      await service.saveCategory(category, 'Children', actor);
+      expect(await find()).toMatchObject({
+        name: 'Children',
+        slug: 'kids-styles',
+      });
+      await expect(
+        service.saveCategory(null, 'children', actor),
+      ).rejects.toThrow('already exists');
+      // An empty category is not offered to clients.
+      expect((await request(app).get('/styles')).text).not.toContain(
+        'category=kids-styles',
+      );
+      await service.removeCategory(category, actor);
+      await expect(
+        service.removeCategory(
+          data.styles.find((x) => x.id === 1).categoryId,
+          actor,
+        ),
+      ).rejects.toThrow('Move its styles');
+      // Leave the later tests with the default order.
+      await db.delete(s.settings).where(eq(s.settings.key, 'catalog'));
+    });
+    it('keeps the website name of an extra, creates one automatically, and switches and orders extras', async () => {
+      const save = (body) =>
+        agent
+          .post('/admin/addons')
+          .set('Accept', 'application/json')
+          .send({
+            price: '40',
+            durationMin: '15',
+            description: '',
+            active: 'on',
+            appliesToAll: 'true',
+            _csrf: token,
+            ...body,
+          });
+      const original = (await service.all()).addons[0];
+      await save({
+        id: original.id,
+        name: 'Renamed extra',
+        slug: 'hacked',
+      }).expect(200);
+      let extras = (await service.all()).addons;
+      expect(extras.find((a) => a.id === original.id)).toMatchObject({
+        slug: original.slug,
+        name: 'Renamed extra',
+      });
+      await save({ name: 'Gold beads' }).expect(200);
+      await save({ name: 'Gold beads' }).expect(200);
+      extras = (await service.all()).addons;
+      expect(extras.slice(-2).map((a) => a.slug)).toEqual([
+        'gold-beads',
+        'gold-beads-2',
+      ]);
+      await save({ name: 'None chosen', appliesToAll: 'false' }).expect((r) =>
+        expect([400, 409]).toContain(r.status),
+      );
+      const ids = extras.map((a) => a.id).reverse();
+      await service.reorderAddons(ids, actor);
+      expect((await service.all()).addons.map((a) => a.id)).toEqual(ids);
+      await service.setAddonActive(ids[0], false, actor);
+      expect(
+        (await createCatalogService(db).load()).addons.some(
+          (a) => a.id === ids[0],
+        ),
+      ).toBe(false);
+      await service.reorderAddons(
+        extras.map((a) => a.id),
+        actor,
+      );
+      await service.saveAddon(
+        original.id,
+        {
+          ...original,
+          price: (original.priceCents / 100).toFixed(2),
+          description: original.description || '',
+        },
+        actor,
+      );
+      for (const extra of extras.slice(-2))
+        await db.delete(s.addons).where(eq(s.addons.id, extra.id));
+    });
+    it('reorders the photos of one style without moving the rest of the library', async () => {
+      const add = (styleId, kind, sort) =>
+        service.saveMedia(
+          null,
+          {
+            path: '/img/styles/x.webp',
+            alt: 'Order photo',
+            kind,
+            styleId,
+            sort,
+          },
+          actor,
+        );
+      const a = await add(1, 'style', 500);
+      const other = await add(null, 'gallery', 501);
+      const b = await add(1, 'style', 502);
+      const own = async () =>
+        (await service.all()).media
+          .filter((m) => m.styleId === 1 && m.kind === 'style')
+          .map((m) => m.id);
+      const ids = await own();
+      const swapped = ids.map((id) => (id === a ? b : id === b ? a : id));
+      await service.reorderStylePhotos(1, swapped, actor);
+      expect(await own()).toEqual(swapped);
+      const order = (await service.all()).media.map((m) => m.id);
+      expect(order.indexOf(other)).toBeGreaterThan(order.indexOf(b));
+      expect(order.indexOf(other)).toBeLessThan(order.indexOf(a));
+      await expect(
+        service.reorderStylePhotos(1, [other], actor),
+      ).rejects.toThrow('Refresh');
+      for (const id of [a, b, other]) await service.removeMedia(id, actor);
+    });
+    it('creates a style with its cover photo in one save', async () => {
+      const image = await sharp({
+        create: { width: 700, height: 900, channels: 3, background: '#73489a' },
+      })
+        .jpeg()
+        .toBuffer();
+      const made = await agent
+        .post('/admin/styles/save')
+        .set('Accept', 'application/json')
+        .set('x-csrf-token', token)
+        .field({
+          name: 'Photo first style',
+          categoryId: String(styleValues.categoryId),
+          durationMin: '240',
+          active: 'on',
+          priceOnConsultation: 'false',
+          prices: JSON.stringify([
+            { size: '', length: '', price: '90', active: true },
+          ]),
+        })
+        .attach('photo', image, 'cover.jpg')
+        .expect(200);
+      const id = Number(made.body.url.split('/').at(-1));
+      const style = (await createCatalogService(db).load()).styles.find(
+        (x) => x.id === id,
+      );
+      expect(style.photos).toHaveLength(1);
+      expect(style.photos[0].alt).toBe('Photo first style hairstyle');
+      expect(style.variants[0].priceCents).toBe(9000);
+    });
     it('lists newest styles first without manual ordering and keeps edits in place', async () => {
       const actor = { id: 1, ip: '127.0.0.1' };
       const first = await service.saveStyle(

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { studioVideos } from './studioVideos.js';
 import { DateTime } from 'luxon';
 import * as s from '../db/schema.js';
+import { orderStyles, priceChanges, priceSort } from './styleSummary.js';
 import {
   styleInput,
   variantInput,
@@ -42,7 +43,7 @@ export function createManagementService(db, clock = () => new Date()) {
         .select()
         .from(s.media)
         .where(inArray(s.media.kind, ['style', 'gallery']))
-        .orderBy(asc(s.media.sort)),
+        .orderBy(asc(s.media.sort), asc(s.media.id)),
       db.select().from(s.settings),
       db.select().from(s.redirects),
       db
@@ -84,7 +85,122 @@ export function createManagementService(db, clock = () => new Date()) {
           blocks,
         }),
       )
-      .then((data) => ({ ...data, videos: studioVideos(data.settings) }));
+      .then((data) => ({
+        ...data,
+        styles: orderStyles(data.styles, data.settings.catalog?.styleOrder),
+        videos: studioVideos(data.settings),
+      }));
+  // A published style must always have a price a client can book.
+  async function ensureBookable(tx, styleId, message) {
+    const [style] = await tx
+      .select()
+      .from(s.styles)
+      .where(eq(s.styles.id, styleId));
+    if (!style.active || style.priceOnConsultation) return;
+    const [option] = await tx
+      .select({ id: s.styleVariants.id })
+      .from(s.styleVariants)
+      .where(
+        and(
+          eq(s.styleVariants.styleId, styleId),
+          eq(s.styleVariants.active, true),
+        ),
+      )
+      .limit(1);
+    if (!option)
+      throw new ManagementError(
+        message ||
+          'Keep at least one price on, or hide the style from the website first.',
+      );
+  }
+  async function newSlug(tx, name, table, fallback) {
+    const base =
+      String(name || '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .slice(0, 160)
+        .replace(/^-|-$/g, '') || fallback;
+    let slug = base,
+      suffix = 2;
+    const taken = async () =>
+      (
+        await tx
+          .select({ id: table.id })
+          .from(table)
+          .where(eq(table.slug, slug))
+          .limit(1)
+      ).length ||
+      (table === s.styles &&
+        (
+          await tx
+            .select({ id: s.redirects.id })
+            .from(s.redirects)
+            .where(eq(s.redirects.source, '/styles/' + slug))
+            .limit(1)
+        ).length);
+    while (await taken()) slug = `${base}-${suffix++}`;
+    return slug;
+  }
+  // Saves the whole price grid. Rows left out are untouched; a cleared price
+  // switches that option off but keeps it for past bookings.
+  async function savePrices(tx, styleId, prices, actor) {
+    const rows = await tx
+      .select()
+      .from(s.styleVariants)
+      .where(eq(s.styleVariants.styleId, styleId));
+    const seen = new Set();
+    for (const raw of prices) {
+      const wanted = {
+        size: raw.size || null,
+        length: raw.length || null,
+      };
+      const before = raw.id
+        ? exists(rows.find((row) => row.id === Number(raw.id)))
+        : rows.find(
+            (row) => row.size === wanted.size && row.length === wanted.length,
+          );
+      const blank = String(raw.price ?? '').trim() === '';
+      if (blank && !before) continue;
+      const { price, ...option } = variantInput.parse({
+        size: before ? before.size || '' : raw.size || '',
+        length: before ? before.length || '' : raw.length || '',
+        label: raw.label ?? before?.label ?? '',
+        price: blank ? (before.priceCents / 100).toFixed(2) : raw.price,
+        durationMin: raw.durationMin ?? '',
+        active: blank ? false : raw.active,
+      });
+      const key = `${option.size}|${option.length}`;
+      if (seen.has(key))
+        throw new ManagementError('A size and length appears twice.');
+      seen.add(key);
+      const values = {
+        ...option,
+        styleId,
+        priceCents: price,
+        sort: priceSort(option.size, option.length),
+      };
+      if (!before) {
+        const id = (
+          await tx.insert(s.styleVariants).values(values).$returningId()
+        )[0].id;
+        await audit(tx, actor, 'variant', id, null, values);
+        continue;
+      }
+      await tx
+        .update(s.styleVariants)
+        .set(values)
+        .where(eq(s.styleVariants.id, before.id));
+      if (
+        before.priceCents !== values.priceCents ||
+        before.active !== values.active ||
+        (before.durationMin ?? null) !== values.durationMin ||
+        (before.label || '') !== values.label
+      )
+        await audit(tx, actor, 'variant', before.id, before, values);
+    }
+  }
   async function setting(tx, key, value, actor) {
     const [before] = await tx
       .select()
@@ -253,35 +369,7 @@ export function createManagementService(db, clock = () => new Date()) {
             )
           : null;
         let slug = raw.slug || before?.slug;
-        if (!slug) {
-          const base =
-            String(raw.name || '')
-              .normalize('NFKD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, '-')
-              .slice(0, 160)
-              .replace(/^-|-$/g, '') || 'style';
-          slug = base;
-          let suffix = 2;
-          while (
-            (
-              await tx
-                .select({ id: s.styles.id })
-                .from(s.styles)
-                .where(eq(s.styles.slug, slug))
-                .limit(1)
-            ).length ||
-            (
-              await tx
-                .select({ id: s.redirects.id })
-                .from(s.redirects)
-                .where(eq(s.redirects.source, '/styles/' + slug))
-                .limit(1)
-            ).length
-          )
-            slug = `${base}-${suffix++}`;
-        }
+        if (!slug) slug = await newSlug(tx, raw.name, s.styles, 'style');
         const { fromPrice, ...input } = styleInput.parse({ ...raw, slug });
         const firstPrice =
           !id && !input.priceOnConsultation && raw.initialPrice
@@ -307,23 +395,6 @@ export function createManagementService(db, clock = () => new Date()) {
           fromPriceCents: fromPrice,
           updatedAt: new Date(),
         };
-        if (input.active && !input.priceOnConsultation) {
-          const options = id
-            ? await tx
-                .select()
-                .from(s.styleVariants)
-                .where(
-                  and(
-                    eq(s.styleVariants.styleId, id),
-                    eq(s.styleVariants.active, true),
-                  ),
-                )
-            : [];
-          if (!options.length && !firstPrice)
-            throw new ManagementError(
-              'Add a price option before publishing, or choose price on consultation.',
-            );
-        }
         if (id)
           await tx.update(s.styles).set(values).where(eq(s.styles.id, id));
         else
@@ -344,6 +415,13 @@ export function createManagementService(db, clock = () => new Date()) {
           )[0].id;
           await audit(tx, actor, 'variant', variantId, null, variantValues);
         }
+        if (Array.isArray(raw.prices))
+          await savePrices(tx, id, raw.prices, actor);
+        await ensureBookable(
+          tx,
+          id,
+          'Add a price option before publishing, or choose price on consultation.',
+        );
         if (before && before.slug !== input.slug) {
           const source = '/styles/' + before.slug,
             target = '/styles/' + input.slug;
@@ -411,17 +489,282 @@ export function createManagementService(db, clock = () => new Date()) {
           { variantId: id },
           { variantId: id, ...values },
         );
+        await ensureBookable(tx, styleId);
         await tx
           .update(s.styles)
           .set({ updatedAt: new Date() })
           .where(eq(s.styles.id, styleId));
       });
     },
-    async saveAddon(id, raw, actor) {
-      const { price, styleIds, ...v } = addonInput.parse(raw);
-      if (!v.appliesToAll && !styleIds.length)
-        throw new ManagementError('Choose at least one style');
+    async setStyleFlags(id, flags, actor) {
+      await db.transaction(async (tx) => {
+        const before = exists(
+          (
+            await tx
+              .select()
+              .from(s.styles)
+              .where(eq(s.styles.id, id))
+              .for('update')
+          )[0],
+        );
+        const values = { ...flags, updatedAt: new Date() };
+        await tx.update(s.styles).set(values).where(eq(s.styles.id, id));
+        await ensureBookable(
+          tx,
+          id,
+          'Add a price option before publishing, or choose price on consultation.',
+        );
+        await audit(
+          tx,
+          actor,
+          'style',
+          id,
+          { active: before.active, featured: before.featured },
+          flags,
+        );
+      });
+    },
+    async reorderStyles(ids, actor) {
+      await db.transaction(async (tx) => {
+        const rows = await tx.select({ id: s.styles.id }).from(s.styles);
+        if (
+          new Set(ids).size !== ids.length ||
+          ids.length !== rows.length ||
+          ids.some((id) => !rows.some((row) => row.id === id))
+        )
+          throw new ManagementError('Refresh the style list and try again');
+        await setting(tx, 'catalog', { styleOrder: ids }, actor);
+      });
+    },
+    async duplicateStyle(id, actor) {
       return db.transaction(async (tx) => {
+        const source = exists(
+          (await tx.select().from(s.styles).where(eq(s.styles.id, id)))[0],
+        );
+        const name = `${source.name} (copy)`.slice(0, 255);
+        const now = new Date();
+        const values = {
+          categoryId: source.categoryId,
+          name,
+          slug: await newSlug(tx, name, s.styles, 'style'),
+          shortDesc: source.shortDesc,
+          longDesc: source.longDesc,
+          durationMin: source.durationMin,
+          priceOnConsultation: source.priceOnConsultation,
+          fromPriceCents: source.fromPriceCents,
+          featured: false,
+          // Hidden until the owner has renamed it and added photos.
+          active: false,
+          updatedAt: now,
+        };
+        const copyId = (
+          await tx.insert(s.styles).values(values).$returningId()
+        )[0].id;
+        const options = await tx
+          .select()
+          .from(s.styleVariants)
+          .where(eq(s.styleVariants.styleId, id));
+        for (const option of options) {
+          const copy = { ...option, styleId: copyId };
+          delete copy.id;
+          const variantId = (
+            await tx.insert(s.styleVariants).values(copy).$returningId()
+          )[0].id;
+          await audit(tx, actor, 'variant', variantId, null, copy);
+        }
+        const links = await tx
+          .select()
+          .from(s.addonStyles)
+          .where(eq(s.addonStyles.styleId, id));
+        if (links.length)
+          await tx
+            .insert(s.addonStyles)
+            .values(
+              links.map((l) => ({ addonId: l.addonId, styleId: copyId })),
+            );
+        await audit(tx, actor, 'style', copyId, null, values);
+        return copyId;
+      });
+    },
+    async priceHistory(styleId) {
+      const variants = await db
+        .select()
+        .from(s.styleVariants)
+        .where(eq(s.styleVariants.styleId, styleId));
+      if (!variants.length) return [];
+      const rows = await db
+        .select({
+          at: s.auditLog.createdAt,
+          name: s.admins.name,
+          entityId: s.auditLog.entityId,
+          before: s.auditLog.before,
+          after: s.auditLog.after,
+        })
+        .from(s.auditLog)
+        .innerJoin(s.admins, eq(s.admins.id, s.auditLog.adminId))
+        .where(
+          and(
+            eq(s.auditLog.entity, 'variant'),
+            inArray(
+              s.auditLog.entityId,
+              variants.map((v) => v.id),
+            ),
+          ),
+        )
+        .orderBy(desc(s.auditLog.id))
+        .limit(60);
+      return priceChanges(rows, variants).slice(0, 30);
+    },
+    async reorderStylePhotos(styleId, ids, actor) {
+      await db.transaction(async (tx) => {
+        const rows = await tx
+          .select()
+          .from(s.media)
+          .where(inArray(s.media.kind, ['style', 'gallery']))
+          .orderBy(asc(s.media.sort), asc(s.media.id))
+          .for('update');
+        const own = rows.filter(
+          (row) => row.styleId === styleId && row.kind === 'style',
+        );
+        if (
+          new Set(ids).size !== ids.length ||
+          ids.length !== own.length ||
+          ids.some((id) => !own.some((row) => row.id === id))
+        )
+          throw new ManagementError('Refresh the photos and try again');
+        // This style's photos swap places; the rest of the library stays put.
+        const next = [...ids];
+        const order = rows.map((row) =>
+          own.includes(row) ? next.shift() : row.id,
+        );
+        for (const [sort, id] of order.entries())
+          if (rows.find((row) => row.id === id).sort !== sort)
+            await tx.update(s.media).set({ sort }).where(eq(s.media.id, id));
+        await audit(
+          tx,
+          actor,
+          'media_order',
+          styleId,
+          own.map((row) => row.id),
+          ids,
+        );
+      });
+    },
+    async saveCategory(id, rawName, actor) {
+      const name = String(rawName || '').trim();
+      if (!name || name.length > 40)
+        throw new ManagementError('Enter a category name of up to 40 letters.');
+      return db.transaction(async (tx) => {
+        const rows = await tx.select().from(s.styleCategories).for('update');
+        const before = id ? exists(rows.find((row) => row.id === id)) : null;
+        if (
+          rows.some(
+            (row) =>
+              row.id !== id && row.name.toLowerCase() === name.toLowerCase(),
+          )
+        )
+          throw new ManagementError('That category already exists.');
+        // The web address stays the same when a category is renamed.
+        const values = before
+          ? { name }
+          : {
+              name,
+              slug: await newSlug(tx, name, s.styleCategories, 'category'),
+              sort: Math.max(-1, ...rows.map((row) => row.sort)) + 1,
+            };
+        if (before)
+          await tx
+            .update(s.styleCategories)
+            .set(values)
+            .where(eq(s.styleCategories.id, id));
+        else
+          id = (
+            await tx.insert(s.styleCategories).values(values).$returningId()
+          )[0].id;
+        await audit(tx, actor, 'category', id, before, values);
+        return id;
+      });
+    },
+    async removeCategory(id, actor) {
+      await db.transaction(async (tx) => {
+        const before = exists(
+          (
+            await tx
+              .select()
+              .from(s.styleCategories)
+              .where(eq(s.styleCategories.id, id))
+              .for('update')
+          )[0],
+        );
+        const [used] = await tx
+          .select({ id: s.styles.id })
+          .from(s.styles)
+          .where(eq(s.styles.categoryId, id))
+          .limit(1);
+        if (used)
+          throw new ManagementError(
+            'Move its styles to another category first.',
+          );
+        await tx.delete(s.styleCategories).where(eq(s.styleCategories.id, id));
+        await audit(tx, actor, 'category', id, before, { removed: true });
+      });
+    },
+    async setAddonActive(id, active, actor) {
+      await db.transaction(async (tx) => {
+        const before = exists(
+          (
+            await tx
+              .select()
+              .from(s.addons)
+              .where(eq(s.addons.id, id))
+              .for('update')
+          )[0],
+        );
+        await tx.update(s.addons).set({ active }).where(eq(s.addons.id, id));
+        await audit(
+          tx,
+          actor,
+          'addon',
+          id,
+          { active: before.active },
+          { active },
+        );
+      });
+    },
+    async reorderAddons(ids, actor) {
+      await db.transaction(async (tx) => {
+        const rows = await tx.select().from(s.addons).for('update');
+        if (
+          new Set(ids).size !== ids.length ||
+          ids.length !== rows.length ||
+          ids.some((id) => !rows.some((row) => row.id === id))
+        )
+          throw new ManagementError('Refresh the extras and try again');
+        for (const [sort, id] of ids.entries())
+          await tx.update(s.addons).set({ sort }).where(eq(s.addons.id, id));
+        await audit(
+          tx,
+          actor,
+          'addon_order',
+          0,
+          rows.map((row) => ({ id: row.id, sort: row.sort })),
+          ids,
+        );
+      });
+    },
+    async saveAddon(id, raw, actor) {
+      return db.transaction(async (tx) => {
+        // The website finds some extras by this name, so it never changes.
+        const [current] = id
+          ? await tx.select().from(s.addons).where(eq(s.addons.id, id))
+          : [];
+        const slug =
+          current?.slug ||
+          raw.slug ||
+          (await newSlug(tx, raw.name, s.addons, 'extra'));
+        const { price, styleIds, ...v } = addonInput.parse({ ...raw, slug });
+        if (!v.appliesToAll && !styleIds.length)
+          throw new ManagementError('Choose at least one style');
         if (
           styleIds.length &&
           (

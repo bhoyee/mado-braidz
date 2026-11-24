@@ -45,6 +45,7 @@ copyFileSync('src/client/batch-payment.js', 'public/build/batch-payment.js');
 copyFileSync('src/client/admin.js', 'public/build/admin.js');
 copyFileSync('src/client/admin-live.js', 'public/build/admin-live.js');
 copyFileSync('src/client/admin-guide.js', 'public/build/admin-guide.js');
+copyFileSync('src/client/admin-styles.js', 'public/build/admin-styles.js');
 copyFileSync('src/client/admin-search.js', 'public/build/admin-search.js');
 copyFileSync('src/client/admin-gallery.js', 'public/build/admin-gallery.js');
 copyFileSync('src/client/admin-videos.js', 'public/build/admin-videos.js');
