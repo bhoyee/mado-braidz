@@ -277,6 +277,51 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         .where(eq(s.bookings.id, hold.id));
       expect(row).toMatchObject({ status: 'confirmed', paidCents: 3000 });
     });
+    it('sorts and counts appointment tabs, finds clients and their visits', async () => {
+      const later = { ...validHold, startAt: '2026-12-29T15:00:00.000Z' };
+      const { id } = await bookings.createHold(later);
+      for (const view of [
+        'today',
+        'upcoming',
+        'review',
+        'balance',
+        'past',
+        'cancelled',
+        'all',
+      ])
+        await agent.get('/admin/bookings?view=' + view).expect(200);
+      expect((await agent.get('/admin/bookings')).text).toMatch(/1–\d+ of \d+/);
+      const digits = validHold.phone.replace(/\D/g, '').slice(-7);
+      for (const q of [validHold.name.slice(0, 3).toLowerCase(), digits]) {
+        const { body } = await agent
+          .get('/admin/api/clients')
+          .query({ q })
+          .expect(200);
+        expect(body.clients[0].name).toBe(validHold.name);
+      }
+      await db
+        .update(s.bookings)
+        .set({
+          status: 'completed',
+          startAt: new Date('2025-01-05T15:00:00Z'),
+          endAt: new Date('2025-01-05T19:00:00Z'),
+          blockEndAt: new Date('2025-01-05T19:00:00Z'),
+        })
+        .where(eq(s.bookings.id, id));
+      const next = await bookings.createHold(later);
+      const all = (await agent.get('/admin/bookings?view=all')).text;
+      expect(all.indexOf(`/admin/bookings/${next.id}`)).toBeLessThan(
+        all.indexOf(`/admin/bookings/${id}"`),
+      );
+      const detail = (await agent.get('/admin/bookings/' + next.id).expect(200))
+        .text;
+      expect(detail).toContain('1 completed visit<');
+      expect(detail).toContain(`href="/admin/bookings/${id}"`);
+      await db
+        .update(s.bookings)
+        .set({ status: 'cancelled' })
+        .where(eq(s.bookings.id, next.id));
+    });
     it('shows the owner header, footer, live search and client phone', async () => {
       await bookings.createHold(validHold);
       for (const path of ['/admin', '/admin/bookings']) {

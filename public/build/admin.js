@@ -541,9 +541,100 @@ if (editor) {
   const style = editor.querySelector('[data-owner-style]'),
     variant = editor.querySelector('[data-owner-variant]'),
     fields = editor.querySelector('[data-style-fields]');
-  const change = editor.querySelector('[data-change-style]'),
-    preview = editor.querySelector('[data-price-preview]');
-  let quoteVersion = 0;
+  const change = editor.querySelector('[data-change-style]');
+  const dateField = editor.querySelector('[data-owner-date]'),
+    timeField = editor.querySelector('[data-owner-time]'),
+    slotBox = editor.querySelector('[data-owner-slots]');
+  const manual = editor.querySelector('[data-manual-fields]');
+  const usd = (cents) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(cents / 100);
+  const hours = (minutes) =>
+    `${Number((minutes / 60).toFixed(2))} ${minutes === 60 ? 'hr' : 'hrs'}`;
+  // Until the style changes, an existing booking keeps its agreed price.
+  let price = editor.dataset.bookingId
+    ? {
+        subtotalCents: Number(editor.dataset.total),
+        durationMin: Number(editor.dataset.duration),
+      }
+    : null;
+  const original = price;
+  let quoteVersion = 0,
+    slotVersion = 0,
+    quoteError = '';
+  const mode = () =>
+    editor.querySelector('[data-payment-mode]:checked')?.value || null;
+  const sum = (name, value) => {
+    const field = editor.querySelector(`[data-sum="${name}"]`);
+    if (field) field.textContent = value || '—';
+  };
+  function summary() {
+    const changed = !fields.disabled;
+    sum('client', editor.elements.name.value.trim());
+    sum(
+      'style',
+      changed
+        ? [
+            style.selectedOptions[0]?.textContent,
+            variant.value &&
+              variant.selectedOptions[0].textContent.replace(/ · \$.*$/, ''),
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : editor.dataset.styleName,
+    );
+    sum(
+      'extras',
+      [...fields.querySelectorAll('[name="addonIds"]:checked')]
+        .map((input) =>
+          input
+            .closest('label')
+            .textContent.trim()
+            .replace(/ · \$.*$/, ''),
+        )
+        .join(', ') || 'None',
+    );
+    const when =
+      dateField.value &&
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: 'UTC',
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        ...(timeField.value ? { hour: 'numeric', minute: '2-digit' } : {}),
+      }).format(
+        new Date(`${dateField.value}T${timeField.value || '00:00'}:00Z`),
+      );
+    sum('when', when && timeField.value ? when + ' ET' : when);
+    sum('duration', price && hours(price.durationMin));
+    if (!price) {
+      sum('total', quoteError || '—');
+      for (const name of ['deposit', 'balance']) sum(name, '—');
+      return;
+    }
+    const provisional = price.consultation ? ' (to agree)' : '';
+    sum('total', usd(price.subtotalCents) + provisional);
+    sum(
+      'deposit',
+      price.depositCents === undefined ? '' : usd(price.depositCents),
+    );
+    const received = manual?.querySelector('[data-money]').value;
+    const paid = editor.dataset.bookingId
+      ? Number(editor.dataset.paid)
+      : mode() === 'manual'
+        ? Math.round(Number(received) * 100) || 0
+        : 0;
+    sum(
+      'balance',
+      usd(Math.max(0, price.subtotalCents - paid)) +
+        (mode() === 'link' ? ' until the deposit is paid' : ''),
+    );
+    const help = editor.querySelector('[data-manual-help]');
+    if (help)
+      help.textContent = `At least the ${usd(price.depositCents)} deposit, and no more than ${usd(price.subtotalCents)}.`;
+  }
   async function quote() {
     if (fields.disabled) return;
     const version = ++quoteVersion;
@@ -564,14 +655,20 @@ if (editor) {
         },
         body: JSON.stringify(body),
       });
-      const price = await response.json();
-      if (version !== quoteVersion) return;
-      if (!response.ok) throw new Error(price.message);
-      preview.textContent = `${price.consultation ? 'Consultation · provisional ' : 'New total '}${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(price.subtotalCents / 100)} · ${Number((price.durationMin / 60).toFixed(2))} ${price.durationMin === 60 ? 'hr' : 'hrs'}`;
+      const next = await response.json();
+      if (version !== quoteVersion || fields.disabled) return;
+      if (!response.ok) throw new Error(next.message);
+      const longer = price?.durationMin !== next.durationMin;
+      price = next;
+      quoteError = '';
       editor.dataset.duration = price.durationMin;
+      if (longer || !slotBox.querySelector('button')) loadSlots();
     } catch (error) {
-      preview.textContent = error.message || 'Unable to load price.';
+      if (version !== quoteVersion) return;
+      price = null;
+      quoteError = error.message || 'Unable to load price.';
     }
+    summary();
   }
   function filterVariants(changed = false) {
     for (const field of fields.querySelectorAll('[data-addon-styles]')) {
@@ -596,6 +693,115 @@ if (editor) {
       variant.value = matching[0]?.value || '';
     quote();
   }
+  function markTime() {
+    for (const button of slotBox.querySelectorAll('button'))
+      button.setAttribute(
+        'aria-pressed',
+        String(button.dataset.time === timeField.value),
+      );
+  }
+  function slotMessage(text) {
+    const note = document.createElement('p');
+    note.className = 'owner-muted';
+    note.textContent = text;
+    slotBox.replaceChildren(note);
+  }
+  async function loadSlots() {
+    const version = ++slotVersion;
+    if (!dateField.value)
+      return slotMessage('Choose a date to see free times.');
+    if (!editor.dataset.duration) return;
+    const query = new URLSearchParams({
+      date: dateField.value,
+      durationMin: editor.dataset.duration,
+    });
+    if (editor.dataset.bookingId)
+      query.set('bookingId', editor.dataset.bookingId);
+    slotMessage('Checking free times…');
+    try {
+      const response = await fetch('/admin/api/slots?' + query, {
+        headers: { Accept: 'application/json' },
+      });
+      const slots = await response.json();
+      if (version !== slotVersion) return;
+      if (!response.ok) throw new Error(slots.message);
+      const free = slots.filter((slot) => slot.available);
+      if (!free.length)
+        return slotMessage('No free times that day. Choose another date.');
+      const groups = new Map([
+        ['Morning', []],
+        ['Afternoon', []],
+        ['Evening', []],
+      ]);
+      for (const slot of free) {
+        const start = new Date(slot.startAt);
+        const local = new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'America/New_York',
+          hour: '2-digit',
+          minute: '2-digit',
+          hourCycle: 'h23',
+        }).format(start);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.time = local;
+        const label = document.createElement('strong');
+        label.textContent = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          hour: 'numeric',
+          minute: '2-digit',
+        }).format(start);
+        const chairs = document.createElement('span');
+        chairs.textContent = `${slot.remaining} ${slot.remaining === 1 ? 'chair' : 'chairs'} left`;
+        button.append(label, chairs);
+        button.addEventListener('click', () => {
+          timeField.value = local;
+          markTime();
+          summary();
+          notifyState();
+        });
+        const hour = Number(local.slice(0, 2));
+        groups
+          .get(hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening')
+          .push(button);
+      }
+      slotBox.replaceChildren();
+      for (const [name, buttons] of groups) {
+        if (!buttons.length) continue;
+        const heading = document.createElement('h3');
+        heading.textContent = name;
+        const list = document.createElement('div');
+        list.className = 'owner-slot-list';
+        list.append(...buttons);
+        slotBox.append(heading, list);
+      }
+      markTime();
+      if (
+        timeField.value &&
+        !free.some(
+          (slot, i) =>
+            slotBox.querySelectorAll('button')[i].dataset.time ===
+            timeField.value,
+        )
+      ) {
+        const warn = document.createElement('p');
+        warn.className = 'slot-warning';
+        warn.textContent =
+          'The chosen start time is not free for this visit. Pick one below.';
+        slotBox.prepend(warn);
+      }
+    } catch (error) {
+      if (version === slotVersion)
+        slotMessage(error.message || 'Unable to load free times.');
+    }
+  }
+  function notifyState() {
+    const notify = editor.querySelector('[data-notify]');
+    if (!notify) return;
+    const moved =
+      `${dateField.value} ${timeField.value}` !== editor.dataset.start;
+    notify.disabled = !moved;
+    editor.querySelector('[data-notify-help]').hidden = moved;
+  }
   style.addEventListener('change', () => filterVariants(true));
   variant.addEventListener('change', quote);
   fields
@@ -603,68 +809,115 @@ if (editor) {
     .forEach((input) => input.addEventListener('change', quote));
   change?.addEventListener('change', () => {
     fields.disabled = !change.checked;
-    if (change.checked) filterVariants();
+    if (change.checked) return filterVariants();
+    quoteVersion++;
+    price = original;
+    editor.dataset.duration = original.durationMin;
+    loadSlots();
+    summary();
   });
-  filterVariants();
-  const mode = editor.querySelector('[data-payment-mode]');
-  mode?.addEventListener('change', () => {
-    const manual = editor.querySelector('[data-manual-fields]');
-    manual.hidden = mode.value !== 'manual';
-    manual.querySelector('input').required = mode.value === 'manual';
-  });
-  editor
-    .querySelector('[data-check-slots]')
-    .addEventListener('click', async () => {
-      const date = editor.querySelector('[data-owner-date]').value,
-        target = editor.querySelector('[data-owner-slots]');
-      if (!date) return report('Choose a date first.');
-      const query = new URLSearchParams({
-        date,
-        durationMin: editor.dataset.duration || '240',
-      });
-      if (editor.dataset.bookingId)
-        query.set('bookingId', editor.dataset.bookingId);
-      // A changed style can have a different duration than the original booking.
-      if (change?.checked) query.set('durationMin', editor.dataset.duration);
-      target.textContent = 'Checking available times…';
+  dateField.addEventListener('change', loadSlots);
+  timeField.addEventListener('change', markTime);
+  for (const radio of editor.querySelectorAll('[data-payment-mode]'))
+    radio.addEventListener('change', () => {
+      manual.hidden = mode() !== 'manual';
+      const amount = manual.querySelector('[data-money]');
+      amount.required = !manual.hidden;
+      if (!manual.hidden && !amount.value && price)
+        amount.value = (price.depositCents / 100).toFixed(2);
+    });
+  for (const name of ['input', 'change'])
+    editor.addEventListener(name, () => {
+      summary();
+      notifyState();
+    });
+
+  const lookup = editor.querySelector('[data-client-lookup]');
+  if (lookup) {
+    const search = lookup.querySelector('[data-client-search]'),
+      results = lookup.querySelector('[data-client-results]'),
+      status = lookup.querySelector('[data-client-status]');
+    let timer,
+      version = 0;
+    async function find() {
+      const asked = ++version;
+      const query = search.value.trim();
+      if (query.length < 2) {
+        results.hidden = true;
+        status.textContent = 'Or enter a new client below.';
+        return;
+      }
       try {
-        const response = await fetch('/admin/api/slots?' + query, {
-          headers: { Accept: 'application/json' },
-        });
-        const slots = await response.json();
-        if (!response.ok) throw new Error(slots.message);
-        target.replaceChildren();
-        for (const slot of slots.filter((s) => s.available)) {
+        const response = await fetch(
+          '/admin/api/clients?' + new URLSearchParams({ q: query }),
+          { headers: { Accept: 'application/json' } },
+        );
+        const data = await response.json();
+        if (asked !== version) return;
+        if (!response.ok) throw new Error(data.message);
+        results.replaceChildren();
+        for (const client of data.clients) {
           const button = document.createElement('button');
           button.type = 'button';
-          const local = new Intl.DateTimeFormat('en-GB', {
-            timeZone: 'America/New_York',
-            hour: '2-digit',
-            minute: '2-digit',
-            hourCycle: 'h23',
-          }).format(new Date(slot.startAt));
-          button.textContent = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/New_York',
-            hour: 'numeric',
-            minute: '2-digit',
-          }).format(new Date(slot.startAt));
+          const name = document.createElement('strong');
+          name.textContent = client.name;
+          const info = document.createElement('span');
+          info.textContent = [client.phoneLabel, client.email]
+            .filter(Boolean)
+            .join(' · ');
+          button.append(name, info);
           button.addEventListener('click', () => {
-            editor.querySelector('[data-owner-time]').value = local;
-            target
-              .querySelectorAll('button')
-              .forEach((b) =>
-                b.setAttribute('aria-pressed', String(b === button)),
-              );
+            editor.elements.name.value = client.name;
+            editor.elements.email.value = client.email;
+            editor.elements.phone.value = client.phone;
+            search.value = '';
+            results.hidden = true;
+            status.textContent = `${client.name}’s details are filled in.`;
+            summary();
+            editor.elements.name.focus();
           });
-          target.append(button);
+          results.append(button);
         }
-        if (!target.children.length)
-          target.textContent = 'No available times. Choose another date.';
-      } catch (error) {
-        target.textContent = error.message;
+        results.hidden = !data.clients.length;
+        status.textContent = data.clients.length
+          ? `${data.clients.length} found. Select one to fill in their details.`
+          : 'No match. Enter a new client below.';
+      } catch {
+        if (asked === version)
+          status.textContent =
+            'Search is unavailable. Enter the details below.';
       }
+    }
+    search.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(find, 250);
     });
+    search.addEventListener('keydown', (event) => {
+      // Enter must never submit the booking from the search box.
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        results.querySelector('button')?.focus();
+      }
+      if (event.key === 'Escape') results.hidden = true;
+    });
+  }
+  filterVariants();
+  if (editor.dataset.bookingId) loadSlots();
+  notifyState();
+  summary();
 }
+document.querySelectorAll('[data-copy-text]').forEach((button) =>
+  button.addEventListener('click', async () => {
+    const label = button.textContent;
+    try {
+      await navigator.clipboard.writeText(button.dataset.copyText);
+      button.textContent = 'Copied';
+      setTimeout(() => (button.textContent = label), 2500);
+    } catch {
+      window.prompt('Copy this link', button.dataset.copyText);
+    }
+  }),
+);
 // Filter the appointment book without moving focus out of the search field.
 const appointmentFilters = document.querySelector('[data-appointment-filters]');
 if (appointmentFilters) {
@@ -674,6 +927,17 @@ if (appointmentFilters) {
     controller,
     version = 0;
   appointmentFilters.querySelector('[type="submit"]').hidden = true;
+  const clearLink = appointmentFilters.querySelector(
+    '[data-appointment-clear]',
+  );
+  const narrowing = () =>
+    ['from', 'to', 'status', 'paymentStatus'].some(
+      (name) => appointmentFilters.elements[name].value,
+    );
+  const filtering = () => Boolean(search.value.trim() || narrowing());
+  // Phones start with the filters folded away unless one is in use.
+  if (matchMedia('(max-width: 760px)').matches && !narrowing())
+    appointmentFilters.querySelector('[data-appointment-more]').open = false;
   async function findAppointments() {
     clearTimeout(timer);
     controller?.abort();
@@ -702,10 +966,14 @@ if (appointmentFilters) {
       const updated = page.querySelector('[data-appointment-results]');
       if (!updated) throw new Error('Please refresh and sign in again.');
       results.replaceWith(document.importNode(updated, true));
+      const tabs = page.querySelector('.appointment-views');
+      if (tabs)
+        document
+          .querySelector('.appointment-views')
+          .replaceWith(document.importNode(tabs, true));
+      clearLink.hidden = !filtering();
       history.replaceState(null, '', url);
-      const count = updated.querySelectorAll(
-        'tbody tr:not(:has(.owner-empty))',
-      ).length;
+      const count = updated.querySelectorAll('tbody tr[data-search]').length;
       status.textContent = count
         ? `${count} appointment${count === 1 ? '' : 's'} shown.`
         : 'No appointments found.';

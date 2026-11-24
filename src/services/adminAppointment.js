@@ -1,3 +1,19 @@
+const optionNames = {
+  medium: 'Medium',
+  semi_medium: 'Semi-medium',
+  small: 'Small',
+  shoulder: 'Shoulder',
+  mid_back: 'Mid back',
+  waist: 'Waist',
+  top_butt: 'Top butt',
+  butt: 'Butt',
+  under_butt: 'Under butt',
+};
+export const optionLabel = (parts) =>
+  parts
+    .filter(Boolean)
+    .map((value) => optionNames[value] || value)
+    .join(' · ') || 'Standard service';
 const methods = {
   zelle: 'Zelle',
   cashapp: 'Cash App',
@@ -33,26 +49,11 @@ export function presentAppointment(row) {
     }
   }
   snapshot ||= {};
-  const labels = {
-    medium: 'Medium',
-    semi_medium: 'Semi-medium',
-    small: 'Small',
-    shoulder: 'Shoulder',
-    mid_back: 'Mid back',
-    waist: 'Waist',
-    top_butt: 'Top butt',
-    butt: 'Butt',
-    under_butt: 'Under butt',
-  };
   return {
     ...row,
     styleName:
       snapshot.styleName || row.styleName || 'Style details unavailable',
-    styleOption:
-      [snapshot.size, snapshot.length]
-        .filter(Boolean)
-        .map((value) => labels[value] || value)
-        .join(' · ') || 'Standard service',
+    styleOption: optionLabel([snapshot.size, snapshot.length]),
     paymentSource: paymentSourceLabel(row.paymentMethod, row.paymentProvider),
     paymentReview: Boolean(Number(row.paymentReview)),
   };

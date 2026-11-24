@@ -2,11 +2,11 @@ import { DateTime } from 'luxon';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 const ZONE = 'America/New_York';
-const money = (cents) =>
+export const money = (cents) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
     cents / 100,
   );
-const labels = {
+export const statusLabels = {
   pending_payment: 'Awaiting payment',
   confirmed: 'Confirmed',
   completed: 'Completed',
@@ -51,7 +51,7 @@ export function calendarBooking(row) {
         ? 'Payment to review'
         : row.paymentReview
           ? 'Balance payment to review'
-          : labels[b.status],
+          : statusLabels[b.status],
       review: row.paymentReview,
       updatedAt: b.updatedAt.toISOString(),
       name: c.name,

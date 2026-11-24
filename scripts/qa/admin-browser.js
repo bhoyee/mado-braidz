@@ -76,15 +76,14 @@ try {
     await page.getByLabel('Date', { exact: true }).fill(start.toISODate());
     // Sunday opens at 10:00; keep the fixture valid on every weekday.
     await page.getByLabel('Start time').fill('10:00');
-    await page.getByLabel('Payment arrangement').selectOption('override');
-    await page.getByRole('button', { name: 'Show available times' }).click();
+    await page.getByLabel('No payment yet').check();
     await page.locator('[data-owner-slots] button').first().waitFor();
     await page.getByRole('button', { name: 'Create appointment' }).click();
     await page.waitForURL(/\/admin\/bookings\/\d+$/);
     console.log(`Owner created appointment at ${width}px`);
     const bookingId = Number(page.url().split('/').pop());
     assert.equal(repo.rows.find((b) => b.id === bookingId).status, 'confirmed');
-    async function submitDetailForm(button) {
+    async function submitDetailForm(button, message) {
       const posted = page.waitForResponse(
         (response) => response.request().method() === 'POST',
       );
@@ -99,7 +98,7 @@ try {
       await page.locator('.owner-alert').waitFor({ state: 'visible' });
       assert.equal(
         await page.locator('.owner-alert').textContent(),
-        'Booking updated.',
+        message + '×',
       );
     }
     await page
@@ -119,7 +118,7 @@ try {
     await page.locator('.owner-alert').waitFor({ state: 'visible' });
     assert.equal(
       await page.locator('.owner-alert').textContent(),
-      'Unable to save. Refresh the page and try again.',
+      'Unable to save. Refresh the page and try again.×',
     );
     assert.notEqual(
       (await repo.bookingById(bookingId)).adminNotes,
@@ -127,11 +126,15 @@ try {
     );
     await submitDetailForm(
       page.getByRole('button', { name: 'Save note', exact: true }),
+      'Note saved.',
     );
     assert.equal(
       (await repo.bookingById(bookingId)).adminNotes,
       'Saved from the private notes form.',
     );
+    await page
+      .getByRole('button', { name: 'Record a payment', exact: true })
+      .click();
     await page.getByLabel('Amount received (USD)').fill('30');
     await page
       .getByLabel('Payment note', { exact: true })
@@ -141,20 +144,18 @@ try {
         name: 'Record received payment',
         exact: true,
       }),
+      'Payment recorded.',
     );
     assert.equal((await repo.bookingById(bookingId)).paidCents, 3000);
     assert.equal((await repo.payments(bookingId)).length, 1);
-    // The action select used to hide the form's URL property just like the
-    // hidden action fields on payment and notes forms.
-    await page.locator('select[name="action"]').selectOption('balance-link');
     await page
-      .getByLabel('Reason / note', { exact: true })
-      .fill('Requested by the client.');
+      .getByRole('button', { name: 'Email balance link', exact: true })
+      .click();
     const queuedResponse = page.waitForResponse(
       (response) => response.request().method() === 'POST',
     );
     await page
-      .getByRole('button', { name: 'Apply action', exact: true })
+      .getByRole('button', { name: 'Send balance link', exact: true })
       .click();
     const queued = await queuedResponse;
     assert.equal(
@@ -308,10 +309,10 @@ try {
       await page
         .getByRole('button', { name: 'Save new time', exact: true })
         .click();
-      await page.waitForFunction(
-        () =>
-          document.querySelector('.owner-alert').textContent ===
-          'Appointment moved.',
+      await page.waitForFunction(() =>
+        document
+          .querySelector('.owner-alert')
+          .textContent.startsWith('Appointment moved.'),
       );
       moved = await repo.bookingById(bookingId);
       assert.equal(
@@ -357,18 +358,15 @@ try {
     // Use a standard UUID to exercise the exact production validation.
     if (response.status() !== 200) throw new Error(await response.text());
     await page.goto(origin + `/admin/bookings/${bookingId}`);
+    await page.getByRole('button', { name: 'Refund', exact: true }).click();
     await page.getByLabel('Refund amount (USD)').fill('5');
     await page
       .getByLabel('Reason', { exact: true })
       .fill('Cash returned to the client.');
     const refundSubmission = submitDetailForm(
       page.getByRole('button', { name: 'Submit refund', exact: true }),
+      'Refund saved.',
     );
-    const refundDialog = page.locator('#owner-confirm-dialog');
-    await refundDialog.waitFor({ state: 'visible' });
-    await refundDialog
-      .getByRole('button', { name: 'Continue', exact: true })
-      .click();
     await refundSubmission;
     assert.equal((await repo.bookingById(bookingId)).paidCents, 2500);
     assert.equal(

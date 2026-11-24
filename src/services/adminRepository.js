@@ -41,6 +41,64 @@ export function createAdminRepository(db) {
       },
     };
   }
+  // Shared by the appointment list and its totals.
+  function conditions({
+    from,
+    to,
+    status,
+    statuses,
+    paymentStatus,
+    search = '',
+    liveAt,
+    balanceOnly = false,
+    upcomingAt,
+    reviewOnly = false,
+  } = {}) {
+    const filters = [];
+    if (from) filters.push(gte(s.bookings.startAt, from));
+    if (to) filters.push(lt(s.bookings.startAt, to));
+    if (status) filters.push(eq(s.bookings.status, status));
+    if (upcomingAt)
+      filters.push(
+        or(
+          eq(s.bookings.status, 'confirmed'),
+          and(
+            eq(s.bookings.status, 'pending_payment'),
+            gt(s.bookings.holdExpiresAt, upcomingAt),
+          ),
+        ),
+      );
+    if (liveAt) filters.push(gt(s.bookings.holdExpiresAt, liveAt));
+    if (balanceOnly)
+      filters.push(
+        inArray(s.bookings.status, ['confirmed', 'completed']),
+        gt(s.bookings.balanceCents, 0),
+      );
+    if (paymentStatus)
+      filters.push(eq(s.bookings.paymentStatus, paymentStatus));
+    if (search) {
+      // LOCATE treats user input as literal text, including % and _.
+      const digits = /^[+\d().\s-]+$/.test(search)
+        ? search.replace(/\D/g, '')
+        : '';
+      filters.push(
+        sql`(LOCATE(${search}, ${s.clients.name}) > 0 OR LOCATE(${search}, ${s.clients.email}) > 0 OR LOCATE(${search}, ${s.clients.phoneE164}) > 0 OR LOCATE(${search}, ${s.bookings.ref}) > 0 OR (${digits.length >= 4} AND LOCATE(${digits}, ${s.clients.phoneE164}) > 0))`,
+      );
+    }
+    if (statuses) filters.push(inArray(s.bookings.status, statuses));
+    if (reviewOnly)
+      filters.push(
+        sql`EXISTS(SELECT 1 FROM payment_proofs pr WHERE pr.booking_id = ${s.bookings.id} AND pr.status = 'pending')`,
+      );
+    return filters;
+  }
+  const sameClient = (client) =>
+    client.phoneE164
+      ? or(
+          eq(s.clients.email, client.email),
+          eq(s.clients.phoneE164, client.phoneE164),
+        )
+      : eq(s.clients.email, client.email);
   return {
     searchPortal: createOwnerSearch(db),
     ...context(db),
@@ -57,50 +115,68 @@ export function createAdminRepository(db) {
         );
       return Number(row.enabled) > 0;
     },
+    async count(options) {
+      const [row] = await db
+        .select({ total: sql`COUNT(*)` })
+        .from(s.bookings)
+        .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
+        .where(and(...conditions(options)));
+      return Number(row.total);
+    },
+    async searchClients(query) {
+      const digits = /^[+\d().\s-]+$/.test(query)
+        ? query.replace(/\D/g, '')
+        : '';
+      return db
+        .select({
+          id: s.clients.id,
+          name: s.clients.name,
+          email: s.clients.email,
+          phoneE164: s.clients.phoneE164,
+        })
+        .from(s.clients)
+        .where(
+          sql`(LOCATE(${query}, ${s.clients.name}) > 0 OR LOCATE(${query}, ${s.clients.email}) > 0 OR (${digits.length >= 3} AND LOCATE(${digits}, ${s.clients.phoneE164}) > 0))`,
+        )
+        .orderBy(desc(s.clients.id))
+        .limit(60);
+    },
+    // Each booking has its own client row, so visits match on email or phone.
+    async clientVisits(client, exceptId) {
+      const [row] = await db
+        .select({
+          completed: sql`COALESCE(SUM(${s.bookings.status} = 'completed'), 0)`,
+          noShows: sql`COALESCE(SUM(${s.bookings.status} = 'no_show'), 0)`,
+        })
+        .from(s.bookings)
+        .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
+        .where(sameClient(client));
+      const rows = await db
+        .select({
+          id: s.bookings.id,
+          startAt: s.bookings.startAt,
+          status: s.bookings.status,
+          styleName: s.styles.name,
+        })
+        .from(s.bookings)
+        .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
+        .innerJoin(s.styles, eq(s.bookings.styleId, s.styles.id))
+        .where(and(sameClient(client), sql`${s.bookings.id} <> ${exceptId}`))
+        .orderBy(desc(s.bookings.startAt))
+        .limit(4);
+      return {
+        completed: Number(row.completed),
+        noShows: Number(row.noShows),
+        rows,
+      };
+    },
     async list({
-      from,
-      to,
-      status,
-      paymentStatus,
-      search = '',
       limit = 100,
       offset = 0,
       order = 'latest',
-      liveAt,
-      balanceOnly = false,
-      upcomingAt,
+      now = new Date(),
+      ...options
     } = {}) {
-      const filters = [];
-      if (from) filters.push(gte(s.bookings.startAt, from));
-      if (to) filters.push(lt(s.bookings.startAt, to));
-      if (status) filters.push(eq(s.bookings.status, status));
-      if (upcomingAt)
-        filters.push(
-          or(
-            eq(s.bookings.status, 'confirmed'),
-            and(
-              eq(s.bookings.status, 'pending_payment'),
-              gt(s.bookings.holdExpiresAt, upcomingAt),
-            ),
-          ),
-        );
-      if (liveAt) filters.push(gt(s.bookings.holdExpiresAt, liveAt));
-      if (balanceOnly)
-        filters.push(
-          inArray(s.bookings.status, ['confirmed', 'completed']),
-          gt(s.bookings.balanceCents, 0),
-        );
-      if (paymentStatus)
-        filters.push(eq(s.bookings.paymentStatus, paymentStatus));
-      if (search) {
-        // LOCATE treats user input as literal text, including % and _.
-        const digits = /^[+\d().\s-]+$/.test(search)
-          ? search.replace(/\D/g, '')
-          : '';
-        filters.push(
-          sql`(LOCATE(${search}, ${s.clients.name}) > 0 OR LOCATE(${search}, ${s.clients.email}) > 0 OR LOCATE(${search}, ${s.clients.phoneE164}) > 0 OR LOCATE(${search}, ${s.bookings.ref}) > 0 OR (${digits.length >= 4} AND LOCATE(${digits}, ${s.clients.phoneE164}) > 0))`,
-        );
-      }
       let query = db
         .select({
           booking: s.bookings,
@@ -113,8 +189,15 @@ export function createAdminRepository(db) {
         .from(s.bookings)
         .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
         .innerJoin(s.styles, eq(s.bookings.styleId, s.styles.id))
-        .where(and(...filters))
+        .where(and(...conditions(options)))
         .orderBy(
+          ...(order === 'smart'
+            ? // Nearest visit first, then the most recent past one.
+              [
+                lt(s.bookings.startAt, now),
+                sql`CASE WHEN ${gte(s.bookings.startAt, now)} THEN ${s.bookings.startAt} END`,
+              ]
+            : []),
           order === 'nearest'
             ? asc(s.bookings.startAt)
             : desc(s.bookings.startAt),

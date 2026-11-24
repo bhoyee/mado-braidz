@@ -13,7 +13,7 @@ import { createDatabase } from './db/index.js';
 import { createCatalogService } from './services/catalogService.js';
 import { publicRouter, money } from './routes/public/index.js';
 import { designRouter } from './routes/admin/design.js';
-import { methodName } from './services/adminAppointment.js';
+import { methodName, optionLabel } from './services/adminAppointment.js';
 import { phoneLabel } from './services/adminCalendar.js';
 import { adminRouter } from './routes/admin/index.js';
 import { createAdminRepository } from './services/adminRepository.js';
@@ -259,6 +259,7 @@ export function createApp({
   );
   views.addFilter('money', money);
   views.addFilter('payMethod', methodName);
+  views.addFilter('optionLabel', optionLabel);
   views.addFilter('phone', phoneLabel);
   views.addFilter('et', (value, format = 'ccc, LLL d · h:mm a') =>
     value

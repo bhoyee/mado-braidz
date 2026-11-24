@@ -1,9 +1,17 @@
 import { guideFor } from '../../config/guideVideos.js';
 import { bookingPaymentSource } from '../../services/adminAppointment.js';
 import {
+  appointmentActions,
+  appointmentHistory,
+  appointmentVersion,
+} from '../../services/adminAppointmentDetail.js';
+import {
   calendarBlock,
   calendarBooking,
+  money,
+  phoneLabel,
   showOnCalendar,
+  statusLabels,
 } from '../../services/adminCalendar.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -404,7 +412,47 @@ export function adminRouter(
       });
     }),
   );
-  function filters(query) {
+  const viewNames = {
+    today: 'Today',
+    upcoming: 'Upcoming',
+    review: 'Needs review',
+    balance: 'Balance due',
+    past: 'Past',
+    cancelled: 'Cancelled',
+    all: 'All',
+  };
+  function viewFilter(view) {
+    const now = new Date();
+    const today = DateTime.now().setZone(ZONE).startOf('day');
+    return {
+      today: {
+        from: today.toJSDate(),
+        to: today.plus({ days: 1 }).toJSDate(),
+        statuses: [
+          'pending_payment',
+          'confirmed',
+          'completed',
+          'no_show',
+          'payment_conflict',
+        ],
+        order: 'nearest',
+      },
+      upcoming: { from: today.toJSDate(), upcomingAt: now, order: 'nearest' },
+      review: { reviewOnly: true, order: 'nearest' },
+      balance: { balanceOnly: true, order: 'smart' },
+      past: {
+        to: now,
+        statuses: ['confirmed', 'completed', 'no_show'],
+        order: 'latest',
+      },
+      cancelled: {
+        statuses: ['cancelled', 'expired', 'payment_conflict'],
+        order: 'latest',
+      },
+      all: { order: 'smart' },
+    }[view];
+  }
+  function filters(query, landing = 'all') {
     const input = z
       .object({
         search: z.string().trim().max(120).default(''),
@@ -413,7 +461,8 @@ export function adminRouter(
         status: status.optional(),
         paymentStatus: paymentStatus.optional(),
         page: z.coerce.number().int().min(1).max(100000).default(1),
-        order: z.enum(['latest', 'nearest']).default('latest'),
+        order: z.enum(['latest', 'nearest']).optional(),
+        view: z.enum(Object.keys(viewNames)).optional(),
         live: z.enum(['true']).optional(),
         upcoming: z.enum(['true']).optional(),
       })
@@ -422,39 +471,114 @@ export function adminRouter(
           Object.entries(query).filter(([, value]) => value !== ''),
         ),
       );
+    const narrowed =
+      input.search ||
+      input.from ||
+      input.to ||
+      input.status ||
+      input.paymentStatus ||
+      input.order ||
+      input.live ||
+      input.upcoming;
+    const view = input.view || (narrowed ? 'all' : landing);
+    const preset = viewFilter(view);
+    const from = input.from
+      ? DateTime.fromISO(input.from, { zone: ZONE }).toJSDate()
+      : undefined;
+    const to = input.to
+      ? DateTime.fromISO(input.to, { zone: ZONE }).plus({ days: 1 }).toJSDate()
+      : undefined;
     return {
       ...input,
-      from: input.from
-        ? DateTime.fromISO(input.from, { zone: ZONE }).toJSDate()
-        : undefined,
-      to: input.to
-        ? DateTime.fromISO(input.to, { zone: ZONE })
-            .plus({ days: 1 })
-            .toJSDate()
-        : undefined,
-      offset: (input.page - 1) * 100,
+      ...preset,
+      view,
+      // A chosen date range narrows the tab; it never widens it.
+      from:
+        from && preset.from
+          ? from > preset.from
+            ? from
+            : preset.from
+          : from || preset.from,
+      to: to && preset.to ? (to < preset.to ? to : preset.to) : to || preset.to,
+      order: input.order || preset.order,
+      offset: (input.page - 1) * 25,
       liveAt: input.live === 'true' ? new Date() : undefined,
-      upcomingAt: input.upcoming === 'true' ? new Date() : undefined,
+      upcomingAt: input.upcoming === 'true' ? new Date() : preset.upcomingAt,
     };
   }
   router.get(
     '/bookings',
     asyncRoute(async (req, res) => {
-      const filter = filters(req.query);
-      const rows = await admins.list({ ...filter, limit: 101 });
+      const filter = filters(req.query, 'upcoming');
+      const counted = ['today', 'upcoming', 'review', 'balance'];
+      const [rows, total, ...counts] = await Promise.all([
+        admins.list({ ...filter, limit: 25 }),
+        admins.count(filter),
+        ...counted.map((key) => admins.count(viewFilter(key))),
+      ]);
       const query = new URLSearchParams(req.query);
-      query.set('page', String(Math.max(1, filter.page - 1)));
-      const previous = '?' + query;
-      query.set('page', String(filter.page + 1));
+      const link = (page) => {
+        query.set('page', String(page));
+        return '?' + query;
+      };
+      const exportQuery = new URLSearchParams(req.query);
+      exportQuery.set('view', filter.view);
+      exportQuery.delete('page');
+      const view =
+        filter.upcoming && !filter.search && !filter.status
+          ? 'upcoming'
+          : filter.view;
       res.render('admin/bookings', {
-        rows: rows.slice(0, 100),
-        hasNext: rows.length > 100,
-        previous,
-        next: '?' + query,
+        rows,
+        view,
+        viewLabel:
+          view === 'all'
+            ? 'All appointments'
+            : view === 'cancelled'
+              ? 'Cancelled and expired'
+              : viewNames[view],
+        views: Object.entries(viewNames).map(([key, label]) => ({
+          key,
+          label,
+          count: counts[counted.indexOf(key)],
+        })),
+        total,
+        firstRow: Math.min(filter.offset + 1, total),
+        lastRow: filter.offset + rows.length,
+        hasNext: filter.offset + rows.length < total,
+        previous: link(Math.max(1, filter.page - 1)),
+        next: link(filter.page + 1),
         page: filter.page,
         filters: req.query,
-        exportQuery: new URLSearchParams(req.query).toString(),
+        exportQuery: exportQuery.toString(),
       });
+    }),
+  );
+  router.get(
+    '/api/clients',
+    rateLimit({
+      windowMs: 60000,
+      limit: 90,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+    }),
+    asyncRoute(async (req, res) => {
+      const query = z.string().trim().min(2).max(80).parse(req.query.q);
+      const seen = new Set();
+      const clients = [];
+      for (const c of await admins.searchClients(query)) {
+        const key = c.email.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        clients.push({
+          name: c.name,
+          email: c.email,
+          phone: c.phoneE164,
+          phoneLabel: phoneLabel(c.phoneE164),
+        });
+        if (clients.length === 6) break;
+      }
+      res.json({ clients });
     }),
   );
   router.get(
@@ -641,6 +765,7 @@ export function adminRouter(
       res.render('admin/edit', {
         isNew: true,
         catalog: await repository.catalog(),
+        today: DateTime.now().setZone(ZONE).toISODate(),
         form: {
           date:
             typeof req.query.date === 'string'
@@ -688,25 +813,63 @@ export function adminRouter(
     asyncRoute(async (req, res) => {
       const data = await admins.detail(id.parse(req.params.id));
       if (!data) throw new BookingError('NOT_FOUND', 'Booking not found.', 404);
-      const proofs = await repository.proofs(data.booking.id);
+      const booking = data.booking;
+      const [proofs, attempts, jobs, visits, { settings }] = await Promise.all([
+        repository.proofs(booking.id),
+        repository.attempts(booking.id),
+        repository.bookingJobs(booking.id),
+        admins.clientVisits(data.client, booking.id),
+        repository.catalog(),
+      ]);
+      const price = decode(booking.priceSnapshot);
+      const refundJobs = jobs.filter((j) => j.type === 'refundConflict');
+      const pendingProof = proofs.find((p) => p.status === 'pending');
+      const actions = appointmentActions({
+        booking,
+        payments: data.payments,
+        proofs,
+        attempts,
+        refundJobs,
+        consultation: price.consultation,
+      });
+      const names = new Map();
+      for (const adminId of new Set(data.audits.map((a) => a.adminId)))
+        if (adminId)
+          names.set(adminId, (await admins.adminById(adminId))?.name);
+      const b = settings.business;
       res.render('admin/detail', {
         ...data,
-        paymentSource: bookingPaymentSource(
-          data.booking,
-          data.payments,
-          proofs,
-        ),
-        pendingProof: proofs.find((p) => p.status === 'pending'),
-        audits: data.audits.map((entry) => ({
-          ...entry,
-          changes: auditChanges(entry),
-        })),
-        price: decode(data.booking.priceSnapshot),
-        manageUrl: `${config.APP_URL.replace(/\/$/, '')}/booking/${accessToken(data.booking.ref, config.SESSION_SECRET)}`,
-        refundJobs: (await repository.bookingJobs(data.booking.id)).filter(
-          (j) => j.type === 'refundConflict',
-        ),
+        price,
         proofs,
+        pendingProof,
+        refundJobs,
+        actions,
+        visits,
+        statusLabel:
+          pendingProof && booking.status === 'pending_payment'
+            ? 'Payment to review'
+            : statusLabels[booking.status],
+        openBooking: ['pending_payment', 'confirmed', 'completed'].includes(
+          booking.status,
+        ),
+        paymentSource: bookingPaymentSource(booking, data.payments, proofs),
+        history: appointmentHistory({
+          ...data,
+          proofs,
+          money,
+          adminName: (key) => names.get(key) || 'Owner',
+          audits: data.audits.map((entry) => ({
+            ...entry,
+            changes: auditChanges(entry),
+          })),
+        }),
+        version: appointmentVersion({ ...data, proofs, refundJobs, actions }),
+        manageUrl: `${config.APP_URL.replace(/\/$/, '')}/booking/${accessToken(booking.ref, config.SESSION_SECRET)}`,
+        directions:
+          'https://www.google.com/maps/search/?api=1&query=' +
+          encodeURIComponent(
+            `${b.street}, ${b.city}, ${b.region} ${b.postalCode}`,
+          ),
       });
     }),
   );
@@ -799,9 +962,17 @@ export function adminRouter(
         req,
         res,
         `/admin/bookings/${bookingId}`,
-        ['resend', 'balance-link'].includes(input.action)
-          ? 'Email queued. Delivery is enabled in Milestone 7.'
-          : 'Booking updated.',
+        {
+          resend: 'Confirmation email on its way.',
+          'balance-link': 'Balance link on its way.',
+          payment: 'Payment recorded.',
+          refund: 'Refund saved.',
+          note: 'Note saved.',
+          cancel: 'Appointment cancelled.',
+          complete: 'Marked completed.',
+          'no-show': 'Marked no-show.',
+          confirm: 'Appointment confirmed.',
+        }[input.action],
       );
     }),
   );

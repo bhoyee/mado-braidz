@@ -24,6 +24,11 @@ if (regions().length) {
     ) ||
     Boolean(region.querySelector('button:disabled')) ||
     Boolean(document.querySelector('dialog[open]')) ||
+    [...document.querySelectorAll('[data-live-guard]')].some(
+      (field) =>
+        field === document.activeElement || field.value !== field.defaultValue,
+    ) ||
+    Boolean(document.querySelector('[data-owner-form][aria-busy]')) ||
     (!getSelection().isCollapsed && region.contains(getSelection().anchorNode));
   function swap(region, next) {
     const html = next.innerHTML;

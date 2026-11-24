@@ -962,3 +962,7 @@ A submitted transfer that the owner has not reviewed by its deadline is extended
 ## Owner amendment — calendar (November 24, 2026)
 
 Calendar colours match the portal status badges, and a submitted transfer shows as Payment to review. Cancelled and expired visits are hidden unless the owner chooses Show cancelled. Opening hours and time blocks are shaded, appointments refresh quietly every 15 seconds, and selecting one opens its details with view, review and call actions. A seven-day list is the default on phones. Blocking time from the calendar and chairs-used counts stay deferred.
+
+## Owner amendment — appointment pages (November 24, 2026)
+
+The appointment book opens on upcoming visits, nearest first, with Today, Upcoming, Needs review, Balance due, Past, Cancelled and All tabs, 25 per page. New and edited appointments load free times automatically with chairs left, keep a live summary in view, and can fill in an existing client. The details page offers only actions that can succeed, confirms each in its own window, refreshes when something changes (never while the owner is typing), and shows one readable history and the client's other visits. Visits match by email or phone because each booking keeps its own client record. Booking rules stay in bookingService.

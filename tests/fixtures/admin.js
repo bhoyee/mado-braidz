@@ -38,6 +38,32 @@ export function memoryAdminRepository(bookings, owner) {
         release();
       }
     },
+    count: async (options) =>
+      (await repository.list({ ...options, limit: null, offset: 0 })).length,
+    searchClients: async (query) =>
+      bookings.clients
+        .map((client, index) => ({ id: index + 1, ...client }))
+        .filter((c) =>
+          [c.name, c.email, c.phoneE164].some((v) =>
+            v.toLowerCase().includes(query.toLowerCase()),
+          ),
+        ),
+    clientVisits: async (client, exceptId) => {
+      const rows = bookings.rows.filter((b) => {
+        const other = bookings.clients[b.clientId - 1];
+        return (
+          other.email === client.email || other.phoneE164 === client.phoneE164
+        );
+      });
+      return {
+        completed: rows.filter((b) => b.status === 'completed').length,
+        noShows: rows.filter((b) => b.status === 'no_show').length,
+        rows: rows
+          .filter((b) => b.id !== exceptId)
+          .slice(0, 4)
+          .map((b) => ({ ...b, styleName: 'Knotless Braids' })),
+      };
+    },
     list: async ({
       from,
       to,
@@ -50,6 +76,9 @@ export function memoryAdminRepository(bookings, owner) {
       liveAt,
       balanceOnly = false,
       upcomingAt,
+      statuses,
+      reviewOnly = false,
+      now = new Date(),
     } = {}) =>
       bookings.rows
         .filter(
@@ -57,6 +86,11 @@ export function memoryAdminRepository(bookings, owner) {
             (!from || b.startAt >= from) &&
             (!to || b.startAt < to) &&
             (!status || b.status === status) &&
+            (!statuses || statuses.includes(b.status)) &&
+            (!reviewOnly ||
+              bookings.proofRows?.some(
+                (p) => p.bookingId === b.id && p.status === 'pending',
+              )) &&
             (!upcomingAt ||
               b.status === 'confirmed' ||
               (b.status === 'pending_payment' &&
@@ -96,9 +130,14 @@ export function memoryAdminRepository(bookings, owner) {
           ),
         )
         .sort((a, b) =>
-          order === 'nearest'
-            ? a.booking.startAt - b.booking.startAt
-            : b.booking.startAt - a.booking.startAt,
+          order === 'smart' &&
+          a.booking.startAt >= now !== b.booking.startAt >= now
+            ? Number(b.booking.startAt >= now) -
+              Number(a.booking.startAt >= now)
+            : order === 'nearest' ||
+                (order === 'smart' && a.booking.startAt >= now)
+              ? a.booking.startAt - b.booking.startAt
+              : b.booking.startAt - a.booking.startAt,
         )
         .slice(offset, limit === null ? undefined : offset + limit),
     receipts: async ({ from, to, offset = 0, limit = 101 }) =>
