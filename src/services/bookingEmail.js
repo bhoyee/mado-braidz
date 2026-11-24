@@ -86,7 +86,7 @@ function paidLabel(booking, payments, owner) {
 function rejectedSection(booking, snapshot, payload) {
   const rows = [
     {
-      label: `${methods[payload.method] || 'Transfer'} payment not verified`,
+      label: `${methods[payload.method] || 'Transfer'} payment ${payload.template === 'payment-review-expired' ? 'sent, not yet verified' : 'not verified'}`,
       value: usd(payload.amountCents),
       color: WARN,
       strong: true,
@@ -234,6 +234,12 @@ export function ownerBookingMail(kind, detail, extras = {}, appUrl, payload) {
     booking_rescheduled: booking.status === 'confirmed',
     booking_cancelled: booking.status === 'cancelled',
     payment_review: proof?.status === 'pending',
+    payment_review_reminder:
+      proof?.status === 'pending' && booking.status === 'pending_payment',
+    payment_review_urgent:
+      proof?.status === 'pending' && booking.status === 'pending_payment',
+    payment_review_expired:
+      proof?.status === 'pending' && booking.status === 'expired',
   }[kind];
   if (!allowed) return null;
   const name = oneLine(client.name) || 'Client';
@@ -258,7 +264,17 @@ export function ownerBookingMail(kind, detail, extras = {}, appUrl, payload) {
   const footer = [`Booking code ${oneLine(booking.ref)}.`, origin]
     .filter(Boolean)
     .join(' ');
-  if (kind === 'payment_review') {
+  if (kind.startsWith('payment_review')) {
+    const ended = kind === 'payment_review_expired';
+    const prefix =
+      {
+        payment_review_reminder: 'Reminder: ',
+        payment_review_urgent: 'Urgent: ',
+      }[kind] || '';
+    const extendable =
+      !extras.extended &&
+      booking.holdExpiresAt &&
+      booking.holdExpiresAt < booking.startAt;
     const method = methods[proof.method] || 'payment';
     const balance = proof.paymentType === 'balance';
     const deadline =
@@ -268,24 +284,43 @@ export function ownerBookingMail(kind, detail, extras = {}, appUrl, payload) {
       ? Math.max(0, booking.balanceCents - proof.amountCents)
       : Math.max(0, total - proof.amountCents);
     return {
-      subject: `Review ${method} payment: ${name}, ${usd(proof.amountCents)}`,
-      preview: deadline
-        ? `Not confirmed yet. Chair held until ${et(booking.holdExpiresAt, SHORT)}`
-        : `${balance ? 'Balance payment' : 'Payment'} for ${when}`,
-      badge: 'Review payment',
+      subject: ended
+        ? `Hold ended: check ${method} for ${name}, ${usd(proof.amountCents)}`
+        : prefix +
+          (prefix
+            ? `review ${method} payment: ${name}, ${usd(proof.amountCents)}`
+            : `Review ${method} payment: ${name}, ${usd(proof.amountCents)}`),
+      preview: ended
+        ? 'Not reviewed in time. The chair has been released.'
+        : deadline
+          ? `Not confirmed yet. Chair held until ${et(booking.holdExpiresAt, SHORT)}`
+          : `${balance ? 'Balance payment' : 'Payment'} for ${when}`,
+      badge: ended
+        ? 'Hold ended'
+        : prefix
+          ? prefix.slice(0, -2)
+          : 'Review payment',
       tone: amber,
-      kicker: balance
-        ? 'Balance payment not recorded yet'
-        : 'Not confirmed yet',
+      kicker: ended
+        ? 'The chair has been released'
+        : balance
+          ? 'Balance payment not recorded yet'
+          : 'Not confirmed yet',
       heading: `Check your ${method} for ${usd(proof.amountCents)}`,
       subheading: deadline
         ? `Review by ${et(booking.holdExpiresAt, STAMP)} Eastern`
         : '',
-      intro:
-        'The client uploaded a payment screenshot. Make sure the money reached your account before you approve.' +
-        (deadline
-          ? ' The chair is released if you don’t review it in time.'
-          : ''),
+      intro: ended
+        ? 'This payment was not reviewed in time. Check whether the money arrived, then call the client. You can still approve it if the time is free.'
+        : (kind === 'payment_review_urgent'
+            ? 'This payment was not reviewed in time, so the chair is being held a little longer. '
+            : 'The client uploaded a payment screenshot. ') +
+          'Make sure the money reached your account before you approve.' +
+          (!deadline
+            ? ''
+            : extendable
+              ? ' If you don’t review it by then, the hold is extended once by up to 24 hours.'
+              : ' The chair is released if you don’t review it by then.'),
       sections: [
         {
           title: 'Payment',
@@ -327,9 +362,10 @@ export function ownerBookingMail(kind, detail, extras = {}, appUrl, payload) {
         style,
         note,
       ].filter(Boolean),
-      actions: [{ label: 'Review payment', href: portal }, call].filter(
-        Boolean,
-      ),
+      actions: (ended
+        ? [call, { label: 'Open booking', href: portal }]
+        : [{ label: 'Review payment', href: portal }, call]
+      ).filter(Boolean),
       footer:
         'Sign in to see the screenshot and approve or reject it. ' + footer,
     };
@@ -376,6 +412,7 @@ const customer = {
   'booking-confirmation': { badge: 'Confirmed', prep: true, where: true },
   'payment-submitted': { badge: 'Awaiting verification', tone: amber },
   'payment-rejected': { badge: 'Not verified', tone: amber },
+  'payment-review-expired': { badge: 'Hold ended', tone: amber },
   'booking-rescheduled': { badge: 'Rescheduled', prep: true, where: true },
   'reminder-48': { badge: 'Reminder', prep: true, where: true },
   'reminder-morning': { badge: 'Today', prep: true, where: true },
@@ -467,7 +504,8 @@ export function customerBookingMail(
   }
   const name = firstName(client);
   const call = { label: 'Call the studio', href: 'tel:' + business.phone };
-  const rejected = template === 'payment-rejected';
+  const lapsed = template === 'payment-review-expired';
+  const rejected = template === 'payment-rejected' || lapsed;
   const line = reminder
     ? when === 'today'
       ? 'see you today'
@@ -479,7 +517,7 @@ export function customerBookingMail(
   const submitted = template === 'payment-submitted' && extras.proof;
   if (submitted && submitted.paymentType !== 'balance')
     message += ` Your booking is not confirmed yet.${booking.holdExpiresAt ? ` Your chair is held until ${et(booking.holdExpiresAt, STAMP)} Eastern.` : ''}`;
-  if (rejected)
+  if (rejected && !lapsed)
     message +=
       payload.paymentType === 'balance'
         ? ' Your appointment is still confirmed and your balance remains due.'

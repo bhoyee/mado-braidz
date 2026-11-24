@@ -59,6 +59,24 @@ await save(
     proof: proofOf('zelle', { paymentType: 'balance', amountCents: 19000 }),
   }),
 );
+for (const [kind, title, booking, extra] of [
+  ['payment_review_reminder', 'review reminder', {}, {}],
+  [
+    'payment_review_urgent',
+    'urgent review',
+    { holdExpiresAt: new Date('2026-11-26T00:20:00Z') },
+    { extended: true },
+  ],
+  ['payment_review_expired', 'hold ended', { status: 'expired' }, {}],
+])
+  await save(
+    'owner-' + kind.replaceAll('_', '-'),
+    'Owner: ' + title,
+    ...owner(kind, sampleDetail({ ...awaitingReview, ...booking }), {
+      proof: proofOf('cashapp'),
+      ...extra,
+    }),
+  );
 await save(
   'owner-rescheduled',
   'Owner: rescheduled',
@@ -76,6 +94,7 @@ await save(
 for (const template of [
   'payment-submitted',
   'payment-rejected',
+  'payment-review-expired',
   'booking-confirmation',
   'booking-rescheduled',
   'booking-cancelled',
@@ -95,6 +114,7 @@ for (const template of [
     ...(['booking-cancelled', 'payment-rejected'].includes(template)
       ? { status: 'cancelled' }
       : {}),
+    ...(template === 'payment-review-expired' ? { status: 'expired' } : {}),
     ...(template === 'payment-conflict' ? { status: 'payment_conflict' } : {}),
   });
   detail.booking.manageTokenHash = tokenHash(

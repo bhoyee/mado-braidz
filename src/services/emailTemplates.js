@@ -13,6 +13,11 @@ export const emailTemplates = {
     intro:
       'Thank you. The studio is checking your transfer and will email you once it is verified. Please do not pay again.',
   },
+  'payment-review-expired': {
+    subject: 'Your appointment hold has ended',
+    intro:
+      'We are sorry: the studio had not finished checking your transfer before your hold ended, so your time has been released. If you sent the money, please call us so we can find it and arrange your visit. Please do not pay again.',
+  },
   'payment-rejected': {
     subject: 'We could not verify your payment',
     intro:

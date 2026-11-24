@@ -503,6 +503,100 @@ function paymentLifecycle(repository, clock) {
         return true;
       });
     },
+    // Ends an unpaid hold. A transfer the owner has not reviewed yet gets one
+    // extra day, never past the appointment, before the chair is released.
+    async expireHold(id) {
+      return locked(id, async (tx, booking, now) => {
+        const due = booking.holdExpiresAt;
+        if (
+          booking.status !== 'pending_payment' ||
+          !due ||
+          due > now.plus({ minutes: 10 }).toJSDate()
+        )
+          return 'none';
+        const proof = (await tx.proofs(id)).find(
+          (p) => p.status === 'pending' && p.paymentType !== 'balance',
+        );
+        if (proof) {
+          const extended = (await tx.bookingJobs(id)).some((job) => {
+            const payload = decode(job.payload);
+            return (
+              payload.template === 'review-extended' &&
+              payload.proofId === proof.id
+            );
+          });
+          const until = new Date(
+            Math.min(
+              Math.max(+due, now.toMillis()) + 24 * 3600000,
+              +booking.startAt,
+            ),
+          );
+          if (!extended && until > due && until > now.toJSDate()) {
+            const schedule = await tx.schedule(
+              booking.startAt,
+              booking.blockEndAt,
+            );
+            const catalog = await tx.catalog();
+            const free =
+              remainingCapacity(
+                DateTime.fromJSDate(booking.startAt, { zone: 'utc' }),
+                DateTime.fromJSDate(booking.blockEndAt, { zone: 'utc' }),
+                schedule.bookings.filter((b) => b.id !== id),
+                catalog.settings.booking.capacity,
+                now,
+              ) > 0 &&
+              !schedule.timeBlocks.some(
+                (b) =>
+                  b.startAt < booking.blockEndAt && b.endAt > booking.startAt,
+              );
+            if (free) {
+              await save(tx, booking, { holdExpiresAt: until }, now);
+              await tx.queueJob({
+                type: 'notification-marker',
+                payload: {
+                  bookingId: id,
+                  template: 'review-extended',
+                  proofId: proof.id,
+                },
+                dedupeKey: `review-extended:${proof.id}`,
+                runAt: now.toJSDate(),
+                status: 'done',
+              });
+              await tx.notify({
+                type: 'payment_review_urgent',
+                title: 'Urgent: payment still needs review',
+                body: booking.ref,
+                url: `/admin/bookings/${id}`,
+              });
+              return 'extended';
+            }
+          }
+        }
+        if (due > now.toJSDate()) return 'none';
+        await change(tx, booking, 'expired', now);
+        if (proof) {
+          await tx.notify({
+            type: 'payment_review_expired',
+            title: 'Hold ended before payment review',
+            body: booking.ref,
+            url: `/admin/bookings/${id}`,
+          });
+          await tx.queueJob({
+            type: 'email',
+            payload: {
+              bookingId: id,
+              template: 'payment-review-expired',
+              method: proof.method,
+              amountCents: proof.amountCents,
+            },
+            dedupeKey: `payment-review-expired:${proof.id}`,
+            runAt: now.toJSDate(),
+            status: 'pending',
+          });
+        }
+        return 'expired';
+      });
+    },
     async applyStripeEvent(event) {
       const object = event.data.object;
       let attempt =

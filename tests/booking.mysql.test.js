@@ -15,6 +15,7 @@ import { createDatabase } from '../src/db/index.js';
 import { createBookingRepository } from '../src/services/bookingRepository.js';
 import { createBookingService } from '../src/services/bookingService.js';
 import { memoryBookingRepository, validHold, now } from './fixtures/booking.js';
+import { createNotificationRepository } from '../src/services/notificationRepository.js';
 import * as s from '../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 
@@ -434,6 +435,49 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         balanceCents: 15000,
       });
       expect(await db.select().from(s.payments)).toHaveLength(1);
+    }, 30000);
+    it('extends an unreviewed transfer once under concurrent jobs, then releases it', async () => {
+      let time = now;
+      const service = createBookingService(
+        repository,
+        () => time,
+        paymentConfig.SESSION_SECRET,
+      );
+      const mail = createNotificationRepository(db);
+      const hold = await service.createHold(validHold);
+      const proof = await service.submitPaymentProof(hold.id, {
+        method: 'zelle',
+        path: 'private.webp',
+      });
+      expect(await mail.pendingReviews()).toMatchObject([
+        { proofId: proof.id, bookingId: hold.id, ref: hold.ref },
+      ]);
+      expect((await mail.emailContext(hold.id)).extended).toBe(false);
+      time = now.plus({ hours: 24, minutes: 1 });
+      const results = await Promise.all(
+        Array.from({ length: 4 }, () => service.expireHold(hold.id)),
+      );
+      expect(results.filter((x) => x === 'extended')).toHaveLength(1);
+      expect((await mail.emailContext(hold.id)).extended).toBe(true);
+      const urgent = () =>
+        db
+          .select()
+          .from(s.notifications)
+          .where(eq(s.notifications.type, 'payment_review_urgent'));
+      expect(await urgent()).toHaveLength(1);
+      time = now.plus({ hours: 48, minutes: 30 });
+      const ended = await Promise.all(
+        Array.from({ length: 4 }, () => service.expireHold(hold.id)),
+      );
+      expect(ended.filter((x) => x === 'expired')).toHaveLength(1);
+      const [booking] = await db.select().from(s.bookings);
+      expect(booking).toMatchObject({ status: 'expired', paidCents: 0 });
+      const emails = (await db.select().from(s.jobs)).filter((j) =>
+        j.dedupeKey.startsWith('payment-review-expired:'),
+      );
+      expect(emails).toHaveLength(1);
+      expect(await mail.pendingReviews()).toEqual([]);
+      expect(await db.select().from(s.payments)).toHaveLength(0);
     }, 30000);
     it('records one payment when the webhook and the recovery check race', async () => {
       const provider = fakeStripe();

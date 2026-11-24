@@ -62,7 +62,7 @@ export function createNotificationRepository(db) {
       };
     },
     async emailContext(bookingId) {
-      const [payments, proofs] = await Promise.all([
+      const [payments, proofs, markers] = await Promise.all([
         db.select().from(s.payments).where(eq(s.payments.bookingId, bookingId)),
         db
           .select()
@@ -75,8 +75,43 @@ export function createNotificationRepository(db) {
           )
           .orderBy(desc(s.paymentProofs.id))
           .limit(1),
+        db
+          .select({ dedupeKey: s.jobs.dedupeKey })
+          .from(s.jobs)
+          .where(
+            and(
+              eq(s.jobs.type, 'notification-marker'),
+              sql`JSON_EXTRACT(${s.jobs.payload}, '$.bookingId') = ${bookingId}`,
+            ),
+          ),
       ]);
-      return { payments, proof: proofs[0] };
+      return {
+        payments,
+        proof: proofs[0],
+        extended: markers.some(
+          (m) => m.dedupeKey === `review-extended:${proofs[0]?.id}`,
+        ),
+      };
+    },
+    // Transfers waiting for the owner while the chair is still held.
+    async pendingReviews() {
+      return db
+        .select({
+          proofId: s.paymentProofs.id,
+          submittedAt: s.paymentProofs.createdAt,
+          bookingId: s.bookings.id,
+          ref: s.bookings.ref,
+          holdExpiresAt: s.bookings.holdExpiresAt,
+        })
+        .from(s.paymentProofs)
+        .innerJoin(s.bookings, eq(s.paymentProofs.bookingId, s.bookings.id))
+        .where(
+          and(
+            eq(s.paymentProofs.status, 'pending'),
+            sql`${s.paymentProofs.paymentType} <> 'balance'`,
+            eq(s.bookings.status, 'pending_payment'),
+          ),
+        );
     },
     async client(id) {
       return (await db.select().from(s.clients).where(eq(s.clients.id, id)))[0];

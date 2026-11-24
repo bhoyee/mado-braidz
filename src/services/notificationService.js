@@ -104,6 +104,14 @@ export function createNotificationService(
   async function eligible(job, state) {
     const p = decode(job.payload);
     if (p.expiresAt && new Date(p.expiresAt) <= clock()) return false;
+    // A review reminder is pointless once the owner has decided.
+    if (p.reviewBookingId) {
+      const held = await repository.detail(p.reviewBookingId);
+      return (
+        held?.booking.status === 'pending_payment' &&
+        Boolean((await repository.emailContext?.(p.reviewBookingId))?.proof)
+      );
+    }
     if (!p.bookingId) return true;
     const detail = await repository.detail(p.bookingId);
     if (!detail) return false;
@@ -128,6 +136,8 @@ export function createNotificationService(
         (await repository.emailContext?.(p.bookingId))?.proof?.id === p.proofId
       );
     // The owner may have confirmed the client another way in the meantime.
+    if (p.template === 'payment-review-expired')
+      return booking.status === 'expired';
     if (p.template === 'payment-rejected')
       return p.paymentType === 'balance' || booking.status !== 'confirmed';
     if (p.template === 'thank-you') return booking.status === 'completed';
@@ -265,6 +275,22 @@ export function createNotificationService(
               );
         }
       }
+      for (const review of (await repository.pendingReviews?.()) ?? []) {
+        const left = +review.holdExpiresAt - +now;
+        // After downtime only the most pressing reminder is sent.
+        const hours = [1, 6].find((h) => left > 0 && left <= h * 3600000);
+        const dueAt = +review.holdExpiresAt - hours * 3600000;
+        if (hours && dueAt > +review.submittedAt)
+          await repository.notifyOnce(
+            `review-reminder:${review.proofId}:${hours}:${+review.holdExpiresAt}`,
+            {
+              type: 'payment_review_reminder',
+              title: `Payment needs review within ${hours === 1 ? '1 hour' : `${hours} hours`}`,
+              body: review.ref,
+              url: `/admin/bookings/${review.bookingId}`,
+            },
+          );
+      }
       for (const job of await repository.pending())
         if (!(await eligible(job, state))) {
           // Future reminders are valid even though they are not due yet.
@@ -335,6 +361,15 @@ export function createNotificationService(
               notificationId: notification.id,
               body: notification.title,
               url: notification.url,
+              ...(['payment_review_reminder', 'payment_review_urgent'].includes(
+                notification.type,
+              )
+                ? {
+                    reviewBookingId: Number(
+                      /(\d+)$/.exec(notification.url)?.[1],
+                    ),
+                  }
+                : {}),
             },
             `owner-notification:${notification.id}`,
           );

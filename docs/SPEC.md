@@ -954,3 +954,7 @@ Tool-neutral SEO: owner-editable page titles and descriptions, verification meta
 ## Owner amendment — guide videos (November 23, 2026)
 
 Each admin page may have a YouTube guide video configured in code. It opens in a small floating player that never blocks the page, can be moved, enlarged, minimised or closed, and closes when the page changes. Nothing loads from YouTube before the owner asks; the public site is unaffected.
+
+## Owner amendment — unreviewed transfers (November 23, 2026)
+
+A submitted transfer that the owner has not reviewed by its deadline is extended once by up to 24 hours, never past the appointment and only with free capacity, under the booking date lock. Owners get reminders 6 hours and 1 hour before each deadline and an urgent alert on extension. If still unreviewed, the chair is released and the client and owner are emailed. No money is recorded without owner approval.
