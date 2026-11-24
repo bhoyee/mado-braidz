@@ -1,4 +1,3 @@
-import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { paymentPages } from './routes/public/paymentPages.js';
 import { manualMethods } from './routes/public/paymentPortal.js';
 import {
@@ -15,6 +14,7 @@ import { createCatalogService } from './services/catalogService.js';
 import { publicRouter, money } from './routes/public/index.js';
 import { designRouter } from './routes/admin/design.js';
 import { methodName } from './services/adminAppointment.js';
+import { phoneLabel } from './services/adminCalendar.js';
 import { adminRouter } from './routes/admin/index.js';
 import { createAdminRepository } from './services/adminRepository.js';
 import { createManagementService } from './services/managementService.js';
@@ -259,13 +259,7 @@ export function createApp({
   );
   views.addFilter('money', money);
   views.addFilter('payMethod', methodName);
-  views.addFilter('phone', (value) => {
-    const phone = parsePhoneNumberFromString(String(value || ''));
-    if (!phone) return value;
-    return phone.country === 'US'
-      ? phone.formatNational()
-      : phone.formatInternational();
-  });
+  views.addFilter('phone', phoneLabel);
   views.addFilter('et', (value, format = 'ccc, LLL d · h:mm a') =>
     value
       ? DateTime.fromJSDate(new Date(value), {

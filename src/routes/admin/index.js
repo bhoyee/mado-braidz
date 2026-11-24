@@ -1,5 +1,10 @@
 import { guideFor } from '../../config/guideVideos.js';
 import { bookingPaymentSource } from '../../services/adminAppointment.js';
+import {
+  calendarBlock,
+  calendarBooking,
+  showOnCalendar,
+} from '../../services/adminCalendar.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { DateTime } from 'luxon';
@@ -494,7 +499,13 @@ export function adminRouter(
       res.end();
     }),
   );
-  router.get('/calendar', (_req, res) => res.render('admin/calendar'));
+  router.get(
+    '/calendar',
+    asyncRoute(async (_req, res) => {
+      const { settings } = await repository.catalog();
+      res.render('admin/calendar', { hours: settings.hours.weekly });
+    }),
+  );
   router.get(
     '/audit',
     asyncRoute(async (req, res) => {
@@ -542,31 +553,20 @@ export function adminRouter(
           'INVALID_RANGE',
           'Choose a calendar range of 62 days or less.',
         );
-      const rows = await admins.list({
-        from: start.toJSDate(),
-        to: end.toJSDate(),
-        limit: 2000,
-      });
-      res.json(
-        rows
-          .filter(
-            ({ booking: b }) =>
-              b.status !== 'pending_payment' || b.holdExpiresAt > new Date(),
-          )
-          .map(({ booking: b, client: c }) => ({
-            id: b.id,
-            title: `${c.name} · ${decode(b.priceSnapshot).styleName}`,
-            start: b.startAt.toISOString(),
-            end: b.endAt.toISOString(),
-            url: `/admin/bookings/${b.id}`,
-            editable: ['confirmed', 'pending_payment'].includes(b.status),
-            classNames: [`status-${b.status}`],
-            extendedProps: {
-              status: b.status,
-              updatedAt: b.updatedAt.toISOString(),
-            },
-          })),
-      );
+      const [rows, { timeBlocks }] = await Promise.all([
+        admins.list({
+          from: start.toJSDate(),
+          to: end.toJSDate(),
+          limit: 2000,
+          order: 'nearest',
+        }),
+        repository.schedule(start.toJSDate(), end.toJSDate()),
+      ]);
+      const now = new Date();
+      res.json([
+        ...rows.filter((row) => showOnCalendar(row, now)).map(calendarBooking),
+        ...timeBlocks.map(calendarBlock),
+      ]);
     }),
   );
   router.post(

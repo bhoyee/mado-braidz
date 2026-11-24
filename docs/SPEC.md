@@ -958,3 +958,7 @@ Each admin page may have a YouTube guide video configured in code. It opens in a
 ## Owner amendment — unreviewed transfers (November 23, 2026)
 
 A submitted transfer that the owner has not reviewed by its deadline is extended once by up to 24 hours, never past the appointment and only with free capacity, under the booking date lock. Owners get reminders 6 hours and 1 hour before each deadline and an urgent alert on extension. If still unreviewed, the chair is released and the client and owner are emailed. No money is recorded without owner approval.
+
+## Owner amendment — calendar (November 24, 2026)
+
+Calendar colours match the portal status badges, and a submitted transfer shows as Payment to review. Cancelled and expired visits are hidden unless the owner chooses Show cancelled. Opening hours and time blocks are shaded, appointments refresh quietly every 15 seconds, and selecting one opens its details with view, review and call actions. A seven-day list is the default on phones. Blocking time from the calendar and chairs-used counts stay deferred.

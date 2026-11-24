@@ -218,7 +218,9 @@ try {
       if (route === '/admin/calendar') {
         await page.locator('.fc-view-harness').waitFor();
         await page.waitForTimeout(500);
-        assert.ok((await page.locator('.fc-timegrid-slot').count()) > 0);
+        if (width === 1440)
+          assert.ok((await page.locator('.fc-timegrid-slot').count()) > 0);
+        else assert.ok((await page.locator('.fc-list').count()) > 0);
       }
       const overflowing = await page.evaluate(() =>
         [...document.querySelectorAll('body *')]
