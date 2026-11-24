@@ -1121,7 +1121,10 @@ export function managementRouter(service, config) {
     };
   });
   settingsPage('/settings/health', 'settings-health', async () => ({
-    checks: healthChecks(await service.health(), config),
+    checks: healthChecks(
+      await service.health(new Date(config.NOTIFICATIONS_START_AT || 0)),
+      config,
+    ),
   }));
   const saveSection = (path, schema, values) =>
     router.post(

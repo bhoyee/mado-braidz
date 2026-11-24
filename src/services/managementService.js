@@ -1,6 +1,6 @@
 import { ManagementConfirm, ManagementError } from './managementErrors.js';
 import { outsideHours, weekSummary } from './openingHours.js';
-import { and, eq, desc, asc, inArray, sql, lt, gt } from 'drizzle-orm';
+import { and, eq, desc, asc, inArray, sql, lt, gt, gte, or } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { studioVideos } from './studioVideos.js';
 import { DateTime } from 'luxon';
@@ -1014,30 +1014,51 @@ export function createManagementService(db, clock = () => new Date()) {
         .where(eq(s.admins.role, 'owner'))
         .orderBy(asc(s.admins.id)),
     // Only facts this site can check for itself.
-    async health() {
+    async health(cutoff = new Date(0)) {
       const now = clock();
       const day = new Date(+now - 86400000);
-      const [late, failed, lastDone, emails, lastEmail, lastEvent, alerts] =
+      const overdue = and(
+        eq(s.jobs.status, 'pending'),
+        lt(s.jobs.runAt, new Date(+now - 20 * 60000)),
+      );
+      // The same rule the sender uses: messages from before email was switched
+      // on stay unsent on purpose, so they are not late.
+      const sendable = or(
+        eq(s.jobs.type, 'refundConflict'),
+        gte(s.jobs.createdAt, cutoff),
+        and(
+          inArray(s.jobs.type, ['reminder', 'winback']),
+          gte(s.jobs.runAt, cutoff),
+        ),
+      );
+      const [late, failed, heartbeat, emails, lastEmail, lastEvent, alerts] =
         await Promise.all([
+          db
+            .select({ count: sql`COUNT(*)` })
+            .from(s.jobs)
+            .where(and(overdue, sendable)),
           db
             .select({ count: sql`COUNT(*)` })
             .from(s.jobs)
             .where(
               and(
-                eq(s.jobs.status, 'pending'),
-                lt(s.jobs.runAt, new Date(+now - 20 * 60000)),
+                eq(s.jobs.status, 'failed'),
+                gt(s.jobs.runAt, day),
+                sendable,
+                inArray(s.jobs.type, [
+                  'email',
+                  'reminder',
+                  'winback',
+                  'push',
+                  'whatsapp',
+                  'refundConflict',
+                ]),
               ),
             ),
           db
-            .select({ count: sql`COUNT(*)` })
-            .from(s.jobs)
-            .where(and(eq(s.jobs.status, 'failed'), gt(s.jobs.runAt, day))),
-          db
-            .select({ at: s.jobs.runAt })
-            .from(s.jobs)
-            .where(eq(s.jobs.status, 'done'))
-            .orderBy(desc(s.jobs.runAt))
-            .limit(1),
+            .select({ at: s.settings.updatedAt })
+            .from(s.settings)
+            .where(eq(s.settings.key, 'jobs_heartbeat')),
           db
             .select({
               failed: sql`COALESCE(SUM(${s.emailLog.status} IN ('failed','unknown','bounced','blocked')), 0)`,
@@ -1068,7 +1089,7 @@ export function createManagementService(db, clock = () => new Date()) {
       return {
         late: Number(late[0].count),
         failed: Number(failed[0].count),
-        lastJob: lastDone[0]?.at || null,
+        lastRun: heartbeat[0]?.at || null,
         emailsSent: Number(emails[0].sent),
         emailsFailed: Number(emails[0].failed),
         lastEmail: lastEmail[0]?.at || null,

@@ -71,6 +71,13 @@
       "when": 1795151696490,
       "tag": "0009_moaning_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1795532464916,
+      "tag": "0010_notification_reads",
+      "breakpoints": true
     }
   ]
 }

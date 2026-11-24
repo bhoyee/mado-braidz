@@ -299,9 +299,97 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         keys: { p256dh: 'key', auth: 'auth' },
       };
       await repo.saveSubscription(1, input);
-      await expect(repo.saveSubscription(2, input)).rejects.toThrow();
+      await expect(
+        repo.saveSubscription(2, {
+          ...input,
+          keys: { p256dh: 'other', auth: 'other' },
+        }),
+      ).rejects.toThrow();
       await repo.deleteSubscription(input.endpoint, 2);
       expect(await repo.subscriptions(1)).toHaveLength(1);
+      // The same browser, now signed in as the other owner.
+      await repo.saveSubscription(2, input, 'iPhone · Safari');
+      expect(await repo.subscriptions(1)).toHaveLength(0);
+      const [moved] = await repo.subscriptions(2);
+      expect(moved.label).toBe('iPhone · Safari');
+      await repo.removeDevice(moved.id, 1);
+      expect(await repo.subscriptions(2)).toHaveLength(1);
+      await repo.removeDevice(moved.id, 2);
+      expect(await repo.subscriptions(2)).toHaveLength(0);
+    });
+    it('keeps read state per owner, filters, pages and undoes', async () => {
+      await db.delete(s.notifications);
+      for (let n = 0; n < 23; n++)
+        await repo.notify({
+          type: n % 2 ? 'booking_confirmed' : 'payment_review',
+          title: 'Update',
+          body: 'MADO-X' + n,
+          url: '/admin/bookings/999' + n,
+        });
+      const first = await repo.feed(1, {});
+      expect(first).toMatchObject({ total: 23, unread: 23, last: 2 });
+      expect(first.items).toHaveLength(20);
+      expect((await repo.feed(1, { page: 99 })).items).toHaveLength(3);
+      expect((await repo.feed(1, { view: 'bookings' })).total).toBe(11);
+      expect((await repo.feed(1, { view: 'payments' })).total).toBe(12);
+      const ids = await repo.markRead(1, null);
+      expect(ids).toHaveLength(23);
+      expect((await repo.feed(1, { view: 'unread' })).total).toBe(0);
+      expect((await repo.feed(2, { view: 'unread' })).total).toBe(23);
+      await repo.markUnread(1, ids.slice(0, 2));
+      expect((await repo.notifications(1)).unread).toBe(2);
+      const old = new Date(Date.now() - 100 * 86400000);
+      await db.update(s.notifications).set({ createdAt: old });
+      await repo.cleanup(new Date(), null);
+      // Owner 1 read all but two, so only the unread ones stay.
+      expect(await db.select().from(s.notifications)).toHaveLength(2);
+      await db.delete(s.notifications);
+    });
+    it('retries a refused message, and never one that may have arrived', async () => {
+      const add = async (key, lastError) => {
+        await repo.queue({
+          type: 'email',
+          payload: { template: 'admin-alert' },
+          dedupeKey: key,
+          runAt: new Date(),
+          status: 'failed',
+          attempts: 4,
+          lastError,
+        });
+        return (
+          await db.select().from(s.jobs).where(eq(s.jobs.dedupeKey, key))
+        )[0].id;
+      };
+      const plain = await add('fail-plain', 'Provider refused');
+      const unclear = await add('fail-unclear', 'timeout');
+      await repo.reserveLog({
+        deliveryKey: `job:${unclear}:abc`,
+        template: 'admin-alert',
+        toEmail: 'owner@example.test',
+        status: 'unknown',
+      });
+      expect(await repo.retryFailure(unclear)).toBe(false);
+      expect(await repo.retryFailure(plain)).toBe(true);
+      const [job] = await db.select().from(s.jobs).where(eq(s.jobs.id, plain));
+      expect(job).toMatchObject({ status: 'pending', attempts: 0 });
+      expect(await repo.dismissFailure(unclear)).toBe(true);
+      expect((await repo.needsYou()).failures).toEqual([]);
+      await db.update(s.jobs).set({ status: 'done' });
+    });
+    it('saves alert choices per owner and shares one lock with the timer', async () => {
+      await repo.saveAlertPreferences(1, { email: {}, quiet: true });
+      await repo.saveAlertPreferences(2, { email: {}, quiet: false });
+      const { settings } = await repo.context();
+      expect(settings.alerts.owners[1].quiet).toBe(true);
+      expect(settings.alerts.owners[2].quiet).toBe(false);
+      let inner;
+      expect(
+        await repo.withLock(async () => {
+          inner = await repo.withLock(async () => {});
+        }),
+      ).toBe(true);
+      expect(inner).toBe(false);
+      expect(await repo.withLock(async () => {})).toBe(true);
     });
     it('persists the sending state before a WhatsApp request and completes it without duplicate sends', async () => {
       await repo.notify({

@@ -371,3 +371,5 @@ For the public WhatsApp chat button, set `WHATSAPP_NUMBER` in the private `.env`
 New private environment variables: `BREVO_API_KEY`, `BREVO_WEBHOOK_SECRET`, `EMAIL_ENABLED` (default `false`), `EMAIL_REPLY_TO`, `NOTIFICATIONS_START_AT` (UTC activation time), and `VAPID_SUBJECT`. Existing `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, `EMAIL_FROM` and `ADMIN_ALERT_EMAILS` are used. Keep delivery disabled until the sending domain and owner inbox test are verified. Set the activation time before enabling delivery to avoid sending historical queued emails. Contact messages remain disabled until delivery is enabled.
 
 Styles are listed newest first automatically in the owner portal and public catalog. Editing a style keeps its position. Display-order fields are omitted from style and price-option forms; price options retain their existing order, with new options added at the end.
+
+Notifications: run `npm run db:migrate` for `0010_notification_reads.sql`. No new environment variables. `src/server.js` sends owner alerts right after a change; keep the five-minute `run-jobs.js` cron, which is the backup and sends everything else.

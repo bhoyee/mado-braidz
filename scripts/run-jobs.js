@@ -33,10 +33,12 @@ try {
       );
     const expired = await expireHolds(repository, bookings);
     await payments.runRefunds();
+    const messages = createNotificationRepository(db);
     const notifications = await createNotificationService(
-      createNotificationRepository(db),
+      messages,
       config,
     ).run();
+    await messages.heartbeat();
     console.log(
       `Email jobs: ${notifications.sent} sent, ${notifications.failed} need retry or review`,
     );

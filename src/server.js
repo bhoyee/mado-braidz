@@ -3,7 +3,7 @@ import { parseEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 const config = parseEnv();
 const logger = createLogger(config);
-const app = createApp({ config, logger });
+const app = createApp({ config, logger, instant: true });
 const server = app.listen(config.PORT, () =>
   logger.info({ port: config.PORT }, 'Mado African Braids is listening'),
 );

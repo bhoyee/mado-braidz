@@ -19,6 +19,7 @@ import { emailName } from './services/adminAppointmentDetail.js';
 import { adminRouter } from './routes/admin/index.js';
 import { createAdminRepository } from './services/adminRepository.js';
 import { createManagementService } from './services/managementService.js';
+import { instantAlerts } from './middleware/instantAlerts.js';
 import { contactRouter } from './routes/public/contact.js';
 import { createNotificationRepository } from './services/notificationRepository.js';
 import { createNotificationService } from './services/notificationService.js';
@@ -50,6 +51,7 @@ export function createApp({
   stripeProvider,
   catalog,
   logger = createLogger(config),
+  instant = false,
 } = {}) {
   const app = express();
   app.locals.whatsappUrl = config.WHATSAPP_NUMBER
@@ -70,6 +72,12 @@ export function createApp({
         config,
       )
     : null;
+  if (instant && notificationService?.deliverAlerts)
+    app.use(
+      instantAlerts(notificationService, (error) =>
+        logger.warn({ message: error.message }, 'Instant alerts unavailable'),
+      ),
+    );
   app.locals.contactEnabled = Boolean(
     notificationService &&
     config.EMAIL_ENABLED &&

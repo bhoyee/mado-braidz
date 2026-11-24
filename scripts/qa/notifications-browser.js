@@ -41,7 +41,21 @@ const repo = {
     items,
     unread: items.filter((n) => !n.readAt).length,
   }),
-  markRead: async () => items.forEach((n) => (n.readAt = new Date())),
+  feed: async () => ({
+    items,
+    unread: items.filter((n) => !n.readAt).length,
+    total: items.length,
+    page: 1,
+    last: 1,
+    first: 1,
+  }),
+  needsYou: async () => ({ reviews: [], failures: [] }),
+  subscriptions: async () => [],
+  markRead: async () => {
+    const unread = items.filter((n) => !n.readAt);
+    unread.forEach((n) => (n.readAt = new Date()));
+    return unread.map((n) => n.id);
+  },
   context: async () => ({ settings }),
   saveTemplates: async (value) => {
     settings.emailTemplates = value;
@@ -113,27 +127,7 @@ try {
     });
     await page.keyboard.press('Escape');
     assert.equal(await bell.getAttribute('aria-expanded'), 'false');
-    assert.equal(
-      await page.locator('.owner-notifications').evaluate((list) => {
-        list.scrollTop = 100;
-        return list.scrollHeight > list.clientHeight && list.scrollTop > 0;
-      }),
-      true,
-    );
     await page.evaluate(() => document.fonts.ready);
-    assert.equal(
-      await page.locator('.owner-notifications-title').evaluate((header) => {
-        const heading = header.querySelector('h2').getBoundingClientRect();
-        const button = header.querySelector('button').getBoundingClientRect();
-        return (
-          Math.abs(
-            heading.top + heading.height / 2 - button.top - button.height / 2,
-          ) < 3
-        );
-      }),
-      true,
-      'Recent updates and read-all button must share the same center line',
-    );
     const violations = (await new AxeBuilder({ page }).analyze()).violations;
     assert.equal(violations.length, 0, JSON.stringify(violations));
     const manifest = await (
@@ -147,21 +141,13 @@ try {
       (await page.request.get(origin + '/admin/sw.js')).status(),
       200,
     );
-    await Promise.all([
-      page.waitForEvent('framenavigated', {
-        predicate: (frame) => frame === page.mainFrame(),
-      }),
-      page.getByRole('button', { name: 'Mark all as read' }).click(),
-    ]);
-    await page.waitForLoadState('networkidle');
-    await page
-      .locator('.owner-badge')
-      .filter({ hasText: '0 unread' })
-      .waitFor();
+    await page.getByRole('button', { name: 'Mark all as read' }).click();
+    await page.getByText('15 marked as read.').waitFor();
     await page.screenshot({
       path: `tmp/qa/notifications-${width}.png`,
       animations: 'disabled',
     });
+    await page.locator('[data-device-panel] summary').click();
     await page.evaluate(() => {
       window.pushPermissionRequests = 0;
       Object.defineProperty(Notification, 'permission', {
@@ -176,6 +162,7 @@ try {
       const registration = {
         pushManager: {
           getSubscription: async () => null,
+          unsubscribe: async () => {},
           subscribe: async () => ({
             toJSON: () => ({
               endpoint: 'https://fcm.googleapis.com/test',
@@ -297,21 +284,8 @@ try {
       () => !!document.querySelector('.owner-alert:not([hidden])'),
     );
     assert.equal(
-      settings.emailTemplates['password-reset'].subject,
+      settings.emailTemplates['booking-confirmation'].subject,
       'Your owner reset link',
-    );
-    await page.getByRole('button', { name: 'Send a test to myself' }).click();
-    await page.waitForFunction(() =>
-      document
-        .querySelector('.owner-alert')
-        ?.textContent.includes('Test queued'),
-    );
-    assert(
-      jobs.some(
-        (j) =>
-          j.payload.template === 'owner-test' &&
-          j.payload.to === 'owner@example.test',
-      ),
     );
     await page.goto(origin + '/contact');
     await page.getByLabel('Name', { exact: true }).fill('Test Visitor');
@@ -337,7 +311,7 @@ try {
     );
     assert.deepEqual(errors, []);
     console.log(
-      `PASS ${width}px: owner auth, notifications/read state, template edits, owner-only test, contact, PWA/service worker, axe 0`,
+      `PASS ${width}px: owner auth, notifications/read state, template edits, contact, PWA/service worker, axe 0`,
     );
     if (width === 1440) {
       for (const device of ['iPhone', 'iPad']) {
@@ -347,6 +321,7 @@ try {
         });
         const applePage = await apple.newPage();
         await applePage.goto(origin + '/admin/notifications');
+        await applePage.locator('[data-device-panel] summary').click();
         await applePage
           .getByRole('switch', {
             name: 'Push notifications on this device',

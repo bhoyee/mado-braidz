@@ -1,5 +1,12 @@
 import { REMOVED_DOMAIN, personIds, wantsNews } from './clientGroups.js';
 import { DateTime } from 'luxon';
+import {
+  alertPreferences,
+  emailAllowed,
+  isUrgent,
+  pushAllowed,
+  quietUntil,
+} from './alerts.js';
 import * as webpush from 'web-push';
 import { createWhatsAppService } from './whatsappService.js';
 import { whatsappBookingMessage } from './whatsappBookingMessage.js';
@@ -170,6 +177,105 @@ export function createNotificationService(
       );
     return true;
   }
+  async function queueAlerts(list, state, now) {
+    for (const notification of list.filter((n) => n.createdAt >= cutoff())) {
+      if (
+        config.WHATSAPP_ALERTS_ENABLED &&
+        ['booking_confirmed', 'payment_review'].includes(notification.type) &&
+        notification.createdAt >= new Date(config.WHATSAPP_ALERTS_START_AT)
+      )
+        await queue(
+          'owner-whatsapp',
+          { notificationId: notification.id },
+          `whatsapp:${notification.id}`,
+          now,
+          'whatsapp',
+        );
+      await queue(
+        'push',
+        { notificationId: notification.id },
+        `push:${notification.id}`,
+        now,
+        'push',
+      );
+      if (emailAllowed(state.settings.alerts, notification.type))
+        await queue(
+          'admin-alert',
+          {
+            notificationId: notification.id,
+            body: notification.title,
+            url: notification.url,
+            ...(['payment_review_reminder', 'payment_review_urgent'].includes(
+              notification.type,
+            )
+              ? {
+                  reviewBookingId: Number(/(\d+)$/.exec(notification.url)?.[1]),
+                }
+              : {}),
+          },
+          `owner-notification:${notification.id}`,
+        );
+    }
+  }
+  const vapid = () => ({
+    subject: config.VAPID_SUBJECT,
+    publicKey: config.VAPID_PUBLIC_KEY,
+    privateKey: config.VAPID_PRIVATE_KEY,
+  });
+  // Sends to each device once, even when another device needs a retry.
+  // Returns the time to try again when some owners are in quiet hours.
+  async function sendPush(job, p, state) {
+    const n = await repository.notification(p.notificationId);
+    if (!n) return null;
+    const done = new Set(p.delivered || []);
+    const readers = (await repository.readers?.(n.id)) || new Set();
+    let later = null,
+      problem = false;
+    for (const sub of await repository.subscriptions(n.adminId)) {
+      const key = sub.id ?? sub.endpoint;
+      if (done.has(key)) continue;
+      const prefs = alertPreferences(state.settings.alerts, sub.adminId);
+      if (!pushAllowed(prefs, n.type)) continue;
+      // Already seen before quiet hours ended.
+      if (readers.has(sub.adminId) || n.readAt) continue;
+      const until = isUrgent(n.type) ? null : quietUntil(prefs, clock());
+      if (until) {
+        if (!later || until < later) later = until;
+        continue;
+      }
+      const [text] = repository.worded
+        ? await repository.worded([n], prefs.names)
+        : [{ title: n.title, body: 'Open your owner studio to see it.' }];
+      try {
+        await push.sendNotification(
+          { endpoint: sub.endpoint, keys: sub.keys },
+          JSON.stringify({
+            title: text.title,
+            body: text.body,
+            url: n.url?.startsWith('/admin') ? n.url : '/admin/notifications',
+            tag: `mado-${n.id}`,
+          }),
+          {
+            vapidDetails: vapid(),
+            TTL: 3600,
+            timeout: 10000,
+            ...(isUrgent(n.type) ? { urgency: 'high' } : {}),
+          },
+        );
+        done.add(key);
+      } catch (error) {
+        if ([404, 410].includes(error.statusCode))
+          await repository.deleteSubscription(sub.endpoint);
+        else problem = true;
+      }
+    }
+    if (done.size) {
+      p.delivered = [...done];
+      await repository.saveJob(job.id, { payload: p });
+    }
+    if (problem) throw new Error('Push delivery failed');
+    return later;
+  }
   return {
     repository,
     config,
@@ -192,11 +298,7 @@ export function createNotificationService(
             tag: 'mado-push-test',
           }),
           {
-            vapidDetails: {
-              subject: config.VAPID_SUBJECT,
-              publicKey: config.VAPID_PUBLIC_KEY,
-              privateKey: config.VAPID_PRIVATE_KEY,
-            },
+            vapidDetails: vapid(),
             TTL: 300,
             timeout: 10000,
           },
@@ -353,48 +455,7 @@ export function createNotificationService(
               ? `/admin/bookings/${job.payload.bookingId}`
               : '/admin/notifications',
           });
-      for (const notification of freshNotifications.filter(
-        (n) => n.createdAt >= cutoff(),
-      )) {
-        if (
-          config.WHATSAPP_ALERTS_ENABLED &&
-          ['booking_confirmed', 'payment_review'].includes(notification.type) &&
-          notification.createdAt >= new Date(config.WHATSAPP_ALERTS_START_AT)
-        )
-          await queue(
-            'owner-whatsapp',
-            { notificationId: notification.id },
-            `whatsapp:${notification.id}`,
-            now,
-            'whatsapp',
-          );
-        await queue(
-          'push',
-          { notificationId: notification.id },
-          `push:${notification.id}`,
-          now,
-          'push',
-        );
-        if (!['balance_paid', 'payment_received'].includes(notification.type))
-          await queue(
-            'admin-alert',
-            {
-              notificationId: notification.id,
-              body: notification.title,
-              url: notification.url,
-              ...(['payment_review_reminder', 'payment_review_urgent'].includes(
-                notification.type,
-              )
-                ? {
-                    reviewBookingId: Number(
-                      /(\d+)$/.exec(notification.url)?.[1],
-                    ),
-                  }
-                : {}),
-            },
-            `owner-notification:${notification.id}`,
-          );
-      }
+      await queueAlerts(freshNotifications, state, now);
       const local = DateTime.fromJSDate(now, { zone: ZONE });
       if (local.hour >= 7) {
         const agenda = state.bookings
@@ -418,9 +479,32 @@ export function createNotificationService(
     },
     async run() {
       await this.schedule();
+      const result = await this.deliver();
+      await repository.cleanup(clock(), config.UPLOAD_DIR);
+      return result;
+    },
+    // Right after something happens: owner alerts only. The timer does the rest.
+    async deliverAlerts() {
+      if (!repository.withLock) return false;
+      return repository.withLock(async () => {
+        const now = clock();
+        const recent = await repository.recentNotifications(
+          new Date(+now - 15 * 60000),
+        );
+        if (!recent.length) return;
+        await queueAlerts(recent, await repository.context(now), now);
+        await this.deliver(
+          (job) =>
+            job.type === 'push' ||
+            (job.type === 'email' &&
+              decode(job.payload).template === 'admin-alert'),
+        );
+      });
+    },
+    async deliver(only = () => true) {
       let sent = 0,
         failed = 0;
-      const jobs = await repository.due(clock(), cutoff());
+      const jobs = (await repository.due(clock(), cutoff())).filter(only);
       for (const job of jobs) {
         if (job.type === 'whatsapp' && !config.WHATSAPP_ALERTS_ENABLED)
           continue;
@@ -483,35 +567,14 @@ export function createNotificationService(
             sent++;
           } else if (job.type === 'push') {
             if (!config.VAPID_PRIVATE_KEY || !config.VAPID_PUBLIC_KEY) continue;
-            const n = await repository.notification(p.notificationId);
-            if (n)
-              for (const sub of await repository.subscriptions(n.adminId)) {
-                try {
-                  await push.sendNotification(
-                    { endpoint: sub.endpoint, keys: sub.keys },
-                    JSON.stringify({
-                      title: n.title,
-                      body: 'Open your owner studio to review this update.',
-                      url: n.url?.startsWith('/admin')
-                        ? n.url
-                        : '/admin/notifications',
-                      tag: `mado-${n.id}`,
-                    }),
-                    {
-                      vapidDetails: {
-                        subject: config.VAPID_SUBJECT,
-                        publicKey: config.VAPID_PUBLIC_KEY,
-                        privateKey: config.VAPID_PRIVATE_KEY,
-                      },
-                      TTL: 3600,
-                    },
-                  );
-                } catch (error) {
-                  if ([404, 410].includes(error.statusCode))
-                    await repository.deleteSubscription(sub.endpoint);
-                  else throw new Error('Push delivery failed');
-                }
-              }
+            const later = await sendPush(job, p, state);
+            if (later) {
+              await repository.saveJob(job.id, {
+                status: 'pending',
+                runAt: later,
+              });
+              continue;
+            }
           } else {
             const detail = p.bookingId
               ? await repository.detail(p.bookingId)
@@ -627,7 +690,6 @@ export function createNotificationService(
             });
         }
       }
-      await repository.cleanup(clock(), config.UPLOAD_DIR);
       return { sent, failed };
     },
     async unsubscribe(token) {

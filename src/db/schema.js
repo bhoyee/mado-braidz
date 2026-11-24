@@ -387,6 +387,19 @@ export const notifications = mysqlTable('notifications', {
   readAt: dt('read_at'),
   createdAt: created(),
 });
+export const notificationReads = mysqlTable(
+  'notification_reads',
+  {
+    notificationId: ref('notification_id')
+      .notNull()
+      .references(() => notifications.id, { onDelete: 'cascade' }),
+    adminId: ref('admin_id')
+      .notNull()
+      .references(() => admins.id),
+    readAt: dt('read_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.notificationId, t.adminId] })],
+);
 export const pushSubscriptions = mysqlTable('push_subscriptions', {
   id: id(),
   adminId: ref('admin_id')
@@ -394,6 +407,7 @@ export const pushSubscriptions = mysqlTable('push_subscriptions', {
     .references(() => admins.id),
   endpoint: str('endpoint', 512).notNull().unique(),
   keys: json('keys').notNull(),
+  label: str('label', 80),
   createdAt: created(),
 });
 export const auditLog = mysqlTable('audit_log', {

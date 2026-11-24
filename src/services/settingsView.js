@@ -73,16 +73,25 @@ export function healthChecks(health, config) {
         ? `${health.emailsFailed} of ${health.emailsSent} emails had a problem in the last 24 hours.`
         : `${health.emailsSent} sent in the last 24 hours, with no problems. ${health.lastEmail ? `Last email: ${ago(health.lastEmail)}.` : ''}`,
   );
+  const quiet =
+    health.lastRun && Date.now() - new Date(health.lastRun) > 20 * 60000;
+  const ran = health.lastRun ? ` Last ran ${ago(health.lastRun)}.` : '';
   add(
     'Reminders and timed tasks',
-    health.late || health.failed ? 'bad' : health.lastJob ? 'good' : 'info',
-    health.late
-      ? `${health.late} task${health.late === 1 ? ' is' : 's are'} late. The server timer may have stopped.`
+    quiet || health.late || health.failed
+      ? 'bad'
+      : health.lastRun
+        ? 'good'
+        : 'info',
+    (quiet
+      ? 'The server timer has stopped, so reminders are not going out. Tell your website support.'
       : health.failed
-        ? `${health.failed} task${health.failed === 1 ? '' : 's'} failed in the last 24 hours.`
-        : health.lastJob
-          ? 'Nothing is late.'
-          : 'No tasks have run yet.',
+        ? `${health.failed} task${health.failed === 1 ? '' : 's'} failed in the last 24 hours and will be tried again where possible.`
+        : health.late
+          ? `${health.late} task${health.late === 1 ? ' is' : 's are'} waiting longer than usual.`
+          : health.lastRun
+            ? 'The timer is running and nothing is late.'
+            : 'Waiting for the first timed run.') + ran,
   );
   add(
     'Alerts on your phone or computer',

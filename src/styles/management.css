@@ -805,13 +805,6 @@
   font-weight: 700;
   color: var(--color-violet-deep);
 }
-.owner-notifications {
-  max-height: 560px;
-  max-height: min(560px, 65vh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-}
 .owner-push-control {
   display: inline-flex;
   align-items: center;
@@ -862,80 +855,6 @@
 }
 .owner-sidebar {
   overflow-y: auto;
-}
-.owner-notification {
-  display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(160px, 1.6fr) auto;
-  align-items: center;
-  gap: 20px;
-  border-top: 1px solid var(--line);
-  padding: 20px 12px;
-}
-.owner-notifications-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.owner-notifications-title h2,
-.owner-notification h3,
-.owner-notification p,
-.owner-notification form,
-.owner-notifications-title form {
-  margin: 0;
-}
-.owner-notification-event h3 {
-  font-size: 18px;
-}
-.owner-notification-event .owner-muted {
-  margin-top: 6px;
-  font-size: 12px;
-}
-.owner-notification-description {
-  font-size: 14px;
-  overflow-wrap: anywhere;
-}
-.owner-notification form {
-  justify-self: end;
-}
-.owner-app .owner-notification .button,
-.owner-app .owner-notifications-title .button {
-  margin: 0;
-  width: auto;
-  white-space: nowrap;
-  padding: 10px 14px;
-  font-size: 13px;
-}
-@media (max-width: 700px) {
-  .owner-notification {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px 12px;
-  }
-  .owner-notification-event {
-    grid-column: 1;
-  }
-  .owner-notification-description {
-    grid-column: 1;
-  }
-  .owner-notification form {
-    grid-column: 2;
-    grid-row: 1 / 3;
-  }
-  .owner-notifications-title {
-    gap: 8px;
-  }
-  .owner-notifications-title h2 {
-    font-size: clamp(16px, 4.8vw, 22px);
-    white-space: nowrap;
-  }
-  .owner-app .owner-notifications-title .button {
-    padding: 10px;
-    font-size: 12px;
-  }
-}
-.owner-notification.unread {
-  border-left: 3px solid var(--color-violet);
 }
 .seo-page {
   margin: 0 0 20px;

@@ -10,7 +10,10 @@ import {
   desc,
   sql,
   lt,
+  like,
+  getTableColumns,
 } from 'drizzle-orm';
+import { ALERT_VIEWS, alertLink, alertText, failureText } from './alerts.js';
 import * as s from '../db/schema.js';
 import { cleanupUploads } from '../jobs/cleanupUploads.js';
 const decode = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
@@ -306,36 +309,338 @@ export function createNotificationRepository(db) {
           );
       });
     },
-    async notifications(adminId, since = 0) {
-      const visible = or(
+    visibleTo(adminId) {
+      return or(
         isNull(s.notifications.adminId),
         eq(s.notifications.adminId, adminId),
       );
-      const items = await db
-        .select()
+    },
+    // Each owner reads their own alerts. `readAt` on the alert itself is from
+    // before that, and still means read by everyone.
+    unreadBy(adminId) {
+      return and(
+        isNull(s.notifications.readAt),
+        sql`NOT EXISTS (SELECT 1 FROM notification_reads r WHERE r.notification_id = ${s.notifications.id} AND r.admin_id = ${adminId})`,
+      );
+    },
+    // Alerts in plain words, with the live appointment behind each one.
+    async worded(rows, names = true) {
+      const links = rows.map(alertLink);
+      const ids = [...new Set(links.map((link) => link.id).filter(Boolean))];
+      const refs = [...new Set(links.map((link) => link.ref).filter(Boolean))];
+      const details =
+        ids.length || refs.length
+          ? await db
+              .select({ booking: s.bookings, client: s.clients })
+              .from(s.bookings)
+              .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
+              .where(
+                or(
+                  ...(ids.length ? [inArray(s.bookings.id, ids)] : []),
+                  ...(refs.length ? [inArray(s.bookings.ref, refs)] : []),
+                ),
+              )
+          : [];
+      for (const { booking } of details)
+        booking.priceSnapshot = decode(booking.priceSnapshot);
+      return rows.map((row, index) => {
+        const { id, ref } = links[index];
+        const detail = details.find(
+          (item) =>
+            (id && item.booking.id === id) || (ref && item.booking.ref === ref),
+        );
+        return { ...row, ...alertText(row, detail, { names }) };
+      });
+    },
+    async notifications(adminId, since = 0) {
+      const visible = this.visibleTo(adminId);
+      const rows = await db
+        .select({
+          ...getTableColumns(s.notifications),
+          ownReadAt: s.notificationReads.readAt,
+        })
         .from(s.notifications)
+        .leftJoin(
+          s.notificationReads,
+          and(
+            eq(s.notificationReads.notificationId, s.notifications.id),
+            eq(s.notificationReads.adminId, adminId),
+          ),
+        )
         .where(and(visible, gt(s.notifications.id, since)))
         .orderBy(desc(s.notifications.id))
-        .limit(100);
+        .limit(20);
       const [unread] = await db
         .select({ count: sql`COUNT(*)` })
         .from(s.notifications)
-        .where(and(visible, isNull(s.notifications.readAt)));
+        .where(and(visible, this.unreadBy(adminId)));
+      const items = await this.worded(
+        rows.map(({ ownReadAt, ...row }) => ({
+          ...row,
+          readAt: row.readAt || ownReadAt,
+        })),
+      );
       return { items, unread: Number(unread.count) };
     },
+    async feed(adminId, { view = 'all', page = 1, size = 20 } = {}) {
+      const where = and(
+        this.visibleTo(adminId),
+        ...(view === 'unread' ? [this.unreadBy(adminId)] : []),
+        ...(ALERT_VIEWS[view]?.types
+          ? [inArray(s.notifications.type, ALERT_VIEWS[view].types)]
+          : []),
+      );
+      const [{ count }] = await db
+        .select({ count: sql`COUNT(*)` })
+        .from(s.notifications)
+        .where(where);
+      const total = Number(count);
+      const last = Math.max(1, Math.ceil(total / size));
+      const current = Math.min(Math.max(1, page), last);
+      const rows = await db
+        .select({
+          ...getTableColumns(s.notifications),
+          ownReadAt: s.notificationReads.readAt,
+        })
+        .from(s.notifications)
+        .leftJoin(
+          s.notificationReads,
+          and(
+            eq(s.notificationReads.notificationId, s.notifications.id),
+            eq(s.notificationReads.adminId, adminId),
+          ),
+        )
+        .where(where)
+        .orderBy(desc(s.notifications.id))
+        .limit(size)
+        .offset((current - 1) * size);
+      const [unread] = await db
+        .select({ count: sql`COUNT(*)` })
+        .from(s.notifications)
+        .where(and(this.visibleTo(adminId), this.unreadBy(adminId)));
+      return {
+        items: await this.worded(
+          rows.map(({ ownReadAt, ...row }) => ({
+            ...row,
+            readAt: row.readAt || ownReadAt,
+          })),
+        ),
+        unread: Number(unread.count),
+        total,
+        page: current,
+        last,
+        first: total ? (current - 1) * size + 1 : 0,
+      };
+    },
+    // Returns what changed, so it can be undone.
     async markRead(adminId, id) {
-      await db
-        .update(s.notifications)
-        .set({ readAt: new Date() })
+      const rows = await db
+        .select({ id: s.notifications.id })
+        .from(s.notifications)
         .where(
           and(
-            or(
-              isNull(s.notifications.adminId),
-              eq(s.notifications.adminId, adminId),
-            ),
+            this.visibleTo(adminId),
+            this.unreadBy(adminId),
             ...(id ? [eq(s.notifications.id, id)] : []),
           ),
         );
+      const ids = rows.map((row) => row.id);
+      const readAt = new Date();
+      for (let at = 0; at < ids.length; at += 500)
+        await db
+          .insert(s.notificationReads)
+          .values(
+            ids
+              .slice(at, at + 500)
+              .map((notificationId) => ({ notificationId, adminId, readAt })),
+          )
+          .onDuplicateKeyUpdate({ set: { adminId } });
+      return ids;
+    },
+    async markUnread(adminId, ids) {
+      if (ids.length)
+        await db
+          .delete(s.notificationReads)
+          .where(
+            and(
+              eq(s.notificationReads.adminId, adminId),
+              inArray(s.notificationReads.notificationId, ids),
+            ),
+          );
+    },
+    async readers(notificationId) {
+      return new Set(
+        (
+          await db
+            .select({ adminId: s.notificationReads.adminId })
+            .from(s.notificationReads)
+            .where(eq(s.notificationReads.notificationId, notificationId))
+        ).map((row) => row.adminId),
+      );
+    },
+    // Things only the owner can finish. Each leaves as soon as it is handled.
+    async needsYou() {
+      const reviews = await db
+        .select({
+          proofId: s.paymentProofs.id,
+          method: s.paymentProofs.method,
+          paymentType: s.paymentProofs.paymentType,
+          amountCents: s.paymentProofs.amountCents,
+          submittedAt: s.paymentProofs.createdAt,
+          bookingId: s.bookings.id,
+          status: s.bookings.status,
+          startAt: s.bookings.startAt,
+          holdExpiresAt: s.bookings.holdExpiresAt,
+          snapshot: s.bookings.priceSnapshot,
+          name: s.clients.name,
+        })
+        .from(s.paymentProofs)
+        .innerJoin(s.bookings, eq(s.paymentProofs.bookingId, s.bookings.id))
+        .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
+        .where(eq(s.paymentProofs.status, 'pending'))
+        .orderBy(s.paymentProofs.createdAt);
+      return {
+        reviews: reviews.map(({ snapshot, ...row }) => ({
+          ...row,
+          style: decode(snapshot)?.styleName,
+          deadline: row.status === 'pending_payment' ? row.holdExpiresAt : null,
+        })),
+        failures: await this.failures(),
+      };
+    },
+    async failures(id) {
+      const rows = await db
+        .select()
+        .from(s.jobs)
+        .where(
+          and(
+            eq(s.jobs.status, 'failed'),
+            gte(s.jobs.attempts, 3),
+            inArray(s.jobs.type, [
+              'email',
+              'reminder',
+              'winback',
+              'whatsapp',
+              'refundConflict',
+            ]),
+            gte(s.jobs.createdAt, new Date(Date.now() - 60 * 86400000)),
+            ...(id ? [eq(s.jobs.id, id)] : []),
+          ),
+        )
+        .orderBy(desc(s.jobs.id))
+        .limit(30);
+      const list = [];
+      for (const job of rows) {
+        const payload = decode(job.payload);
+        if (['password-reset', 'owner-test'].includes(payload.template))
+          continue;
+        const detail = payload.bookingId
+          ? await this.detail(payload.bookingId)
+          : null;
+        const [unclear] = await db
+          .select({ id: s.emailLog.id })
+          .from(s.emailLog)
+          .where(
+            and(
+              like(s.emailLog.deliveryKey, `job:${job.id}:%`),
+              inArray(s.emailLog.status, ['unknown', 'sending']),
+            ),
+          )
+          .limit(1);
+        const uncertain =
+          Boolean(unclear) ||
+          job.type === 'whatsapp' ||
+          /verif/i.test(job.lastError || '');
+        const refund = job.type === 'refundConflict';
+        const toOwner = ['admin-alert', 'daily-agenda', 'contact-enquiry'];
+        list.push({
+          id: job.id,
+          template: payload.template,
+          refund,
+          whatsapp: job.type === 'whatsapp',
+          bookingId: payload.bookingId || null,
+          name:
+            toOwner.includes(payload.template) || job.type === 'whatsapp'
+              ? 'you'
+              : detail?.client?.name || 'a client',
+          reason: refund
+            ? 'The refund did not go through. It is tried again by itself.'
+            : failureText(job.lastError, uncertain),
+          canRetry: !refund && !uncertain,
+          canDismiss: !refund,
+          at: job.createdAt,
+        });
+      }
+      return list;
+    },
+    // Only when nothing can have been delivered already.
+    async retryFailure(id, now = new Date()) {
+      const [failure] = await this.failures(id);
+      if (!failure?.canRetry) return false;
+      await db
+        .update(s.jobs)
+        .set({ status: 'pending', attempts: 0, lastError: null, runAt: now })
+        .where(and(eq(s.jobs.id, id), eq(s.jobs.status, 'failed')));
+      return true;
+    },
+    async dismissFailure(id) {
+      const [failure] = await this.failures(id);
+      if (!failure?.canDismiss) return false;
+      await db
+        .update(s.jobs)
+        .set({ status: 'done', lastError: 'Dismissed by the owner' })
+        .where(and(eq(s.jobs.id, id), eq(s.jobs.status, 'failed')));
+      return true;
+    },
+    async saveAlertPreferences(adminId, { email, ...own }) {
+      await db.transaction(async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(s.settings)
+          .where(eq(s.settings.key, 'alerts'))
+          .for('update');
+        const old = decode(row?.value) || {};
+        const value = {
+          ...old,
+          email,
+          owners: { ...old.owners, [adminId]: own },
+        };
+        await tx
+          .insert(s.settings)
+          .values({
+            key: 'alerts',
+            value,
+            updatedBy: adminId,
+            updatedAt: new Date(),
+          })
+          .onDuplicateKeyUpdate({
+            set: { value, updatedBy: adminId, updatedAt: new Date() },
+          });
+      });
+    },
+    // Shared with the server timer, so an alert is never sent twice.
+    async withLock(fn) {
+      const connection = await db.$client.getConnection();
+      try {
+        const [[row]] = await connection.query(
+          "SELECT GET_LOCK('jobs',0) AS acquired",
+        );
+        if (row.acquired !== 1) return false;
+        try {
+          await fn();
+        } finally {
+          await connection.query("SELECT RELEASE_LOCK('jobs')");
+        }
+        return true;
+      } finally {
+        connection.release();
+      }
+    },
+    async recentNotifications(since) {
+      return db
+        .select()
+        .from(s.notifications)
+        .where(gte(s.notifications.createdAt, since));
     },
     async notification(id) {
       return (
@@ -393,17 +698,41 @@ export function createNotificationRepository(db) {
           .where(adminId ? eq(s.pushSubscriptions.adminId, adminId) : undefined)
       ).map((r) => ({ ...r, keys: decode(r.keys) }));
     },
-    async saveSubscription(adminId, input) {
+    async saveSubscription(adminId, input, label = null) {
       const [existing] = await db
         .select()
         .from(s.pushSubscriptions)
         .where(eq(s.pushSubscriptions.endpoint, input.endpoint));
-      if (existing && existing.adminId !== adminId)
+      // Holding the same private keys proves it is the same browser, now used
+      // by another owner. Its alerts move to whoever is signed in.
+      const keys = decode(existing?.keys);
+      if (
+        existing &&
+        existing.adminId !== adminId &&
+        (keys.auth !== input.keys.auth || keys.p256dh !== input.keys.p256dh)
+      )
         throw new Error('Subscription belongs to another owner');
       await db
         .insert(s.pushSubscriptions)
-        .values({ adminId, ...input })
-        .onDuplicateKeyUpdate({ set: { keys: input.keys } });
+        .values({ adminId, ...input, label })
+        .onDuplicateKeyUpdate({
+          set: { adminId, keys: input.keys, ...(label ? { label } : {}) },
+        });
+    },
+    async removeDevice(id, adminId) {
+      await db
+        .delete(s.pushSubscriptions)
+        .where(
+          and(
+            eq(s.pushSubscriptions.id, id),
+            eq(s.pushSubscriptions.adminId, adminId),
+          ),
+        );
+    },
+    async removeDevices(adminId) {
+      await db
+        .delete(s.pushSubscriptions)
+        .where(eq(s.pushSubscriptions.adminId, adminId));
     },
     async deleteSubscription(endpoint, adminId) {
       await db
@@ -437,6 +766,15 @@ export function createNotificationRepository(db) {
         .where(
           and(lt(s.stripeEvents.processedAt, new Date(+now - 90 * 86400000))),
         );
+      // Read alerts go after 90 days. Unread ones stay.
+      await db
+        .delete(s.notifications)
+        .where(
+          and(
+            lt(s.notifications.createdAt, new Date(+now - 90 * 86400000)),
+            sql`(${s.notifications.readAt} IS NOT NULL OR EXISTS (SELECT 1 FROM notification_reads r WHERE r.notification_id = ${s.notifications.id}))`,
+          ),
+        );
       const [last] = await db
         .select()
         .from(s.settings)
@@ -462,6 +800,14 @@ export function createNotificationRepository(db) {
           .values({ key: 'notifications_cleanup', value, updatedAt: now })
           .onDuplicateKeyUpdate({ set: { value, updatedAt: now } });
       }
+    },
+    // Proof that the server timer is running.
+    async heartbeat(now = new Date()) {
+      const value = { at: now.toISOString() };
+      await db
+        .insert(s.settings)
+        .values({ key: 'jobs_heartbeat', value, updatedAt: now })
+        .onDuplicateKeyUpdate({ set: { value, updatedAt: now } });
     },
     async failedJobs() {
       return (

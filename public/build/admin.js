@@ -84,6 +84,7 @@ if (notificationBadge) {
         link.href = /^\/admin(?:\/|$)/.test(item.url || '')
           ? item.url
           : '/admin/notifications';
+        if (item.urgent) link.classList.add('is-urgent');
         const title = document.createElement('strong');
         title.textContent = item.title;
         const body = document.createElement('span');
@@ -136,12 +137,39 @@ const permissionHelp = appleMobile
   : /Android/.test(navigator.userAgent)
     ? "In your browser, open this site's permissions and allow Notifications. Also check Android Settings > Apps > your browser > Notifications. Then reload this page and try again."
     : "Open this site's permissions in your browser and allow Notifications. Also check your computer's notification settings, then try again.";
+const pushSummary = document.querySelector('[data-device-summary]');
 if (pushHelp) {
-  pushHelp.textContent = appleMobile
-    ? 'iPhone / iPad: use iOS or iPadOS 16.4 or later. Open this portal in Safari, tap Share > Add to Home Screen, then open its Home Screen icon to enable alerts.'
-    : /Android/.test(navigator.userAgent)
-      ? 'Android phone / tablet: open this portal in an up-to-date browser, turn on the push switch and allow notifications. No app installation is required.'
-      : 'Enable alerts in a supported browser on this computer. Each device needs its own permission.';
+  const steps =
+    appleMobile && !homeScreen
+      ? [
+          'You need iOS or iPadOS 16.4 or later.',
+          'Open this page in Safari and tap the Share button.',
+          'Tap Add to Home Screen, then Add.',
+          'Open the new Mado Studio icon, sign in and come back to Notifications.',
+          'Turn on the switch and tap Allow.',
+        ]
+      : /Android/.test(navigator.userAgent)
+        ? [
+            'Turn on the switch below and tap Allow.',
+            'A test alert is sent to this phone or tablet. No app is needed.',
+          ]
+        : [
+            'Turn on the switch below and choose Allow.',
+            'A test alert is sent to this device.',
+          ];
+  pushHelp.replaceChildren(
+    ...steps.map((text) => {
+      const item = document.createElement('li');
+      item.textContent = text;
+      return item;
+    }),
+  );
+}
+// One line once it works; open with the steps while it does not.
+function showDevice(on, text) {
+  if (!pushSummary) return;
+  pushSummary.textContent = text || (on ? 'On' : 'Off. Open to set up.');
+  if (pushHelp) pushHelp.hidden = on;
 }
 const pushCsrf = () =>
   document.querySelector('meta[name="csrf-token"]').content;
@@ -160,22 +188,99 @@ const worker = () =>
   navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin/' });
 if (notificationBadge && 'serviceWorker' in navigator) worker().catch(() => {});
 const pushSwitch = document.querySelector('[data-push-switch]');
-if (pushSwitch && 'serviceWorker' in navigator && 'Notification' in window) {
-  navigator.serviceWorker
-    .getRegistration('/admin/')
-    .then(async (registration) => {
-      const subscribed = !!(await registration?.pushManager.getSubscription());
-      if (!pushSwitch.disabled)
-        pushSwitch.checked =
-          Notification.permission === 'granted' && subscribed;
-    })
-    .catch(() => {});
+const vapidBytes = () =>
+  Uint8Array.from(
+    atob(pushSwitch.dataset.vapidKey.replace(/-/g, '+').replace(/_/g, '/')),
+    (c) => c.charCodeAt(0),
+  );
+// A registration made with an older server key can never receive anything.
+const sameKey = (subscription) => {
+  const key = subscription.options?.applicationServerKey;
+  if (!key) return true;
+  const ours = vapidBytes(),
+    theirs = new Uint8Array(key);
+  return (
+    ours.length === theirs.length && ours.every((byte, i) => byte === theirs[i])
+  );
+};
+async function currentSubscription(registration) {
+  const subscription = await registration.pushManager.getSubscription();
+  if (subscription && !sameKey(subscription)) {
+    await subscription.unsubscribe();
+    return null;
+  }
+  return subscription;
 }
+const subscribeDevice = (registration) =>
+  registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: vapidBytes(),
+  });
+// The switch shows what the server knows, and reconnects a lost device.
+async function checkDevice() {
+  if (!pushSwitch) return;
+  if (!('serviceWorker' in navigator) || !('Notification' in window))
+    return showDevice(false);
+  try {
+    const registration =
+      await navigator.serviceWorker.getRegistration('/admin/');
+    const had = await registration?.pushManager.getSubscription();
+    if (!had || Notification.permission !== 'granted') return showDevice(false);
+    let subscription = await currentSubscription(registration);
+    const renewed = !subscription;
+    subscription ||= await subscribeDevice(registration);
+    let known = false;
+    if (!renewed) {
+      const response = await fetch('/admin/api/push-check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': pushCsrf(),
+        },
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      });
+      if (!response.ok) throw new Error('Unavailable');
+      known = (await response.json()).known;
+    }
+    if (!known) await pushRequest('POST', subscription.toJSON());
+    if (pushSwitch.disabled) return;
+    pushSwitch.checked = true;
+    showDevice(true);
+  } catch {
+    if (!pushSwitch.disabled) pushSwitch.checked = false;
+    showDevice(false, 'Off. Turn it on again below.');
+  }
+}
+checkDevice();
+// Alerts stop on this device when its owner signs out.
+document
+  .querySelector('[data-sign-out]')
+  ?.addEventListener('submit', async (event) => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    const form = event.currentTarget;
+    event.preventDefault();
+    try {
+      await Promise.race([
+        (async () => {
+          const registration =
+            await navigator.serviceWorker.getRegistration('/admin/');
+          const subscription =
+            await registration?.pushManager.getSubscription();
+          if (!subscription) return;
+          await pushRequest('DELETE', { endpoint: subscription.endpoint });
+          await subscription.unsubscribe();
+        })(),
+        new Promise((done) => setTimeout(done, 2500)),
+      ]);
+    } catch {
+      /* Signing out must always work. */
+    }
+    form.submit();
+  });
 document
   .querySelector('[data-push-switch]')
   ?.addEventListener('change', async (event) => {
     const button = event.currentTarget;
-    const raw = button.dataset.vapidKey;
     const enabling = button.checked;
     button.disabled = true;
     pushStatus.textContent = 'Checking notification permission…';
@@ -189,6 +294,7 @@ document
           await subscription.unsubscribe();
         }
         pushStatus.textContent = 'Push alerts disabled on this device.';
+        showDevice(false);
         return;
       }
       if (appleMobile && !homeScreen)
@@ -230,18 +336,16 @@ document
           ),
         ),
       ]);
-      const bytes = Uint8Array.from(
-        atob(raw.replace(/-/g, '+').replace(/_/g, '/')),
-        (c) => c.charCodeAt(0),
-      );
       const subscription =
-        (await registration.pushManager.getSubscription()) ||
-        (await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: bytes,
-        }));
+        (await currentSubscription(registration)) ||
+        (await subscribeDevice(registration));
       const data = await pushRequest('POST', subscription.toJSON());
       pushStatus.textContent = data.message;
+      showDevice(true);
+      setTimeout(
+        () => document.querySelector('[data-test-push]')?.click(),
+        1200,
+      );
     } catch (error) {
       button.checked = !enabling;
       pushStatus.textContent = error.message;

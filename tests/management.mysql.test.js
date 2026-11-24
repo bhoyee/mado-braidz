@@ -1801,6 +1801,8 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         '/time-off',
         '/seo',
         '/settings?tab=security',
+        '/notifications',
+        '/notifications?view=unread&page=2',
         '/calendar',
       ])
         expect([path, (await agent.get('/admin' + path)).status]).toEqual([
@@ -1836,6 +1838,58 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       expect(
         (await service.all()).settings.emailTemplates['booking-confirmation'],
       ).toBeUndefined();
+    });
+    it('does not call messages from before email was switched on late', async () => {
+      const cutoff = new Date('2026-11-21T00:00:00Z');
+      const job = (key, values) =>
+        db.insert(s.jobs).values({
+          type: 'email',
+          payload: {},
+          status: 'pending',
+          dedupeKey: key,
+          ...values,
+        });
+      const before = (await service.health(cutoff)).late;
+      const old = new Date('2026-11-17T00:00:00Z');
+      await job('health-old', { runAt: old, createdAt: old });
+      expect((await service.health(cutoff)).late).toBe(before);
+      const recent = new Date('2026-11-25T00:00:00Z');
+      await job('health-new', { runAt: recent, createdAt: recent });
+      expect((await service.health(cutoff)).late).toBe(before + 1);
+      await createNotificationRepository(db).heartbeat(now.toJSDate());
+      expect(+(await service.health(cutoff)).lastRun).toBe(+now.toJSDate());
+    });
+    it('accepts Microsoft push devices, refuses unknown services, and saves alert choices', async () => {
+      const device = (host) =>
+        saveAs('/api/push-subscriptions', {
+          endpoint: `https://${host}/w/?token=abc`,
+          keys: { p256dh: 'B'.repeat(87), auth: 'a'.repeat(22) },
+        });
+      const before = await device('evil.example.com');
+      // Without server keys push is off entirely.
+      expect([400, 503]).toContain(before.status);
+      await saveAs('/notifications/preferences', {
+        quiet: 'on',
+        quietFrom: '22:00',
+        quietTo: '07:00',
+        push_bookings: 'on',
+      }).expect(200);
+      const { alerts } = (await service.all()).settings;
+      expect(alerts.owners[1]).toMatchObject({
+        quiet: true,
+        push: { bookings: true, changes: false },
+      });
+      expect(
+        (
+          await saveAs('/notifications/preferences', {
+            quiet: 'on',
+            quietFrom: '07:00',
+            quietTo: '07:00',
+          })
+        ).status,
+      ).toBe(400);
+      await request(app).get('/admin/manifest.webmanifest').expect(200);
+      expect((await request(app).get('/admin/notifications')).status).toBe(303);
     });
     it('denies management access to a non-owner account', async () => {
       await db

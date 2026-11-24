@@ -32,7 +32,7 @@ import { holdSchema } from '../public/booking.js';
 import { daySlots, ZONE } from '../../services/availabilityService.js';
 import { priceBooking } from '../../services/pricingService.js';
 import { managementRouter } from './management.js';
-import { ownerNotifications } from './notifications.js';
+import { ownerAppFiles, ownerNotifications } from './notifications.js';
 import { searchPortalPages } from '../../services/ownerSearch.js';
 
 const id = z.coerce.number().int().positive().safe();
@@ -106,6 +106,7 @@ export function adminRouter(
     standardHeaders: 'draft-8',
     legacyHeaders: false,
   });
+  router.use(ownerAppFiles());
   router.use((req, res, next) => {
     res.set({
       'Cache-Control': 'no-store',
@@ -313,6 +314,7 @@ export function adminRouter(
     '/security/sign-out',
     asyncRoute(async (req, res) => {
       await auth.signOutEverywhere(res.locals.admin.id, req.ip);
+      await notifications?.repository.removeDevices?.(res.locals.admin.id);
       req.session.destroy(() => {});
       finish(req, res, '/admin/login', 'Signed out on every device.');
     }),
