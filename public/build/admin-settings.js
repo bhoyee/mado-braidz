@@ -242,9 +242,20 @@
     };
     fresh.addEventListener('input', check);
     again.addEventListener('input', check);
-    $('[data-password-show]').addEventListener('change', (event) => {
-      for (const input of $$('input[autocomplete$="password"]', password))
-        input.type = event.target.checked ? 'text' : 'password';
-    });
+    for (const eye of $$('[data-password-eye]', password)) {
+      const input = document.getElementById(eye.getAttribute('aria-controls'));
+      const name = eye.getAttribute('aria-label').replace('Show ', '');
+      const show = (visible) => {
+        input.type = visible ? 'text' : 'password';
+        eye.setAttribute('aria-label', (visible ? 'Hide ' : 'Show ') + name);
+        eye.classList.toggle('is-showing', visible);
+      };
+      eye.addEventListener('click', () => {
+        show(input.type === 'password');
+        input.focus();
+      });
+      // Hidden again before it is sent, so browsers do not remember it as text.
+      password.addEventListener('submit', () => show(false));
+    }
   }
 })();

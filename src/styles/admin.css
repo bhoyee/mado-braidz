@@ -3186,3 +3186,44 @@
     align-items: center;
   }
 }
+
+/* Password boxes with an eye */
+.password-field {
+  display: grid;
+  gap: 7px;
+}
+.password-box {
+  display: block;
+  position: relative;
+}
+.owner-app .password-box input {
+  padding-right: 54px;
+}
+.password-box input::-ms-reveal {
+  display: none;
+}
+.password-eye {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #685d6d;
+  transform: translateY(-50%);
+}
+.password-eye:hover,
+.password-eye.is-showing {
+  color: #5f2d9e;
+}
+.password-eye:focus-visible {
+  outline: 3px solid #5f2d9e;
+  outline-offset: -3px;
+}
+.password-eye:not(.is-showing) .password-eye-slash {
+  display: none;
+}

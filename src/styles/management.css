@@ -724,6 +724,25 @@
   color: var(--color-violet-deep);
   font-weight: 700;
 }
+/* Every owner button shows it can be clicked; specific cursors still win. */
+:where(.owner-app button:not(:disabled)) {
+  cursor: pointer;
+}
+.owner-notification-bell {
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.owner-notification-bell:hover,
+.owner-notification-bell[aria-expanded='true'] {
+  border-color: #5f2d9e;
+  background: #5f2d9e;
+  color: #fff;
+}
+.owner-notification-bell:active {
+  background: #431d73;
+}
 .owner-notifications-header {
   display: flex;
   justify-content: flex-end;
