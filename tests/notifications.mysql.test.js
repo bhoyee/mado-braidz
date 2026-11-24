@@ -255,6 +255,21 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         .where(eq(s.jobs.dedupeKey, 'winback-test'));
       expect(job.status).toBe('cancelled');
       expect((await repo.client(1)).unsubscribedAt).toBeTruthy();
+      // The same choice covers every booking made with that email.
+      const { email } = await repo.client(1);
+      const [other] = await db
+        .insert(s.clients)
+        .values({
+          name: 'Same person',
+          email: email.toUpperCase(),
+          phoneE164: '+14105550000',
+          marketingConsent: true,
+        })
+        .$returningId();
+      await repo.unsubscribe(1);
+      expect(await repo.client(other.id)).toMatchObject({
+        marketingConsent: false,
+      });
     });
     it('creates an owner notification once and keeps read state', async () => {
       const values = {

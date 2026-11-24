@@ -19,6 +19,7 @@ function context(db, locking = false) {
     async updateClient(id, values) {
       await db.update(s.clients).set(values).where(eq(s.clients.id, id));
     },
+    // A new booking means they came back, whichever record that was on.
     async cancelClientWinbacks(id) {
       await db
         .update(s.jobs)
@@ -27,7 +28,7 @@ function context(db, locking = false) {
           and(
             eq(s.jobs.type, 'winback'),
             inArray(s.jobs.status, ['pending', 'failed']),
-            sql`JSON_EXTRACT(${s.jobs.payload}, '$.clientId') = ${id}`,
+            sql`JSON_EXTRACT(${s.jobs.payload}, '$.clientId') IN (SELECT other.id FROM clients mine JOIN clients other ON LOWER(other.email) = LOWER(mine.email) OR (mine.phone_e164 <> '' AND other.phone_e164 = mine.phone_e164) WHERE mine.id = ${id})`,
           ),
         );
     },

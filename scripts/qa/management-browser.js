@@ -420,20 +420,19 @@ try {
         'Please arrive ten minutes',
       ),
     );
-    await page.goto(origin + '/admin/clients');
+    await page.goto(origin + '/admin/clients?view=unbooked');
     await page
-      .getByRole('link', { name: /View Test Client/ })
+      .locator('.client-row-link')
+      .filter({ hasText: 'Test Client' })
       .first()
       .click();
     await page
-      .getByLabel('Preferences and notes for the studio')
+      .getByLabel('Private notes, only for the studio')
       .fill('Prefers a quiet appointment.');
     await save(page.getByRole('button', { name: 'Save notes' }));
     await page.waitForLoadState('networkidle');
     assert.equal(
-      await page
-        .getByLabel('Preferences and notes for the studio')
-        .inputValue(),
+      await page.getByLabel('Private notes, only for the studio').inputValue(),
       'Prefers a quiet appointment.',
     );
     await page.goto(origin + '/admin/redirects');

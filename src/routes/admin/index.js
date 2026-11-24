@@ -761,12 +761,26 @@ export function adminRouter(
   );
   router.get(
     '/bookings/new',
-    asyncRoute(async (req, res) =>
+    asyncRoute(async (req, res) => {
+      const again = /^\d+$/.test(String(req.query.client || ''))
+        ? await management?.people
+            ?.summary(Number(req.query.client))
+            .catch(() => null)
+        : null;
+      const client = again && !again.removed ? again : null;
+      const last = client?.visits.find((visit) =>
+        ['completed', 'confirmed'].includes(visit.status),
+      );
       res.render('admin/edit', {
         isNew: true,
         catalog: await repository.catalog(),
         today: DateTime.now().setZone(ZONE).toISODate(),
         form: {
+          name: client?.name,
+          email: client?.email,
+          phone: client?.phone,
+          styleId: last?.styleId,
+          styleVariantId: last?.styleVariantId,
           date:
             typeof req.query.date === 'string'
               ? req.query.date.slice(0, 10)
@@ -775,8 +789,8 @@ export function adminRouter(
           notes: '',
           adminNotes: '',
         },
-      }),
-    ),
+      });
+    }),
   );
   router.post(
     '/bookings/new',

@@ -15,6 +15,12 @@ import { seoPages, verificationTag } from '../../services/pageSeo.js';
 import { photoPlacement } from '../../services/photoPlacement.js';
 import { isShown, libraryPhoto } from '../../services/photoState.js';
 import { decorateCatalog, workItems } from '../public/index.js';
+import { holdSchema } from '../public/booking.js';
+import {
+  CLIENT_TAGS,
+  clientSorts,
+  clientViews,
+} from '../../services/clientService.js';
 import {
   durationChoices,
   durationLabel,
@@ -791,47 +797,186 @@ export function managementRouter(service, config) {
       finish(req, res, '/admin/redirects');
     }),
   );
+  const people = service.people;
+  function clientFilter(query) {
+    return z
+      .object({
+        search: z.string().trim().max(80).default(''),
+        view: z.enum(Object.keys(clientViews)).default('all'),
+        sort: z.enum(Object.keys(clientSorts)).default('recent'),
+        page: z.coerce.number().int().min(1).max(100000).default(1),
+      })
+      .parse(
+        Object.fromEntries(
+          Object.entries(query).filter(([, value]) => value !== ''),
+        ),
+      );
+  }
   router.get(
     '/clients',
     run(async (req, res) => {
-      const search = text(120).parse(req.query.search),
-        page = z.coerce
-          .number()
-          .int()
-          .min(1)
-          .max(100000)
-          .default(1)
-          .parse(req.query.page);
-      const rows = await service.clients(search, (page - 1) * 50);
+      const filter = clientFilter(req.query);
+      const data = await people.directory(filter);
+      const link = (page) =>
+        '?' + new URLSearchParams({ ...filter, page: String(page) });
+      const exported = new URLSearchParams({ ...filter });
+      exported.delete('page');
       res.render('admin/manage/clients', {
-        rows: rows.slice(0, 50),
-        hasNext: rows.length > 50,
-        page,
-        search,
+        ...data,
+        filter,
+        page: filter.page,
+        views: Object.entries(clientViews),
+        viewLabel: clientViews[filter.view],
+        sorts: Object.entries(clientSorts),
+        previous: link(Math.max(1, filter.page - 1)),
+        next: link(filter.page + 1),
+        exportQuery: exported.toString(),
       });
     }),
   );
   router.get(
-    '/clients/:id',
-    run(async (req, res) =>
-      res.render(
-        'admin/manage/client',
-        await service.client(entityId.parse(req.params.id)),
-      ),
-    ),
+    '/clients/export',
+    run(async (req, res) => {
+      const { rows } = await people.directory({
+        ...clientFilter(req.query),
+        page: 1,
+        all: true,
+      });
+      const cell = (value) =>
+        '"' +
+        String(value ?? '')
+          .replace(/^[=+\-@\t\r]/, (c) => "'" + c)
+          .replaceAll('"', '""') +
+        '"';
+      const day = (value) =>
+        value
+          ? new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/New_York',
+            }).format(value)
+          : '';
+      res.set({
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="mado-clients.csv"',
+      });
+      res.send(
+        'Name,Email,Phone,Visits,No-shows,Last visit,Next visit,Paid USD,Balance USD,Repeat,Salon news\r\n' +
+          rows
+            .map((p) =>
+              [
+                p.name,
+                p.email,
+                p.phone,
+                p.visitCount,
+                p.noShows,
+                day(p.lastVisit),
+                day(p.nextVisit?.startAt),
+                (p.spentCents / 100).toFixed(2),
+                (p.balanceCents / 100).toFixed(2),
+                p.repeat ? 'Yes' : 'No',
+                p.news ? 'Opted in' : 'No',
+              ]
+                .map(cell)
+                .join(','),
+            )
+            .join('\r\n') +
+          '\r\n',
+      );
+    }),
   );
-  router.post(
+  router.get(
     '/clients/:id',
     run(async (req, res) => {
       const id = entityId.parse(req.params.id);
-      await service.saveClient(
-        id,
-        text(5000).parse(req.body.notes),
-        actor(req, res),
-      );
-      finish(req, res, '/admin/clients/' + id);
+      const profile = await people.profile(id);
+      // One address per person, whichever of their records was opened.
+      if (profile.id !== id)
+        return res.redirect(303, '/admin/clients/' + profile.id);
+      res.render('admin/manage/client', {
+        ...profile,
+        tagChoices: [...new Set([...CLIENT_TAGS, ...profile.tags])],
+        changeNames: {
+          edit: 'Details edited',
+          notes: 'Notes or tags saved',
+          update: 'Notes saved',
+          unsubscribe: 'Salon news stopped',
+          join: 'Joined with another record',
+          'undo-join': 'Join undone',
+          'keep-apart': 'Kept apart from another client',
+          'remove-details': 'Personal details removed',
+        },
+      });
     }),
   );
+  const clientAction = (path, handler) =>
+    router.post(
+      '/clients/:id/' + path,
+      run(async (req, res) => {
+        const id = entityId.parse(req.params.id);
+        await handler(id, req, res);
+        finish(req, res, '/admin/clients/' + id);
+      }),
+    );
+  const contactInput = holdSchema.pick({
+    name: true,
+    email: true,
+    phone: true,
+  });
+  clientAction('details', (id, req, res) =>
+    people.saveDetails(
+      id,
+      contactInput.parse({
+        name: req.body.name,
+        email: req.body.email,
+        phone: req.body.phone,
+      }),
+      actor(req, res),
+    ),
+  );
+  clientAction('notes', (id, req, res) => {
+    let tags;
+    try {
+      tags = JSON.parse(req.body.tags || '[]');
+    } catch {
+      throw new ManagementError('Refresh the page and try again.');
+    }
+    return people.saveNotes(
+      id,
+      {
+        notes: text(5000).parse(req.body.notes),
+        tags: z
+          .array(z.string().trim().min(1).max(30))
+          .max(10, 'Choose up to 10 tags')
+          .parse(tags),
+      },
+      actor(req, res),
+    );
+  });
+  clientAction('stop-news', (id, req, res) =>
+    people.stopNews(id, actor(req, res)),
+  );
+  for (const [path, how] of [
+    ['join', 'join'],
+    ['apart', 'apart'],
+  ])
+    clientAction(path, (id, req, res) =>
+      people.link(id, entityId.parse(req.body.other), how, actor(req, res)),
+    );
+  clientAction('unjoin', (id, req, res) =>
+    people.unlink(
+      id,
+      z
+        .string()
+        .regex(/^\d+-\d+$/)
+        .parse(req.body.pair)
+        .split('-')
+        .map(Number),
+      actor(req, res),
+    ),
+  );
+  clientAction('remove', (id, req, res) => {
+    z.literal('REMOVE', 'Type REMOVE to confirm').parse(req.body.confirm);
+    return people.removeDetails(id, actor(req, res));
+  });
   router.get(
     '/seo',
     run(async (req, res) => {

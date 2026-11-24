@@ -15,6 +15,7 @@ import { publicRouter, money } from './routes/public/index.js';
 import { designRouter } from './routes/admin/design.js';
 import { methodName, optionLabel } from './services/adminAppointment.js';
 import { phoneLabel } from './services/adminCalendar.js';
+import { emailName } from './services/adminAppointmentDetail.js';
 import { adminRouter } from './routes/admin/index.js';
 import { createAdminRepository } from './services/adminRepository.js';
 import { createManagementService } from './services/managementService.js';
@@ -259,6 +260,7 @@ export function createApp({
   );
   views.addFilter('money', money);
   views.addFilter('payMethod', methodName);
+  views.addFilter('emailName', emailName);
   views.addFilter('optionLabel', optionLabel);
   views.addFilter('phone', phoneLabel);
   views.addFilter('et', (value, format = 'ccc, LLL d · h:mm a') =>

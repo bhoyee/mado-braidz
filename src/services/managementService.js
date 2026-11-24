@@ -6,6 +6,7 @@ import { DateTime } from 'luxon';
 import * as s from '../db/schema.js';
 import { orderStyles, priceChanges, priceSort } from './styleSummary.js';
 import { createCatalogService } from './catalogService.js';
+import { createClientService } from './clientService.js';
 import {
   KEEP_REMOVED_DAYS,
   cleanFocus,
@@ -1281,59 +1282,6 @@ export function createManagementService(db, clock = () => new Date()) {
         await audit(tx, actor, 'redirect', id, before, { removed: true });
       });
     },
-    async clients(search = '', offset = 0) {
-      return db
-        .select()
-        .from(s.clients)
-        .where(
-          sql`LOCATE(${search}, CONCAT(name,' ',email,' ',phone_e164)) > 0`,
-        )
-        .orderBy(desc(s.clients.id))
-        .limit(51)
-        .offset(offset);
-    },
-    async client(id) {
-      const client = exists(
-        (await db.select().from(s.clients).where(eq(s.clients.id, id)))[0],
-      );
-      const visits = await db
-        .select()
-        .from(s.bookings)
-        .where(eq(s.bookings.clientId, id))
-        .orderBy(desc(s.bookings.startAt));
-      const jobs = await db
-        .select()
-        .from(s.jobs)
-        .where(
-          sql`JSON_EXTRACT(${s.jobs.payload}, '$.clientId') = ${id} OR JSON_EXTRACT(${s.jobs.payload}, '$.bookingId') IN (SELECT id FROM bookings WHERE client_id = ${id})`,
-        );
-      return {
-        client,
-        visits,
-        winbacks: jobs.filter((r) => r.type.includes('winback')),
-      };
-    },
-    async saveClient(id, notes, actor) {
-      await db.transaction(async (tx) => {
-        const before = exists(
-          (
-            await tx
-              .select()
-              .from(s.clients)
-              .where(eq(s.clients.id, id))
-              .for('update')
-          )[0],
-        );
-        await tx.update(s.clients).set({ notes }).where(eq(s.clients.id, id));
-        await audit(
-          tx,
-          actor,
-          'client',
-          id,
-          { notes: before.notes },
-          { notes },
-        );
-      });
-    },
+    people: createClientService(db, clock),
   };
 }

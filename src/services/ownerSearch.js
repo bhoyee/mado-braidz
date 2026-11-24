@@ -112,8 +112,11 @@ export function createOwnerSearch(db) {
           })
           .from(s.clients)
           .where(
-            contact(
-              sql`CONCAT_WS(' ',${s.clients.name},${s.clients.email},${s.clients.phoneE164},'client customer')`,
+            and(
+              sql`${s.clients.email} NOT LIKE '%@removed.invalid'`,
+              contact(
+                sql`CONCAT_WS(' ',${s.clients.name},${s.clients.email},${s.clients.phoneE164},'client customer')`,
+              ),
             ),
           )
           .orderBy(desc(s.clients.id))

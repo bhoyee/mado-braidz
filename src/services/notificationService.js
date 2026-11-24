@@ -1,3 +1,4 @@
+import { REMOVED_DOMAIN, personIds, wantsNews } from './clientGroups.js';
 import { DateTime } from 'luxon';
 import * as webpush from 'web-push';
 import { createWhatsAppService } from './whatsappService.js';
@@ -30,21 +31,27 @@ export function reminderTimes(booking, hours = 48) {
     morning: morning.toUTC().toJSDate(),
   };
 }
-export function marketingEligible(booking, client, all, now = new Date()) {
-  return (
-    booking.status === 'completed' &&
-    client?.marketingConsent &&
-    !client.unsubscribedAt &&
-    !all.some(
-      (other) =>
-        other.id !== booking.id &&
-        other.clientId === booking.clientId &&
-        ((['pending_payment', 'confirmed'].includes(other.status) &&
-          other.startAt > booking.completedAt &&
-          (!other.holdExpiresAt || other.holdExpiresAt > now)) ||
-          (other.status === 'completed' &&
-            other.completedAt > booking.completedAt)),
-    )
+export function marketingEligible(
+  booking,
+  client,
+  all,
+  now = new Date(),
+  clients = client ? [client] : [],
+  links = {},
+) {
+  if (booking.status !== 'completed' || !wantsNews(client, clients))
+    return false;
+  // Every booking has its own client record, so look at the whole person.
+  const person = new Set(personIds(clients, booking.clientId, links));
+  return !all.some(
+    (other) =>
+      other.id !== booking.id &&
+      person.has(other.clientId) &&
+      ((['pending_payment', 'confirmed'].includes(other.status) &&
+        other.startAt > booking.completedAt &&
+        (!other.holdExpiresAt || other.holdExpiresAt > now)) ||
+        (other.status === 'completed' &&
+          other.completedAt > booking.completedAt)),
   );
 }
 export function createNotificationService(
@@ -121,7 +128,14 @@ export function createNotificationService(
     if (job.type === 'winback')
       return (
         booking.completedAt >= cutoff() &&
-        marketingEligible(booking, client, state.bookings, clock()) &&
+        marketingEligible(
+          booking,
+          client,
+          state.bookings,
+          clock(),
+          state.clients,
+          state.settings.clientLinks,
+        ) &&
         state.settings.emails?.winback === true
       );
     if (job.type === 'reminder')
@@ -254,7 +268,14 @@ export function createNotificationService(
           );
           if (
             prefs.winback === true &&
-            marketingEligible(booking, client, state.bookings, now)
+            marketingEligible(
+              booking,
+              client,
+              state.bookings,
+              now,
+              state.clients,
+              state.settings.clientLinks,
+            )
           )
             for (const days of [30, 60, 90])
               await queue(
@@ -516,6 +537,7 @@ export function createNotificationService(
               await mailExtras(p, detail, state),
             );
             for (const recipient of recipients) {
+              if (recipient.endsWith(REMOVED_DOMAIN)) continue;
               if (await repository.suppressed(recipient)) continue;
               const key = `job:${job.id}:${createHash('sha256').update(recipient.toLowerCase()).digest('hex')}`;
               let log = await repository.log(key);

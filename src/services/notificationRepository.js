@@ -277,10 +277,23 @@ export function createNotificationRepository(db) {
     },
     async unsubscribe(id) {
       await db.transaction(async (tx) => {
+        const [client] = await tx
+          .select()
+          .from(s.clients)
+          .where(eq(s.clients.id, id));
+        if (!client) return;
+        // One choice covers every booking made with this email.
+        const rows = await tx
+          .select({ id: s.clients.id })
+          .from(s.clients)
+          .where(
+            sql`LOWER(TRIM(${s.clients.email})) = ${client.email.trim().toLowerCase()}`,
+          );
+        const ids = rows.map((row) => row.id);
         await tx
           .update(s.clients)
           .set({ marketingConsent: false, unsubscribedAt: new Date() })
-          .where(eq(s.clients.id, id));
+          .where(inArray(s.clients.id, ids));
         await tx
           .update(s.jobs)
           .set({ status: 'cancelled' })
@@ -288,7 +301,7 @@ export function createNotificationRepository(db) {
             and(
               eq(s.jobs.type, 'winback'),
               inArray(s.jobs.status, ['pending', 'failed']),
-              sql`JSON_EXTRACT(${s.jobs.payload}, '$.clientId') = ${id}`,
+              sql`JSON_EXTRACT(${s.jobs.payload}, '$.clientId') IN (${sql.join(ids, sql`, `)})`,
             ),
           );
       });

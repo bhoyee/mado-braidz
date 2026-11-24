@@ -1,6 +1,7 @@
 import { and, or, eq, gte, gt, lt, asc, desc, sql, inArray } from 'drizzle-orm';
 import { presentAppointment } from './adminAppointment.js';
 import { createOwnerSearch } from './ownerSearch.js';
+import { isRemovedClient, personIds } from './clientGroups.js';
 import * as s from '../db/schema.js';
 
 export function createAdminRepository(db) {
@@ -92,13 +93,6 @@ export function createAdminRepository(db) {
       );
     return filters;
   }
-  const sameClient = (client) =>
-    client.phoneE164
-      ? or(
-          eq(s.clients.email, client.email),
-          eq(s.clients.phoneE164, client.phoneE164),
-        )
-      : eq(s.clients.email, client.email);
   return {
     searchPortal: createOwnerSearch(db),
     ...context(db),
@@ -136,21 +130,35 @@ export function createAdminRepository(db) {
         })
         .from(s.clients)
         .where(
-          sql`(LOCATE(${query}, ${s.clients.name}) > 0 OR LOCATE(${query}, ${s.clients.email}) > 0 OR (${digits.length >= 3} AND LOCATE(${digits}, ${s.clients.phoneE164}) > 0))`,
+          sql`${s.clients.email} NOT LIKE '%@removed.invalid' AND (LOCATE(${query}, ${s.clients.name}) > 0 OR LOCATE(${query}, ${s.clients.email}) > 0 OR (${digits.length >= 3} AND LOCATE(${digits}, ${s.clients.phoneE164}) > 0))`,
         )
         .orderBy(desc(s.clients.id))
         .limit(60);
     },
-    // Each booking has its own client row, so visits match on email or phone.
+    // Each booking has its own client row, so look at the whole person.
     async clientVisits(client, exceptId) {
+      const [clients, settings] = await Promise.all([
+        db.select().from(s.clients),
+        db
+          .select()
+          .from(s.settings)
+          .where(inArray(s.settings.key, ['clientLinks', 'clientTags'])),
+      ]);
+      const saved = Object.fromEntries(
+        settings.map((row) => [
+          row.key,
+          typeof row.value === 'string' ? JSON.parse(row.value) : row.value,
+        ]),
+      );
+      const ids = personIds(clients, client.id, saved.clientLinks);
+      const mine = clients.filter((row) => ids.includes(row.id));
       const [row] = await db
         .select({
           completed: sql`COALESCE(SUM(${s.bookings.status} = 'completed'), 0)`,
           noShows: sql`COALESCE(SUM(${s.bookings.status} = 'no_show'), 0)`,
         })
         .from(s.bookings)
-        .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
-        .where(sameClient(client));
+        .where(inArray(s.bookings.clientId, ids));
       const rows = await db
         .select({
           id: s.bookings.id,
@@ -159,15 +167,24 @@ export function createAdminRepository(db) {
           styleName: s.styles.name,
         })
         .from(s.bookings)
-        .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
         .innerJoin(s.styles, eq(s.bookings.styleId, s.styles.id))
-        .where(and(sameClient(client), sql`${s.bookings.id} <> ${exceptId}`))
+        .where(
+          and(
+            inArray(s.bookings.clientId, ids),
+            sql`${s.bookings.id} <> ${exceptId}`,
+          ),
+        )
         .orderBy(desc(s.bookings.startAt))
         .limit(4);
       return {
         completed: Number(row.completed),
         noShows: Number(row.noShows),
         rows,
+        notes: [
+          ...new Set(mine.map((item) => item.notes?.trim()).filter(Boolean)),
+        ].join('\n'),
+        tags: [...new Set(ids.flatMap((id) => saved.clientTags?.[id] || []))],
+        removed: mine.some(isRemovedClient),
       };
     },
     async list({

@@ -830,6 +830,316 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       expect(await films()).not.toContain(own.id);
       await post(`videos/${own.id}/remove`, {}).expect(refused);
     });
+    it('treats records as one person, and edits, joins, unsubscribes and removes them safely', async () => {
+      const people = service.people;
+      const refused = (r) => expect([400, 403, 404, 409]).toContain(r.status);
+      const post = (url, body) =>
+        agent
+          .post('/admin/clients/' + url)
+          .set('Accept', 'application/json')
+          .send({ ...body, _csrf: token });
+      const page = async (url) => (await agent.get(url).expect(200)).text;
+      const start = (n) =>
+        now
+          .plus({ days: 40 + n })
+          .set({ hour: 15, minute: 0, second: 0, millisecond: 0 })
+          .toISO();
+      const book = (n, values) =>
+        bookings.createHold(
+          { ...validHold, startAt: start(n), ...values },
+          null,
+          { admin: actor, mode: 'override' },
+        );
+      const one = {
+        name: 'Zuri Cole',
+        email: 'zuri@x.test',
+        phone: '+14437434101',
+      };
+      const a = await book(0, one);
+      const b = await book(1, { ...one, email: 'ZURI@x.test' });
+      const c = await book(2, {
+        name: 'Other Cole',
+        email: 'other@x.test',
+        phone: one.phone,
+      });
+      const rowOf = async (id) =>
+        (await db.select().from(s.bookings).where(eq(s.bookings.id, id)))[0];
+      const [idA, idB, idC] = [
+        (await rowOf(a.id)).clientId,
+        (await rowOf(b.id)).clientId,
+        (await rowOf(c.id)).clientId,
+      ];
+      const clientRow = async (id) =>
+        (await db.select().from(s.clients).where(eq(s.clients.id, id)))[0];
+
+      const list = await page('/admin/clients?search=zuri');
+      expect(list.match(/class="client-row"/g)).toHaveLength(1);
+      expect(list).toContain('Repeat');
+      expect(list).toContain('Possible match');
+      expect(list).toMatch(/1–1 of 1/);
+      const text = await page('/admin/clients/' + idA);
+      expect(text).toContain('Is this the same person?');
+      expect(text).toContain('/admin/bookings/new?client=' + idA);
+      // Any of their records opens the same profile.
+      await agent
+        .get('/admin/clients/' + idB)
+        .expect(303)
+        .expect('Location', '/admin/clients/' + idA);
+      expect(await page('/admin/bookings/new?client=' + idB)).toContain(
+        'value="Zuri Cole"',
+      );
+      await agent.get('/admin/clients/999999').expect(refused);
+
+      // Notes and tags belong to the person and show on each appointment.
+      await post(idA + '/notes', {
+        notes: 'Likes the window',
+        tags: '["Allergy","VIP"]',
+      }).expect(200);
+      for (const id of [a.id, b.id]) {
+        const detail = await page('/admin/bookings/' + id);
+        expect(detail).toContain('Likes the window');
+        expect(detail).toContain('Allergy');
+      }
+      expect(await page('/admin/bookings/' + c.id)).not.toContain(
+        'Likes the window',
+      );
+      await post(idA + '/notes', { notes: '', tags: 'bad' }).expect(refused);
+      await post(idA + '/notes', {
+        notes: '',
+        tags: JSON.stringify(['x'.repeat(40)]),
+      }).expect(refused);
+
+      // Editing covers every record; a taken email is refused.
+      await post(idA + '/details', {
+        name: 'Zuri Cole-Adams',
+        email: 'other@x.test',
+        phone: one.phone,
+      }).expect(refused);
+      await post(idA + '/details', {
+        name: 'Zuri Cole-Adams',
+        email: 'nope',
+        phone: one.phone,
+      }).expect(refused);
+      await post(idA + '/details', {
+        name: 'Zuri Cole-Adams',
+        email: 'zuri.new@x.test',
+        phone: '+14437434102',
+      }).expect(200);
+      for (const id of [idA, idB])
+        expect(await clientRow(id)).toMatchObject({
+          name: 'Zuri Cole-Adams',
+          email: 'zuri.new@x.test',
+          phoneE164: '+14437434102',
+        });
+      expect((await clientRow(idC)).name).toBe('Other Cole');
+      expect(await page('/admin/clients/' + idA)).toContain(
+        'zuri@x.test → zuri.new@x.test'.replace('zuri@x.test', 'ZURI@x.test'),
+      );
+
+      // Join, undo and keep apart.
+      await post(idA + '/join', { other: idC }).expect(200);
+      expect((await people.summary(idC)).ids).toEqual([idA, idB, idC]);
+      await post(idA + '/join', { other: idC }).expect(refused);
+      await post(idA + '/unjoin', { pair: `${idA}-${idC}` }).expect(200);
+      expect((await people.summary(idC)).ids).toEqual([idC]);
+      await post(idA + '/unjoin', { pair: `${idA}-${idC}` }).expect(refused);
+      await post(idA + '/details', {
+        name: 'Zuri Cole-Adams',
+        email: 'zuri.new@x.test',
+        phone: one.phone,
+      }).expect(200);
+      expect((await people.profile(idA)).matches).toHaveLength(1);
+      await post(idA + '/apart', { other: idC }).expect(200);
+      expect((await people.profile(idA)).matches).toHaveLength(0);
+
+      // Stopping news covers every record and waiting message.
+      await db
+        .update(s.clients)
+        .set({ marketingConsent: true, consentAt: new Date('2026-01-01') })
+        .where(eq(s.clients.id, idB));
+      await db.insert(s.jobs).values({
+        type: 'winback',
+        payload: { clientId: idB, bookingId: b.id },
+        dedupeKey: 'person-winback',
+        runAt: new Date(),
+        status: 'pending',
+      });
+      await post(idA + '/stop-news', {}).expect(200);
+      expect(await clientRow(idB)).toMatchObject({ marketingConsent: false });
+      const job = async (key) =>
+        (await db.select().from(s.jobs).where(eq(s.jobs.dedupeKey, key)))[0];
+      expect((await job('person-winback')).status).toBe('cancelled');
+      // A new booking on a new record cancels an old come-back message too.
+      await db
+        .update(s.jobs)
+        .set({ status: 'pending' })
+        .where(eq(s.jobs.dedupeKey, 'person-winback'));
+      const d = await book(3, {
+        name: 'Zuri Cole-Adams',
+        email: 'Zuri.New@x.test',
+        phone: one.phone,
+      });
+      expect((await job('person-winback')).status).toBe('cancelled');
+
+      // Removal waits for upcoming visits and balances.
+      await post(idA + '/remove', { confirm: 'remove' }).expect(refused);
+      await post(idA + '/remove', { confirm: 'REMOVE' }).expect(refused);
+      expect((await clientRow(idA)).name).toBe('Zuri Cole-Adams');
+      const mine = [a.id, b.id, d.id];
+      const finish = (values) =>
+        Promise.all(
+          mine.map((id) =>
+            db.update(s.bookings).set(values).where(eq(s.bookings.id, id)),
+          ),
+        );
+      await finish({
+        status: 'completed',
+        startAt: new Date('2026-01-05T15:00:00Z'),
+        endAt: new Date('2026-01-05T19:00:00Z'),
+        blockEndAt: new Date('2026-01-05T19:00:00Z'),
+        clientNotes: 'Private words about Zuri',
+        adminNotes: 'Owner words',
+      });
+      await post(idA + '/remove', { confirm: 'REMOVE' }).expect(refused);
+      await finish({ balanceCents: 0, paidCents: 18000 });
+      const [photo] = await db
+        .insert(s.media)
+        .values({
+          kind: 'inspiration',
+          path: 'private.webp',
+          alt: 'x',
+          sort: 0,
+        })
+        .$returningId();
+      await db
+        .update(s.bookings)
+        .set({ inspirationMediaId: photo.id })
+        .where(eq(s.bookings.id, a.id));
+      await db.insert(s.paymentProofs).values({
+        bookingId: a.id,
+        method: 'zelle',
+        paymentType: 'deposit',
+        amountCents: 3000,
+        path: 'payment-x.webp',
+        status: 'approved',
+      });
+      await db.insert(s.emailLog).values({
+        bookingId: a.id,
+        clientId: idA,
+        template: 'booking-confirmation',
+        toEmail: 'zuri.new@x.test',
+        status: 'sent',
+      });
+      await db.insert(s.notifications).values({
+        type: 'x',
+        title: 'Zuri booked',
+        body: 'x',
+        url: '/admin/bookings/' + a.id,
+      });
+      await db.insert(s.jobs).values({
+        type: 'email',
+        payload: {
+          template: 'contact-enquiry',
+          body: 'From zuri.new@x.test',
+        },
+        dedupeKey: 'person-contact',
+        runAt: new Date(),
+        status: 'done',
+      });
+      await post(idA + '/remove', { confirm: 'REMOVE' }).expect(200);
+      for (const id of [idA, idB])
+        expect(await clientRow(id)).toMatchObject({
+          name: 'Removed client',
+          phoneE164: '',
+          notes: null,
+          marketingConsent: false,
+        });
+      expect(await rowOf(a.id)).toMatchObject({
+        status: 'completed',
+        paidCents: 18000,
+        clientNotes: null,
+        adminNotes: null,
+        inspirationMediaId: null,
+      });
+      expect(
+        (await db.select().from(s.media).where(eq(s.media.id, photo.id)))
+          .length,
+      ).toBe(0);
+      const everything = JSON.stringify([
+        await db.select().from(s.clients),
+        await db.select().from(s.bookings),
+        await db.select().from(s.auditLog),
+        await db.select().from(s.emailLog),
+        await db.select().from(s.notifications),
+        await db.select().from(s.jobs),
+        await db.select().from(s.paymentProofs),
+        await db.select().from(s.settings),
+      ]);
+      for (const trace of [
+        'Zuri',
+        'zuri',
+        'Private words',
+        'Owner words',
+        'Likes the window',
+        'payment-x.webp',
+        '14437434102',
+      ])
+        expect(everything.includes(trace), trace).toBe(false);
+      // Their family member is untouched, and the records still open.
+      expect(await clientRow(idC)).toMatchObject({
+        name: 'Other Cole',
+        phoneE164: one.phone,
+      });
+      expect(await page('/admin/bookings/' + a.id)).toContain('Removed client');
+      expect(await page('/admin/clients/' + idA)).toContain(
+        'Personal details were removed',
+      );
+      expect(await page('/admin/clients')).not.toContain('Removed client');
+      expect(
+        (await agent.get('/admin/api/clients').query({ q: 'removed' })).body
+          .clients,
+      ).toEqual([]);
+      for (const path of ['/notes', '/details', '/stop-news', '/remove'])
+        await post(idA + path, {
+          ...one,
+          notes: 'x',
+          tags: '[]',
+          confirm: 'REMOVE',
+        }).expect(refused);
+      await db
+        .update(s.bookings)
+        .set({ status: 'cancelled' })
+        .where(eq(s.bookings.id, c.id));
+    });
+    it('exports clients safely and needs a signed-in owner', async () => {
+      const held = await bookings.createHold(
+        {
+          ...validHold,
+          name: '=HYPERLINK("x")',
+          email: 'csv@x.test',
+          phone: '+14437434199',
+          startAt: now.plus({ days: 50 }).set({ hour: 16, minute: 0 }).toISO(),
+        },
+        null,
+        { admin: actor, mode: 'override' },
+      );
+      const csv = await agent
+        .get('/admin/clients/export?search=csv')
+        .expect(200);
+      expect(csv.headers['content-type']).toMatch(/csv/);
+      expect(csv.text).toContain(`"'=HYPERLINK`);
+      for (const url of [
+        '/admin/clients',
+        '/admin/clients/1',
+        '/admin/clients/export',
+      ])
+        expect([303, 401]).toContain((await request(app).get(url)).status);
+      await agent.get('/admin/clients?view=nonsense').expect(400);
+      await db
+        .update(s.bookings)
+        .set({ status: 'cancelled' })
+        .where(eq(s.bookings.id, held.id));
+    });
     it('creates a style with its cover photo in one save', async () => {
       const image = await sharp({
         create: { width: 700, height: 900, channels: 3, background: '#73489a' },
