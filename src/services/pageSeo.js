@@ -123,6 +123,17 @@ function salon(data, social, base, full) {
         opens: hours.weekly[day].open,
         closes: hours.weekly[day].close,
       })),
+    ...(hours?.specialDays?.length
+      ? {
+          specialOpeningHoursSpecification: hours.specialDays.map((day) => ({
+            '@type': 'OpeningHoursSpecification',
+            validFrom: day.date,
+            validThrough: day.date,
+            opens: day.closed ? '00:00' : day.open,
+            closes: day.closed ? '00:00' : day.close,
+          })),
+        }
+      : {}),
     // A search-results link is not a business profile.
     sameAs: Object.values(social || {}).filter(
       (url) =>

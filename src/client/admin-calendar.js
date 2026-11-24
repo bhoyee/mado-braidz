@@ -56,6 +56,7 @@ if (element) {
   const status = document.querySelector('[data-calendar-status]');
   const cancelledSwitch = document.querySelector('[data-show-cancelled]');
   const weekly = JSON.parse(element.dataset.hours || '{}');
+  const special = JSON.parse(element.dataset.special || '[]');
   const openDays = Object.values(weekly).filter((day) => !day.closed);
   const clock = (text) => Number(text.slice(0, 2)) + Number(text.slice(3)) / 60;
   const firstHour = openDays.length
@@ -172,6 +173,120 @@ if (element) {
   details.addEventListener('click', (event) => {
     if (event.target === details) details.close();
   });
+
+  // An empty time: book it, or block it.
+  const slot = document.querySelector('#calendar-slot');
+  const slotForm = slot.querySelector('[data-slot-form]');
+  const blocked = document.querySelector('#calendar-blocked');
+  let slotDay = '',
+    blockedId = null;
+  for (const button of document.querySelectorAll('[data-slot-close]'))
+    button.addEventListener('click', () => button.closest('dialog').close());
+  const later = (time, limit) => {
+    const [h, m] = time.split(':').map(Number);
+    const next = `${String(Math.min(23, h + 1)).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    return limit && next > limit ? limit : next;
+  };
+  function showSlotTimes() {
+    const all = slotForm.elements.allDay.checked;
+    slot.querySelector('[data-slot-times]').hidden = all;
+    slotForm.elements.start.required = slotForm.elements.end.required = !all;
+  }
+  slotForm.elements.allDay.addEventListener('change', showSlotTimes);
+  function openSlot(day, time, close) {
+    slotDay = day;
+    slotForm.reset();
+    slotForm.elements.start.value = time;
+    slotForm.elements.end.value = later(time, close);
+    slot.querySelector('[data-slot-error]').hidden = true;
+    slot.querySelector('[data-slot-title]').textContent =
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: 'UTC',
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(new Date(`${day}T${time}:00Z`));
+    slot.querySelector('[data-slot-book]').href =
+      '/admin/bookings/new?' + new URLSearchParams({ date: day, time });
+    showSlotTimes();
+    slot.showModal();
+  }
+  function openBlocked(event) {
+    const info = event.extendedProps;
+    blockedId = info.blockId || null;
+    blocked.querySelector('[data-blocked-title]').textContent = event.title;
+    blocked.querySelector('[data-blocked-when]').textContent = info.special
+      ? 'This is a special day. Change it in Time off.'
+      : info.repeat
+        ? `${info.when}. Part of a longer block; removing here opens only this day.`
+        : info.when;
+    blocked.querySelector('[data-blocked-remove]').hidden = !blockedId;
+    blocked.querySelector('[data-blocked-error]').hidden = true;
+    blocked.showModal();
+  }
+  async function save(url, body) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'x-csrf-token': document.querySelector('meta[name="csrf-token"]')
+          .content,
+      },
+      body: JSON.stringify(body),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Unable to save.');
+  }
+  slotForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = slotForm.querySelector('[type="submit"]');
+    const problem = slot.querySelector('[data-slot-error]');
+    if (button.disabled) return;
+    button.disabled = true;
+    problem.hidden = true;
+    try {
+      const all = slotForm.elements.allDay.checked;
+      await save('/admin/availability/blocks', {
+        date: slotDay,
+        allDay: all,
+        start: all ? '' : slotForm.elements.start.value,
+        end: all ? '' : slotForm.elements.end.value,
+        reason: slotForm.elements.reason.value,
+        repeat: 'once',
+      });
+      slot.close();
+      calendar.refetchEvents();
+      toast('Time blocked.', true);
+    } catch (error) {
+      problem.textContent = error.message;
+      problem.hidden = false;
+    } finally {
+      button.disabled = false;
+    }
+  });
+  blocked
+    .querySelector('[data-blocked-remove]')
+    .addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      const problem = blocked.querySelector('[data-blocked-error]');
+      button.disabled = true;
+      try {
+        await save(`/admin/availability/blocks/${blockedId}/remove`, {
+          series: false,
+        });
+        blocked.close();
+        calendar.refetchEvents();
+        toast('Block removed.', true);
+      } catch (error) {
+        problem.textContent = error.message;
+        problem.hidden = false;
+      } finally {
+        button.disabled = false;
+      }
+    });
 
   const calendar = new Calendar(element, {
     plugins: [
@@ -305,7 +420,8 @@ if (element) {
       const click = info.jsEvent;
       if (click.ctrlKey || click.metaKey || click.shiftKey) return;
       click.preventDefault();
-      if (!info.event.extendedProps.block) openDetails(info.event);
+      if (info.event.extendedProps.block) openBlocked(info.event);
+      else openDetails(info.event);
     },
     dateClick(info) {
       const day = info.dateStr.slice(0, 10);
@@ -321,15 +437,21 @@ if (element) {
       }).format(now);
       if (day < today || (timed && info.date < now))
         return toast('That time has passed. Choose a later one.');
-      if (!hours || hours.closed)
-        return toast('The studio is closed that day.');
-      location.assign(
-        '/admin/bookings/new?' +
-          new URLSearchParams({
-            date: day,
-            time: timed ? info.dateStr.slice(11, 16) : hours.open,
-          }),
-      );
+      if (timed) {
+        const covering = calendar
+          .getEvents()
+          .find(
+            (event) =>
+              event.extendedProps.block &&
+              event.start <= info.date &&
+              event.end > info.date,
+          );
+        if (covering) return openBlocked(covering);
+      }
+      const exception = special.find((item) => item.date === day);
+      const open = exception || hours;
+      if (!open || open.closed) return toast('The studio is closed that day.');
+      openSlot(day, timed ? info.dateStr.slice(11, 16) : open.open, open.close);
     },
     eventDragStart() {
       dragging = true;

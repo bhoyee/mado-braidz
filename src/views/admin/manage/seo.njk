@@ -1,7 +1,7 @@
 {% extends "layouts/admin.njk" %}{% from "admin/manage/macros.njk" import csrf %}{% block content %}
-<header class="owner-page-head"><div><p class="eyebrow">Settings</p><h1>Search &amp; AI.</h1><p>Edit how your pages appear in Google, Bing and AI answers. Paste in suggestions from any SEO tool after you have checked them.</p></div></header>
+<header class="owner-page-head"><div><p class="eyebrow">Settings</p><h1>Settings.</h1><p>Edit how your pages appear in Google, Bing and AI answers. Paste in suggestions from any SEO tool after you have checked them.</p></div></header>
 {% set settingsTab = 'seo' %}{% include "admin/manage/settings-tabs.njk" %}
-<form action="/admin/seo" method="post" data-owner-form>{{ csrf(csrfToken) }}
+<form class="settings-form" action="/admin/seo" method="post" data-owner-form data-settings-form>{{ csrf(csrfToken) }}
 <section class="owner-panel"><h2>Page titles and descriptions</h2><p class="owner-muted">Leave a box empty to use the wording shown in grey. Aim for about 60 characters in a title and 155 in a description. Search engines may show different text.</p>
 {% for path, page in seoPages %}{% set own = (search.pages or {})[path] or {} %}
 <fieldset class="seo-page"><legend>{{ page.name }}</legend>
@@ -14,5 +14,5 @@
 <label class="owner-field"><span>Bing Webmaster Tools</span><input name="bing" maxlength="400" value="{{ tags.bing }}" autocomplete="off" spellcheck="false"></label>
 <label class="owner-field"><span>Another SEO tool (full tag)</span><input name="other" maxlength="400" value="{{ tags.other }}" autocomplete="off" spellcheck="false" placeholder="&lt;meta name=&quot;…&quot; content=&quot;…&quot;&gt;"></label></section>
 <section class="owner-panel"><h2>Links for SEO tools</h2><p class="owner-muted">Give these to any tool that asks for them.</p><ul class="seo-links">{% for label, path in [['Sitemap','/sitemap.xml'],['Robots file','/robots.txt'],['Guide for AI assistants','/llms.txt']] %}<li>{{ label }}: <a href="{{ path }}" target="_blank" rel="noopener">{{ siteUrl }}{{ path }}</a></li>{% endfor %}</ul></section>
-<div class="owner-panel manage-save-bar"><p>Save your search settings.</p><button class="button" type="submit">Save search settings</button></div>
-</form>{% endblock %}
+<div class="style-save" data-save-bar><p role="status" data-dirty-status>All changes saved</p><button class="button" type="submit">Save search settings</button></div>
+</form><script defer src="/build/admin-settings.js"></script>{% endblock %}

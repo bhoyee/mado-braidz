@@ -222,6 +222,13 @@ export function createAdminAuthService(
         await audit(tx, admin, 'password_reset', ip);
       });
     },
+    async signOutEverywhere(id, ip) {
+      await repository.transaction(async (tx) => {
+        const admin = await tx.adminById(id);
+        await tx.saveAdmin(id, { authVersion: (admin.authVersion || 0) + 1 });
+        await audit(tx, admin, 'sign_out_everywhere', ip);
+      });
+    },
     async changeSecurity(id, password, input, ip) {
       return repository.transaction(async (tx) => {
         const admin = await tx.adminById(id);

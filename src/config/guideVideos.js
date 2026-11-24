@@ -20,6 +20,9 @@ export const guideVideos = [
   { path: '/clients/*', title: 'Client details', video: SAMPLE },
   { path: '/clients', title: 'Clients', video: SAMPLE },
   { path: '/availability', title: 'Opening hours', video: SAMPLE },
+  { path: '/time-off', title: 'Time off', video: SAMPLE },
+  { path: '/email-templates', title: 'Email wording', video: SAMPLE },
+  { path: '/settings/*', title: 'Settings', video: SAMPLE },
   { path: '/seo', title: 'Search & AI', video: SAMPLE },
   {
     path: '/settings?tab=security',

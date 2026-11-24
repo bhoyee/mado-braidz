@@ -36,6 +36,32 @@ const pages = [
     'availability working week time off holidays blocked times',
   ],
   [
+    'Payments settings',
+    '/admin/settings/payments',
+    'deposit settings balance methods',
+  ],
+  [
+    'Policies',
+    '/admin/settings/policies',
+    'settings policy reschedule refund rules',
+  ],
+  ['Emails', '/admin/settings/emails', 'settings reminders alerts'],
+  [
+    'Email wording',
+    '/admin/email-templates',
+    'settings email templates subject text',
+  ],
+  [
+    'Time off',
+    '/admin/time-off',
+    'settings holidays blocked vacation special days closed',
+  ],
+  [
+    'Health check',
+    '/admin/settings/health',
+    'settings status working problems',
+  ],
+  [
     'Search & AI',
     '/admin/seo',
     'seo google bing titles descriptions verification settings',

@@ -17,6 +17,12 @@ const emailNames = {
   'reminder-48': 'Reminder before the visit',
   'reminder-morning': 'Reminder on the day',
   'admin-alert': 'Alert to the owner',
+  'thank-you': 'Thank you after a visit',
+  'winback-30': 'Come back, 30 days later',
+  'winback-60': 'Come back, 60 days later',
+  'winback-90': 'Come back, 90 days later',
+  'contact-enquiry': 'Website message to the owner',
+  'owner-test': 'Test email',
 };
 const actionNames = {
   create: 'Appointment created',

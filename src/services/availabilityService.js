@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon';
 import { BookingError } from './bookingErrors.js';
+import { hoursOn } from './openingHours.js';
 
 export const ZONE = 'America/New_York';
 const millis = (value) =>
@@ -48,9 +49,9 @@ export function daySlots({
   timeBlocks = [],
   now = DateTime.utc(),
 }) {
-  const day = localDay(date);
+  localDay(date);
   const config = settings.booking;
-  const hours = settings.hours.weekly[day.toFormat('cccc').toLowerCase()];
+  const hours = hoursOn(settings.hours, date);
   if (!hours || hours.closed) return [];
   if (
     !Number.isInteger(config.capacity) ||

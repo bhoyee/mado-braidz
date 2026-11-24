@@ -4,6 +4,7 @@
     <h2>{{ business.street }}<br><em>{{ business.city }}, {{ business.region }} {{ business.postalCode }}</em></h2>
     <dl class="visit-details">
       <div><dt>Hours</dt><dd>{{ hours.description or 'Call to confirm opening hours.' }}</dd></div>
+      {% if hours.specialDays and hours.specialDays.length %}<div><dt>Special days</dt><dd>{% for day in hours.specialDays %}{{ day.label }}: {{ day.text }}{% if day.note %} ({{ day.note }}){% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}</dd></div>{% endif %}
       <div><dt>Phone</dt><dd><a href="tel:{{ business.phone }}">{{ phoneDisplay }}</a></dd></div>
       <div><dt>Before you come</dt><dd>Call to confirm your appointment and directions.</dd></div>
     </dl>

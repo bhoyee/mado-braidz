@@ -16,6 +16,8 @@ import { createBookingRepository } from '../src/services/bookingRepository.js';
 import { createBookingService } from '../src/services/bookingService.js';
 import { createApp } from '../src/app.js';
 import { createAdminRepository } from '../src/services/adminRepository.js';
+import { createNotificationService } from '../src/services/notificationService.js';
+import { createNotificationRepository } from '../src/services/notificationRepository.js';
 import { createCatalogService } from '../src/services/catalogService.js';
 import { parseEnv } from '../src/config/env.js';
 import { paymentConfig, fakeStripe } from './fixtures/stripe.js';
@@ -75,12 +77,17 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       service = createManagementService(db, () => now.toJSDate());
       repository = createBookingRepository(db);
       bookings = createBookingService(repository, () => now, 'x'.repeat(32));
+      const config = parseEnv({
+        ...paymentConfig,
+        DATABASE_URL: url.toString(),
+        UPLOAD_DIR: uploadDir,
+      });
       app = createApp({
-        config: parseEnv({
-          ...paymentConfig,
-          DATABASE_URL: url.toString(),
-          UPLOAD_DIR: uploadDir,
-        }),
+        config,
+        notificationService: createNotificationService(
+          createNotificationRepository(db),
+          config,
+        ),
         catalog: createCatalogService(db),
         bookingRepository: repository,
         adminRepository: createAdminRepository(db),
@@ -1650,6 +1657,185 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
           await db.select().from(s.media).where(eq(s.media.id, privatePhoto.id))
         )[0].path,
       ).toBe('private-inspiration.webp');
+    });
+    const saveAs = (url, body) =>
+      agent
+        .post('/admin' + url)
+        .set('Accept', 'application/json')
+        .send({ ...body, _csrf: token });
+    it('saves each settings section without losing the others, and names the box to fix', async () => {
+      const before = (await service.all()).settings;
+      const business = {
+        name: 'Mado African Braidz',
+        phone: '443 743 4979',
+        street: '1 Main St',
+        city: 'Lanham',
+        region: 'MD',
+        postalCode: '20706',
+        instagram: '',
+        tiktok: '',
+        facebook: '',
+        google: '',
+      };
+      const bad = await saveAs('/settings/business', {
+        ...business,
+        phone: '12',
+        facebook: 'facebook.com/mado',
+      });
+      expect(bad.status).toBe(400);
+      expect(Object.keys(bad.body.fields).sort()).toEqual([
+        'facebook',
+        'phone',
+      ]);
+      await saveAs('/settings/business', business).expect(200);
+      await saveAs('/settings/payments', {
+        deposit: '42.50',
+        holdMinutes: '45',
+        depositCashapp: 'on',
+        balanceOnline: 'on',
+        balanceCash: 'on',
+        balanceZelle: 'on',
+        balanceCashapp: 'on',
+        balanceTerminal: 'on',
+      }).expect(200);
+      await saveAs('/settings/policies', {
+        rescheduleHours: '24',
+        freeReschedules: '2',
+        policyText: 'Be kind.',
+      }).expect(200);
+      expect(
+        (
+          await saveAs('/settings/emails', {
+            reminderHours: '48',
+            adminAlertEmails: 'one@example.com, nope',
+          })
+        ).body.fields.adminAlertEmails,
+      ).toContain('nope');
+      await saveAs('/settings/emails', {
+        reminderHours: '72',
+        adminAlertEmails: 'One@example.com, one@example.com',
+      }).expect(200);
+      const after = (await service.all()).settings;
+      expect(after.business.name).toBe('Mado African Braids');
+      expect(after.business.phone).toBe('+14437434979');
+      for (const key of Object.keys(before.business))
+        expect(after.business).toHaveProperty(key);
+      expect(after.booking).toEqual({
+        ...before.booking,
+        depositCents: 4250,
+        holdMinutes: 45,
+      });
+      expect(after.depositOptions).toMatchObject({
+        zelle: false,
+        cashapp: true,
+      });
+      expect(after.depositOptions.changedAt).toBeTruthy();
+      expect(after.policy).toMatchObject({
+        freeReschedules: 2,
+        depositRefundable: false,
+        text: 'Be kind.',
+      });
+      expect(after.emails.adminAlertEmails).toEqual(['one@example.com']);
+      await service.saveSettings(
+        {
+          booking: before.booking,
+          depositOptions: { zelle: true, cashapp: true },
+        },
+        actor,
+      );
+    });
+    it('warns before special hours leave a booked client outside them, then saves on request', async () => {
+      const closed = { date: '2026-12-03', closed: 'on', note: 'Holiday' };
+      const asked = await saveAs('/time-off/special', closed);
+      expect(asked.status).toBe(409);
+      expect(asked.body.confirm.detail).toContain('stay booked');
+      expect((await service.all()).settings.hours.special || []).toEqual([]);
+      await saveAs('/time-off/special', {
+        ...closed,
+        acknowledge: 'true',
+      }).expect(200);
+      expect((await service.all()).settings.hours.special).toHaveLength(1);
+      await saveAs('/time-off/special/remove', { date: closed.date }).expect(
+        200,
+      );
+      expect((await service.all()).settings.hours.special).toEqual([]);
+    });
+    it('closes a special day to new bookings', async () => {
+      await service.saveSpecialDay(
+        { date: '2026-12-09', closed: true, note: '' },
+        actor,
+      );
+      await expect(
+        bookings.createHold({ ...validHold, startAt: '2026-12-09T15:00:00Z' }),
+      ).rejects.toThrow();
+      await service.removeSpecialDay('2026-12-09', actor);
+    });
+    it('blocks several days as one entry and removes them together', async () => {
+      await saveAs('/availability/blocks', {
+        date: '2027-01-11',
+        endDate: '2027-01-13',
+        allDay: 'on',
+        reason: 'Trip',
+      }).expect(200);
+      const rows = () =>
+        db.select().from(s.timeBlocks).where(eq(s.timeBlocks.reason, 'Trip'));
+      const added = await rows();
+      expect(added).toHaveLength(3);
+      expect((await agent.get('/admin/time-off')).text).toContain(
+        'Mon, Jan 11 – Wed, Jan 13, 2027',
+      );
+      await saveAs(`/availability/blocks/${added[0].id}/remove`, {
+        series: 'true',
+      }).expect(200);
+      expect(await rows()).toHaveLength(0);
+    });
+    it('shows every settings page, and previews and restores email wording', async () => {
+      for (const path of [
+        '/settings',
+        '/settings/payments',
+        '/settings/policies',
+        '/settings/emails',
+        '/settings/health',
+        '/email-templates',
+        '/availability',
+        '/time-off',
+        '/seo',
+        '/settings?tab=security',
+        '/calendar',
+      ])
+        expect([path, (await agent.get('/admin' + path)).status]).toEqual([
+          path,
+          200,
+        ]);
+      const page = await agent.get('/admin/email-templates');
+      const keys = new Set(
+        [...page.text.matchAll(/name="template" value="([^"]+)"/g)].map(
+          (match) => match[1],
+        ),
+      );
+      expect(keys.size).toBeGreaterThan(5);
+      for (const template of keys) {
+        const mail = await saveAs('/email-templates/preview', {
+          template,
+          subject: 'Subject',
+          intro: 'Hello <script>x</script> there',
+        });
+        expect([template, mail.status]).toEqual([template, 200]);
+        expect(mail.text).not.toContain('<script>x');
+        expect(mail.headers['content-security-policy']).toContain('sandbox');
+      }
+      expect(keys).not.toContain('password-reset');
+      await saveAs('/email-templates', {
+        template: 'booking-confirmation',
+        subject: 'Yours',
+        intro: 'Mine',
+      }).expect(200);
+      await saveAs('/email-templates/reset', {
+        template: 'booking-confirmation',
+      }).expect(200);
+      expect(
+        (await service.all()).settings.emailTemplates['booking-confirmation'],
+      ).toBeUndefined();
     });
     it('denies management access to a non-owner account', async () => {
       await db

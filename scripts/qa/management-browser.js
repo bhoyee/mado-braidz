@@ -398,21 +398,28 @@ try {
     );
     await pool.query("DELETE FROM styles WHERE slug LIKE '%-copy%'");
     await page.goto(origin + '/admin/availability');
-    await page.getByLabel('Minimum advance notice (hours)').fill('12');
+    await page
+      .getByLabel('Shortest notice for online booking (hours)')
+      .fill('12');
     await save(
-      page.getByRole('button', { name: 'Save availability', exact: true }),
+      page.getByRole('button', { name: 'Save opening hours', exact: true }),
     );
     await page.waitForLoadState('networkidle');
     assert.equal((await repo.catalog()).settings.booking.minNoticeHours, 12);
     await page.goto(origin + '/admin/settings');
-    await page
-      .getByLabel('Business name', { exact: true })
-      .fill('Mado Test Studio');
+    await page.getByLabel('Business name').fill('Mado Test Studio ' + width);
+    await page.getByText('Unsaved changes').waitFor();
+    await save(page.getByRole('button', { name: 'Save business' }));
+    await page.waitForLoadState('networkidle');
+    await page.goto(origin + '/admin/settings/payments');
     await page.getByLabel('Booking deposit (USD)').fill('35');
+    await save(page.getByRole('button', { name: 'Save payments' }));
+    await page.waitForLoadState('networkidle');
+    await page.goto(origin + '/admin/settings/policies');
     await page
-      .getByLabel('Additional policy text')
+      .getByLabel('Added at the end of the Policies page')
       .fill('Please arrive ten minutes before your appointment.');
-    await save(page.getByRole('button', { name: 'Save settings' }));
+    await save(page.getByRole('button', { name: 'Save policies' }));
     await page.waitForLoadState('networkidle');
     assert.equal((await repo.catalog()).settings.booking.depositCents, 3500);
     assert.ok(

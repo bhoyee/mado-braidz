@@ -5,16 +5,22 @@ import {
   entityId,
   durationFromHours,
   checked,
-  dollars,
 } from '../../services/managementValidation.js';
 import { prepareCatalogImage } from '../../services/catalogImages.js';
 import { prepareCatalogVideo } from '../../services/catalogVideos.js';
 import { publicSettings } from '../../db/public-defaults.js';
-import { ManagementError } from '../../services/managementErrors.js';
+import { DateTime } from 'luxon';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import {
+  ManagementConfirm,
+  ManagementError,
+} from '../../services/managementErrors.js';
+import { rangeLabel } from '../../services/openingHours.js';
+import { groupBlocks, healthChecks } from '../../services/settingsView.js';
 import { seoPages, verificationTag } from '../../services/pageSeo.js';
 import { photoPlacement } from '../../services/photoPlacement.js';
 import { isShown, libraryPhoto } from '../../services/photoState.js';
-import { decorateCatalog, workItems } from '../public/index.js';
+import { decorateCatalog, studioName, workItems } from '../public/index.js';
 import { holdSchema } from '../public/booking.js';
 import {
   CLIENT_TAGS,
@@ -34,7 +40,12 @@ const optionalId = (v) => (v ? entityId.parse(v) : null);
 const text = (max) => z.string().trim().max(max).default('');
 const socials = z.union([
   z.literal(''),
-  z.url().refine((v) => v.startsWith('https://'), 'Use an HTTPS link'),
+  z
+    .url('Paste the full link, starting with https://')
+    .refine(
+      (v) => v.startsWith('https://'),
+      'Paste the full link, starting with https://',
+    ),
 ]);
 export function managementRouter(service, config) {
   const router = Router();
@@ -347,6 +358,42 @@ export function managementRouter(service, config) {
     '/availability',
     run((req, res) => render(req, res, 'availability')),
   );
+  router.get(
+    '/time-off',
+    run(async (req, res) => {
+      const data = await service.all();
+      const today = DateTime.now().setZone('America/New_York').toISODate();
+      res.render('admin/manage/time-off', {
+        ...data,
+        today,
+        specialDays: (data.settings.hours.special || [])
+          .filter((day) => day.date >= today)
+          .map((day) => ({
+            ...day,
+            label: DateTime.fromISO(day.date).toFormat('cccc, LLLL d, yyyy'),
+            text: rangeLabel(day),
+          })),
+        blockGroups: groupBlocks(data.blocks),
+      });
+    }),
+  );
+  router.post(
+    '/time-off/special',
+    run(async (req, res) => {
+      await service.saveSpecialDay(req.body, actor(req, res));
+      finish(req, res, '/admin/time-off');
+    }),
+  );
+  router.post(
+    '/time-off/special/remove',
+    run(async (req, res) => {
+      await service.removeSpecialDay(
+        z.iso.date().parse(req.body.date),
+        actor(req, res),
+      );
+      finish(req, res, '/admin/time-off');
+    }),
+  );
   router.post(
     '/availability',
     run(async (req, res) => {
@@ -358,7 +405,7 @@ export function managementRouter(service, config) {
     '/availability/blocks',
     run(async (req, res) => {
       await service.addBlocks(req.body, actor(req, res));
-      finish(req, res, '/admin/availability');
+      finish(req, res, '/admin/time-off');
     }),
   );
   router.post(
@@ -369,7 +416,7 @@ export function managementRouter(service, config) {
         checked.parse(req.body.series),
         actor(req, res),
       );
-      finish(req, res, '/admin/availability');
+      finish(req, res, '/admin/time-off');
     }),
   );
   // Exactly what clients see on Our Work, in order.
@@ -1035,101 +1082,185 @@ export function managementRouter(service, config) {
       finish(req, res, '/admin/seo');
     }),
   );
-  router.get(
-    '/settings',
-    run((req, res) =>
-      render(req, res, 'settings', {
-        stripeMode: config.STRIPE_SECRET_KEY?.startsWith('sk_live_')
-          ? 'Live'
-          : 'Test',
+  const settingsPage = (path, view, extra = () => ({})) =>
+    router.get(
+      path,
+      run(async (req, res) => render(req, res, view, await extra())),
+    );
+  const stripeMode = config.STRIPE_SECRET_KEY?.startsWith('sk_live_')
+    ? 'live'
+    : 'test';
+  settingsPage('/settings', 'settings');
+  settingsPage('/settings/payments', 'settings-payments', async () => {
+    const { settings } = await service.all();
+    return {
+      stripeMode,
+      holdChoices: [
+        ...new Set([30, 45, 60, 90, 120, settings.booking.holdMinutes]),
+      ].sort((a, b) => a - b),
+      recipients: {
+        name: config.MANUAL_PAYMENT_NAME,
+        zelle: config.ZELLE_RECIPIENT,
+        cashapp: config.CASHAPP_CASHTAG,
+      },
+    };
+  });
+  settingsPage('/settings/policies', 'settings-policies');
+  settingsPage('/settings/emails', 'settings-emails', async () => {
+    const { settings } = await service.all();
+    const saved = settings.emails?.reminderHours || 48;
+    return {
+      reminderChoices: [...new Set([24, 48, 72, saved])]
+        .sort((a, b) => a - b)
+        .map((hours) => [
+          hours,
+          hours % 24
+            ? `${hours} hours before`
+            : `${hours / 24} day${hours === 24 ? '' : 's'} before`,
+        ]),
+    };
+  });
+  settingsPage('/settings/health', 'settings-health', async () => ({
+    checks: healthChecks(await service.health(), config),
+  }));
+  const saveSection = (path, schema, values) =>
+    router.post(
+      '/settings/' + path,
+      run(async (req, res) => {
+        const input = schema.parse(req.body);
+        const current = (await service.all()).settings;
+        await service.saveSettings(values(input, current), actor(req, res));
+        finish(
+          req,
+          res,
+          path === 'business' ? '/admin/settings' : '/admin/settings/' + path,
+        );
       }),
-    ),
-  );
-  router.post(
-    '/settings',
-    run(async (req, res) => {
-      const v = z
-        .object({
-          name: z.string().trim().min(2).max(120),
-          street: text(200),
-          city: text(100),
-          region: text(50),
-          postalCode: text(20),
-          phone: z
-            .string()
-            .regex(/^\+1\d{10}$/, 'Use a US number such as +14437434979'),
-          instagram: socials,
-          tiktok: socials,
-          facebook: socials,
-          google: socials,
-          deposit: dollars.refine(
-            (value) => value >= 50,
-            'Deposit must be at least $0.50',
-          ),
-          holdMinutes: z.coerce.number().int().min(30).max(120),
-          rescheduleHours: z.coerce.number().int().min(0).max(168),
-          freeReschedules: z.coerce.number().int().min(0).max(10),
-          depositRefundable: checked,
-          policyText: text(5000),
-          reminderHours: z.coerce.number().int().min(1).max(168),
-          morningReminder: checked,
-          winback: checked,
-          adminAlertEmails: text(1000),
-          balanceOnline: checked,
-          balanceCash: checked,
-          balanceZelle: checked,
-          balanceCashapp: checked,
-          balanceTerminal: checked,
-        })
-        .parse(req.body);
-      const emails = v.adminAlertEmails
-        .split(/[\s,;]+/)
-        .filter(Boolean)
-        .map((e) => z.email().parse(e));
-      await service.saveSettings(
-        {
-          business: {
-            name: v.name,
-            street: v.street,
-            city: v.city,
-            region: v.region,
-            postalCode: v.postalCode,
-            phone: v.phone,
-            social: {
-              instagram: v.instagram,
-              tiktok: v.tiktok,
-              facebook: v.facebook,
-              google: v.google,
-            },
-          },
-          booking: {
-            depositCents: v.deposit,
-            holdMinutes: v.holdMinutes,
-          },
-          policy: {
-            rescheduleHours: v.rescheduleHours,
-            freeReschedules: v.freeReschedules,
-            depositRefundable: v.depositRefundable,
-            text: v.policyText,
-          },
-          emails: {
-            reminderHours: v.reminderHours,
-            morningReminder: v.morningReminder,
-            winback: v.winback,
-            adminAlertEmails: emails,
-          },
-          balanceOptions: {
-            online: v.balanceOnline,
-            cash: v.balanceCash,
-            zelle: v.balanceZelle,
-            cashapp: v.balanceCashapp,
-            terminal: v.balanceTerminal,
-          },
-        },
-        actor(req, res),
-      );
-      finish(req, res, '/admin/settings');
+    );
+  const whole = (min, max, message) =>
+    z.coerce.number(message).int(message).min(min, message).max(max, message);
+  saveSection(
+    'business',
+    z.object({
+      name: z
+        .string()
+        .trim()
+        .min(2, 'Enter the business name')
+        .max(120)
+        .transform(studioName),
+      phone: z.string().transform((value, context) => {
+        const phone = parsePhoneNumberFromString(value, 'US');
+        if (phone?.country === 'US' && phone.isValid()) return phone.number;
+        context.addIssue({
+          code: 'custom',
+          message: 'Enter a US number, such as (443) 743-4979',
+        });
+        return z.NEVER;
+      }),
+      street: z.string().trim().min(2, 'Enter the street address').max(200),
+      city: z.string().trim().min(2, 'Enter the city').max(100),
+      region: z.string().trim().min(2, 'Enter the state').max(50),
+      postalCode: z
+        .string()
+        .trim()
+        .regex(/^\d{5}(?:-\d{4})?$/, 'Enter a ZIP code, such as 20706'),
+      instagram: socials,
+      tiktok: socials,
+      facebook: socials,
+      google: socials,
     }),
+    ({ instagram, tiktok, facebook, google, ...business }, current) => ({
+      business: {
+        ...business,
+        social: {
+          ...current.business.social,
+          instagram,
+          tiktok,
+          facebook,
+          google,
+        },
+      },
+    }),
+  );
+  saveSection(
+    'payments',
+    z.object({
+      deposit: z
+        .string()
+        .trim()
+        .regex(/^\d{1,6}(?:\.\d{1,2})?$/, 'Enter an amount, such as 30')
+        .transform((value) => Math.round(Number(value) * 100))
+        .refine((value) => value >= 50, 'The deposit must be at least $0.50'),
+      holdMinutes: whole(30, 120, 'Choose 30 to 120 minutes'),
+      depositZelle: checked,
+      depositCashapp: checked,
+      balanceOnline: checked,
+      balanceCash: checked,
+      balanceZelle: checked,
+      balanceCashapp: checked,
+      balanceTerminal: checked,
+    }),
+    (v, current) => {
+      const before = current.depositOptions || {};
+      const changed =
+        (before.zelle !== false) !== v.depositZelle ||
+        (before.cashapp !== false) !== v.depositCashapp;
+      return {
+        booking: { depositCents: v.deposit, holdMinutes: v.holdMinutes },
+        depositOptions: {
+          zelle: v.depositZelle,
+          cashapp: v.depositCashapp,
+          ...(changed ? { changedAt: new Date().toISOString() } : {}),
+        },
+        balanceOptions: {
+          online: v.balanceOnline,
+          cash: v.balanceCash,
+          zelle: v.balanceZelle,
+          cashapp: v.balanceCashapp,
+          terminal: v.balanceTerminal,
+        },
+      };
+    },
+  );
+  saveSection(
+    'policies',
+    z.object({
+      rescheduleHours: whole(0, 168, 'Enter 0 to 168 hours'),
+      freeReschedules: whole(0, 10, 'Enter 0 to 10'),
+      depositRefundable: checked,
+      policyText: text(5000),
+    }),
+    ({ policyText, ...policy }) => ({
+      policy: { ...policy, text: policyText },
+    }),
+  );
+  saveSection(
+    'emails',
+    z.object({
+      reminderHours: whole(1, 168, 'Choose 1 to 168 hours'),
+      morningReminder: checked,
+      winback: checked,
+      adminAlertEmails: text(1000).transform((value, context) => {
+        const list = [
+          ...new Set(
+            value
+              .split(/[\s,;]+/)
+              .filter(Boolean)
+              .map((item) => item.toLowerCase()),
+          ),
+        ];
+        const bad = list.find((item) => !z.email().safeParse(item).success);
+        if (bad || list.length > 10)
+          context.addIssue({
+            code: 'custom',
+            message: bad
+              ? `${bad} is not an email address`
+              : 'Keep up to 10 addresses',
+          });
+        return list;
+      }),
+    }),
+    (emails) => ({ emails }),
   );
   router.use((error, req, res, _next) => {
     req.log?.error({ err: error }, 'Owner management request failed');
@@ -1146,9 +1277,27 @@ export function managementRouter(service, config) {
             : error instanceof ManagementError
               ? error.message
               : 'Unable to save. Please refresh and try again.';
-    const status = error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    const status =
+      error.code === 'LIMIT_FILE_SIZE'
+        ? 413
+        : error instanceof ManagementConfirm
+          ? 409
+          : 400;
     if (req.accepts(['html', 'json']) === 'json')
-      return res.status(status).json({ message });
+      return res.status(status).json({
+        message,
+        ...(error.confirm ? { confirm: error.confirm } : {}),
+        // Lets the page mark the exact boxes to fix.
+        ...(error instanceof z.ZodError
+          ? {
+              fields: Object.fromEntries(
+                error.issues
+                  .filter((issue) => issue.path.length === 1)
+                  .map((issue) => [issue.path[0], issue.message]),
+              ),
+            }
+          : {}),
+      });
     res.status(status).render('admin/error', { error: message });
   });
   return router;

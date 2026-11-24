@@ -1,4 +1,5 @@
-import { ManagementError } from './managementErrors.js';
+import { ManagementConfirm, ManagementError } from './managementErrors.js';
+import { outsideHours, weekSummary } from './openingHours.js';
 import { and, eq, desc, asc, inArray, sql, lt, gt } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { studioVideos } from './studioVideos.js';
@@ -20,6 +21,8 @@ import {
   redirectInput,
   availabilityInput,
   blockOccurrences,
+  checked,
+  specialDayInput,
 } from './managementValidation.js';
 
 export function createManagementService(db, clock = () => new Date()) {
@@ -184,6 +187,59 @@ export function createManagementService(db, clock = () => new Date()) {
         await audit(tx, actor, 'media', row.id, row, values);
       }
     });
+  }
+  const named = (rows) =>
+    [...new Map(rows.map((row) => [row.id, row])).values()]
+      .slice(0, 4)
+      .map(
+        (row) =>
+          `${row.name}, ${DateTime.fromJSDate(row.startAt, { zone: 'America/New_York' }).toFormat('ccc LLL d, h:mm a')}`,
+      )
+      .join('; ') + (rows.length > 4 ? `; and ${rows.length - 4} more` : '');
+  const heldSettings = async (tx) =>
+    Object.fromEntries(
+      (await tx.select().from(s.settings).for('update')).map((row) => [
+        row.key,
+        typeof row.value === 'string' ? JSON.parse(row.value) : row.value,
+      ]),
+    );
+  // New hours never move a booking, so show which ones they would leave behind.
+  async function warnOutside(tx, hours, oldHours, acknowledged, onlyDate) {
+    if (checked.parse(acknowledged)) return;
+    const upcoming = await tx
+      .select({
+        id: s.bookings.id,
+        startAt: s.bookings.startAt,
+        endAt: s.bookings.endAt,
+        name: s.clients.name,
+      })
+      .from(s.bookings)
+      .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
+      .where(
+        and(
+          gt(s.bookings.startAt, clock()),
+          sql`(${s.bookings.status} = 'confirmed' OR (${s.bookings.status} = 'pending_payment' AND ${s.bookings.holdExpiresAt} > ${clock()}))`,
+        ),
+      )
+      .orderBy(asc(s.bookings.startAt));
+    const already = new Set(
+      outsideHours(upcoming, oldHours).map((row) => row.id),
+    );
+    const left = outsideHours(upcoming, hours).filter(
+      (row) =>
+        !already.has(row.id) &&
+        (!onlyDate ||
+          DateTime.fromJSDate(row.startAt, {
+            zone: 'America/New_York',
+          }).toISODate() === onlyDate),
+    );
+    if (left.length)
+      throw new ManagementConfirm(
+        left.length === 1
+          ? '1 appointment is outside these hours'
+          : `${left.length} appointments are outside these hours`,
+        `${named(left)}. They stay booked unless you move them. Clients are not emailed.`,
+      );
   }
   async function newSlug(tx, name, table, fallback) {
     const base =
@@ -901,39 +957,124 @@ export function createManagementService(db, clock = () => new Date()) {
     async saveAvailability(raw, actor) {
       const v = availabilityInput(raw);
       await db.transaction(async (tx) => {
-        const old = Object.fromEntries(
-          (await tx.select().from(s.settings).for('update')).map((r) => [
-            r.key,
-            typeof r.value === 'string' ? JSON.parse(r.value) : r.value,
-          ]),
-        );
-        const fmt = (t) =>
-          DateTime.fromISO('2026-01-01T' + t).toFormat('h:mm a');
-        const summary = Object.entries(v.weekly)
-          .map(
-            ([day, h]) =>
-              day.slice(0, 3) +
-              ': ' +
-              (h.closed ? 'Closed' : fmt(h.open) + '–' + fmt(h.close)),
-          )
-          .join(' · ');
-        await setting(
-          tx,
-          'hours',
-          {
-            ...old.hours,
-            customHours: true,
-            weekly: v.weekly,
-            summary,
-            description: summary,
-            daysLabel: 'Opening hours',
-            timeLabel: 'See weekly schedule',
-            sundayLabel: 'Eastern time',
-          },
-          actor,
-        );
+        const old = await heldSettings(tx);
+        const hours = {
+          ...old.hours,
+          customHours: true,
+          weekly: v.weekly,
+          summary: weekSummary(v.weekly),
+          description: weekSummary(v.weekly),
+        };
+        await warnOutside(tx, hours, old.hours, raw.acknowledge);
+        await setting(tx, 'hours', hours, actor);
         await setting(tx, 'booking', { ...old.booking, ...v.booking }, actor);
       });
+    },
+    async saveSpecialDay(raw, actor) {
+      const day = specialDayInput.parse(raw);
+      const today = DateTime.fromJSDate(clock(), {
+        zone: 'America/New_York',
+      }).toISODate();
+      if (day.date < today)
+        throw new ManagementError('Choose today or a later date.');
+      await db.transaction(async (tx) => {
+        const old = await heldSettings(tx);
+        const special = [
+          ...(old.hours.special || []).filter(
+            (item) => item.date !== day.date && item.date >= today,
+          ),
+          day,
+        ].sort((a, b) => a.date.localeCompare(b.date));
+        if (special.length > 60)
+          throw new ManagementError('Keep up to 60 special days.');
+        const hours = { ...old.hours, special };
+        await warnOutside(tx, hours, old.hours, raw.acknowledge, day.date);
+        await setting(tx, 'hours', hours, actor);
+      });
+    },
+    async removeSpecialDay(date, actor) {
+      await db.transaction(async (tx) => {
+        const old = await heldSettings(tx);
+        const special = (old.hours.special || []).filter(
+          (item) => item.date !== date,
+        );
+        await setting(tx, 'hours', { ...old.hours, special }, actor);
+      });
+    },
+    owners: () =>
+      db
+        .select({
+          id: s.admins.id,
+          name: s.admins.name,
+          email: s.admins.email,
+          role: s.admins.role,
+          lastLoginAt: s.admins.lastLoginAt,
+        })
+        .from(s.admins)
+        .where(eq(s.admins.role, 'owner'))
+        .orderBy(asc(s.admins.id)),
+    // Only facts this site can check for itself.
+    async health() {
+      const now = clock();
+      const day = new Date(+now - 86400000);
+      const [late, failed, lastDone, emails, lastEmail, lastEvent, alerts] =
+        await Promise.all([
+          db
+            .select({ count: sql`COUNT(*)` })
+            .from(s.jobs)
+            .where(
+              and(
+                eq(s.jobs.status, 'pending'),
+                lt(s.jobs.runAt, new Date(+now - 20 * 60000)),
+              ),
+            ),
+          db
+            .select({ count: sql`COUNT(*)` })
+            .from(s.jobs)
+            .where(and(eq(s.jobs.status, 'failed'), gt(s.jobs.runAt, day))),
+          db
+            .select({ at: s.jobs.runAt })
+            .from(s.jobs)
+            .where(eq(s.jobs.status, 'done'))
+            .orderBy(desc(s.jobs.runAt))
+            .limit(1),
+          db
+            .select({
+              failed: sql`COALESCE(SUM(${s.emailLog.status} IN ('failed','unknown','bounced','blocked')), 0)`,
+              sent: sql`COUNT(*)`,
+            })
+            .from(s.emailLog)
+            .where(gt(s.emailLog.createdAt, day)),
+          db
+            .select({ at: s.emailLog.createdAt })
+            .from(s.emailLog)
+            .where(
+              inArray(s.emailLog.status, [
+                'sent',
+                'delivered',
+                'opened',
+                'clicked',
+              ]),
+            )
+            .orderBy(desc(s.emailLog.id))
+            .limit(1),
+          db
+            .select({ at: s.stripeEvents.receivedAt })
+            .from(s.stripeEvents)
+            .orderBy(desc(s.stripeEvents.receivedAt))
+            .limit(1),
+          db.select({ count: sql`COUNT(*)` }).from(s.pushSubscriptions),
+        ]);
+      return {
+        late: Number(late[0].count),
+        failed: Number(failed[0].count),
+        lastJob: lastDone[0]?.at || null,
+        emailsSent: Number(emails[0].sent),
+        emailsFailed: Number(emails[0].failed),
+        lastEmail: lastEmail[0]?.at || null,
+        lastCardEvent: lastEvent[0]?.at || null,
+        alertDevices: Number(alerts[0].count),
+      };
     },
     async saveSettings(values, actor) {
       await db.transaction(async (tx) => {
@@ -943,7 +1084,12 @@ export function createManagementService(db, clock = () => new Date()) {
     },
     async addBlocks(raw, actor) {
       const rows = blockOccurrences(raw),
-        series = raw.repeat === 'weekly' ? 'weekly:' + randomUUID() : null;
+        series =
+          raw.repeat === 'weekly'
+            ? 'weekly:' + randomUUID()
+            : rows.length > 1
+              ? 'range:' + randomUUID()
+              : null;
       await db.transaction(async (tx) => {
         const dates = [
           ...new Set(
@@ -964,23 +1110,30 @@ export function createManagementService(db, clock = () => new Date()) {
             .where(eq(s.calendarLocks.date, date))
             .for('update');
         }
+        const clashes = [];
         for (const row of rows) {
           const conflict = await tx
-            .select({ id: s.bookings.id })
+            .select({
+              id: s.bookings.id,
+              startAt: s.bookings.startAt,
+              name: s.clients.name,
+            })
             .from(s.bookings)
+            .innerJoin(s.clients, eq(s.bookings.clientId, s.clients.id))
             .where(
               and(
                 lt(s.bookings.startAt, row.endAt),
                 gt(s.bookings.blockEndAt, row.startAt),
-                sql`(status IN ('confirmed','completed') OR (status = 'pending_payment' AND hold_expires_at > ${clock()}))`,
+                sql`(${s.bookings.status} IN ('confirmed','completed') OR (${s.bookings.status} = 'pending_payment' AND hold_expires_at > ${clock()}))`,
               ),
             )
             .for('update');
-          if (conflict.length)
-            throw new ManagementError(
-              'This time overlaps an existing appointment or payment hold. Move the appointment first.',
-            );
+          if (conflict.length) clashes.push(...conflict);
         }
+        if (clashes.length)
+          throw new ManagementError(
+            `This time overlaps an existing appointment or payment hold: ${named(clashes)}. Move ${clashes.length === 1 ? 'it' : 'them'} first.`,
+          );
         for (const row of rows) {
           const [created] = await tx
             .insert(s.timeBlocks)

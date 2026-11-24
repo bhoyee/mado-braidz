@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import { tokenHash } from '../../services/bookingService.js';
 import { generateToken } from '../../middleware/csrf.js';
-import { paymentPortal, manualMethods } from './paymentPortal.js';
+import {
+  initialOptions,
+  manualMethods,
+  paymentPortal,
+} from './paymentPortal.js';
 import { payableBalance } from '../../services/paymentEligibility.js';
 export function paymentPages(repository, config, payments, catalog) {
   const router = Router();
@@ -28,7 +32,8 @@ export function paymentPages(repository, config, payments, catalog) {
         : row.priceSnapshot;
     const proofs = await repository.proofs(row.id);
     const pendingProof = proofs.find((p) => p.status === 'pending');
-    const options = (await catalog.load()).settings.balanceOptions || {};
+    const { settings } = await catalog.load();
+    const options = settings.balanceOptions || {};
     res
       .set({
         'Cache-Control': 'no-store',
@@ -46,7 +51,9 @@ export function paymentPages(repository, config, payments, catalog) {
           : row.balanceCents,
         manualMethods: manualMethods(
           config,
-          row.status === 'pending_payment' ? {} : options,
+          row.status === 'pending_payment'
+            ? initialOptions(settings, row)
+            : options,
         ),
         balanceOptions: options,
         paymentName: config.MANUAL_PAYMENT_NAME,

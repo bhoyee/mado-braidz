@@ -1,12 +1,12 @@
 import { pageSeo, siteGuide } from '../../services/pageSeo.js';
 import { publicSettings } from '../../db/public-defaults.js';
 import { focusClass, orderWork } from '../../services/photoState.js';
+import { publicHours } from '../../services/openingHours.js';
 import { studioVideos } from '../../services/studioVideos.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { marked } from 'marked';
 import sanitizeHtml from 'sanitize-html';
-import { DateTime } from 'luxon';
 import { generateToken } from '../../middleware/csrf.js';
 export const areas = {
   bowie: {
@@ -259,6 +259,9 @@ export function workItems(
   }
   return orderWork(items, order);
 }
+// "braidz" is only in the web address.
+export const studioName = (name) =>
+  String(name || '').replace(/\bBraidz?\b/gi, 'Braids');
 export function decorateCatalog(data) {
   const styles = data.styles.map((style) => {
     const allPhotos = (style.photos || []).map(safePhoto).filter(Boolean);
@@ -336,26 +339,10 @@ export function decorateCatalog(data) {
   const b = {
     ...data.settings.business,
     // Earlier setups stored the domain spelling.
-    name: data.settings.business.name.replace(/\bBraidz\b/, 'Braids'),
+    name: studioName(data.settings.business.name),
   };
   const pages = { ...(data.settings.seo?.pages || {}) };
-  let openingHours = data.settings.hours;
-  if (openingHours?.customHours) {
-    const today = DateTime.now().setZone('America/New_York');
-    const current = openingHours.weekly[today.toFormat('cccc').toLowerCase()];
-    const format = (value) =>
-      DateTime.fromISO(today.toISODate() + 'T' + value, {
-        zone: 'America/New_York',
-      }).toFormat('h:mm a');
-    openingHours = {
-      ...openingHours,
-      daysLabel: today.toFormat('cccc'),
-      timeLabel: current.closed
-        ? 'Closed'
-        : format(current.open) + '–' + format(current.close),
-      sundayLabel: 'Eastern time',
-    };
-  }
+  const openingHours = publicHours(data.settings.hours);
   if (pages.faq)
     pages.faq = pages.faq.map((item) => {
       const initial = publicSettings.seo.pages.faq.find(
@@ -460,6 +447,9 @@ export function publicRouter(catalog, paymentRoutes, contactRoutes) {
       Object.assign(res.locals, decorateCatalog(await catalog.load()), {
         currentPath: req.path,
       });
+      res.locals.manualMethods = (req.app.locals.manualMethods || []).filter(
+        (method) => res.locals.settings?.depositOptions?.[method.id] !== false,
+      );
       res.locals.seo = pageSeo(
         req.path,
         res.locals,

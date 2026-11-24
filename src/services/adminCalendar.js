@@ -80,6 +80,22 @@ export function calendarBlock(block) {
     end: new Date(block.endAt).toISOString(),
     editable: false,
     classNames: ['calendar-block'],
-    extendedProps: { block: true },
+    extendedProps: {
+      block: true,
+      blockId: block.id,
+      repeat: Boolean(block.repeatRule),
+      when: `${et(new Date(block.startAt), 'ccc, LLL d · h:mm a')} – ${et(new Date(block.endAt), 'h:mm a')} ET`,
+    },
+  };
+}
+export function calendarShade(shade) {
+  return {
+    id: shade.id,
+    title: shade.title,
+    start: shade.startAt.toISOString(),
+    end: shade.endAt.toISOString(),
+    editable: false,
+    classNames: ['calendar-block'],
+    extendedProps: { block: true, special: true },
   };
 }

@@ -3446,19 +3446,28 @@ dialog .button-row {
   white-space: nowrap;
 }
 
+/* Beside the page title: the heading is a flex box, so it sits next to a float. */
 .owner-back-nav {
-  margin-bottom: 20px;
+  float: left;
+  margin: clamp(42px, 3.6vw, 52px) 16px 0 0;
+}
+.owner-back-nav ~ .owner-panel {
+  clear: both;
 }
 .owner-app .owner-back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 10px 14px;
-  font-size: 14px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #c9bccd;
+  border-radius: 50%;
+  background: #fffdfb;
+  color: #5f2d9e;
 }
-.owner-back-link svg {
-  flex-shrink: 0;
+.owner-app .owner-back-link:hover {
+  border-color: #5f2d9e;
+  background: #5f2d9e;
+  color: #fff;
 }
 .owner-app [data-appointment-filters] .owner-filter-clear {
   display: inline-flex;

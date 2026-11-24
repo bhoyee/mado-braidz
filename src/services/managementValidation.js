@@ -143,39 +143,99 @@ export function availabilityInput(raw) {
       .parse(raw),
   };
 }
+export const specialDayInput = z
+  .object({
+    date: z.iso.date('Choose a date'),
+    closed: checked,
+    open: z.string().default(''),
+    close: z.string().default(''),
+    note: text(60),
+  })
+  .superRefine((value, context) => {
+    if (value.closed) return;
+    const time = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+    for (const key of ['open', 'close'])
+      if (!time.test(value[key]))
+        context.addIssue({
+          code: 'custom',
+          path: [key],
+          message: 'Choose a time, or tick Closed',
+        });
+    if (value.open >= value.close)
+      context.addIssue({
+        code: 'custom',
+        path: ['close'],
+        message: 'Closing time must be after opening time',
+      });
+  })
+  .transform((value) =>
+    value.closed
+      ? { date: value.date, closed: true, note: value.note }
+      : {
+          date: value.date,
+          closed: false,
+          open: value.open,
+          close: value.close,
+          note: value.note,
+        },
+  );
 export function blockOccurrences(raw) {
+  const ZONE = 'America/New_York';
   const v = z
     .object({
-      date: z.iso.date(),
-      start: z.string().regex(/^\d\d:\d\d$/),
-      end: z.string().regex(/^\d\d:\d\d$/),
+      date: z.iso.date('Choose a date'),
+      endDate: z.union([z.iso.date(), z.literal('')]).default(''),
+      allDay: checked,
+      start: z.string().default(''),
+      end: z.string().default(''),
       reason: text(500),
-      repeat: z.enum(['once', 'weekly']),
+      repeat: z.enum(['once', 'weekly']).default('once'),
       until: z.string().default(''),
     })
     .parse(raw);
-  const start = DateTime.fromISO(v.date + 'T' + v.start, {
-      zone: 'America/New_York',
-    }),
-    end = DateTime.fromISO(v.date + 'T' + v.end, { zone: 'America/New_York' });
+  const time = /^\d\d:\d\d$/;
+  if (!v.allDay && (!time.test(v.start) || !time.test(v.end)))
+    throw new ManagementError('Choose a valid start and end time');
+  const span = (date) => {
+    const day = DateTime.fromISO(date, { zone: ZONE });
+    if (v.allDay) return [day, day.plus({ days: 1 })];
+    return [
+      DateTime.fromISO(`${date}T${v.start}`, { zone: ZONE }),
+      DateTime.fromISO(`${date}T${v.end}`, { zone: ZONE }),
+    ];
+  };
+  const [start, end] = span(v.date);
   if (
     !start.isValid ||
     !end.isValid ||
-    start.toFormat('HH:mm') !== v.start ||
-    end.toFormat('HH:mm') !== v.end ||
+    (!v.allDay &&
+      (start.toFormat('HH:mm') !== v.start ||
+        end.toFormat('HH:mm') !== v.end)) ||
     end <= start
   )
     throw new ManagementError('Choose a valid start and end time');
-  const until =
-    v.repeat === 'weekly'
-      ? DateTime.fromISO(v.until, { zone: 'America/New_York' }).endOf('day')
-      : end;
-  if (!until.isValid || until < end || until > start.plus({ days: 365 }))
-    throw new ManagementError('Choose a repeat end date within one year');
+  const weekly = v.repeat === 'weekly';
+  const last = weekly ? v.until : v.endDate || v.date;
+  const until = DateTime.fromISO(last, { zone: ZONE });
+  if (!until.isValid || last < v.date || until > start.plus({ days: 365 }))
+    throw new ManagementError(
+      weekly
+        ? 'Choose a repeat end date within one year'
+        : 'Choose a last day after the first day',
+    );
+  if (!weekly && until.diff(start.startOf('day'), 'days').days > 60)
+    throw new ManagementError('Block up to 60 days at a time');
   const rows = [];
-  for (let a = start; a <= until; a = a.plus({ weeks: 1 })) {
-    const b = a.set({ hour: end.hour, minute: end.minute });
-    if (a.toFormat('HH:mm') !== v.start || b.toFormat('HH:mm') !== v.end)
+  for (
+    let day = start.startOf('day');
+    day.toISODate() <= last;
+    day = day.plus(weekly ? { weeks: 1 } : { days: 1 })
+  ) {
+    const [a, b] = span(day.toISODate());
+    if (
+      !v.allDay &&
+      (a.toFormat('HH:mm') !== v.start || b.toFormat('HH:mm') !== v.end)
+    )
       throw new ManagementError(
         'A repeated time falls in a daylight-saving gap',
       );
@@ -184,7 +244,6 @@ export function blockOccurrences(raw) {
       endAt: b.toUTC().toJSDate(),
       reason: v.reason,
     });
-    if (v.repeat === 'once') break;
   }
   return rows;
 }

@@ -22,6 +22,16 @@ import {
   paymentPageUrl,
 } from '../../services/paymentAccess.js';
 
+// A switched-off method stays open for bookings made before the change, so
+// nobody who already sent money is stuck.
+export function initialOptions(settings, booking) {
+  const options = settings?.depositOptions || {};
+  return options.changedAt &&
+    booking.createdAt &&
+    new Date(booking.createdAt) < new Date(options.changedAt)
+    ? {}
+    : options;
+}
 export function manualMethods(config, options = {}) {
   return [
     ...(config.ZELLE_RECIPIENT && options.zelle !== false
@@ -70,9 +80,11 @@ export function paymentPortal(repository, config, payments, catalog) {
       .render('pages/pay', {
         title: 'Make a payment | Mado African Braids',
         csrfToken: generateToken(req),
-        manualMethods: manualMethods(
-          config,
-          res.locals.settings?.balanceOptions,
+        // Shown as a guide; each visit page lists what that payment accepts.
+        manualMethods: manualMethods(config).filter((method) =>
+          ['depositOptions', 'balanceOptions'].some(
+            (key) => res.locals.settings?.[key]?.[method.id] !== false,
+          ),
         ),
         paymentName: config.MANUAL_PAYMENT_NAME,
         hideMobileBooking: true,
@@ -357,10 +369,11 @@ export function paymentPortal(repository, config, payments, catalog) {
           .parse(req.params.ref);
         const booking = await payments.authorize(ref, paymentToken(req, ref));
         const method = z.enum(['zelle', 'cashapp']).parse(req.body.method);
+        const { settings } = await catalog.load();
         const options =
           booking.status === 'pending_payment'
-            ? {}
-            : (await catalog.load()).settings.balanceOptions;
+            ? initialOptions(settings, booking)
+            : settings.balanceOptions;
         if (!manualMethods(config, options).some((m) => m.id === method))
           throw new BookingError(
             'METHOD_UNAVAILABLE',

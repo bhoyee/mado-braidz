@@ -342,6 +342,37 @@ if (resetToken && /^[a-f0-9]{64}$/.test(location.hash.slice(1))) {
   resetToken.value = location.hash.slice(1);
   history.replaceState(null, '', location.pathname);
 }
+function clearFieldErrors(form) {
+  for (const note of form.querySelectorAll('[data-field-error]')) note.remove();
+  for (const input of form.querySelectorAll('[data-had-error]')) {
+    input.removeAttribute('aria-invalid');
+    input.removeAttribute('aria-describedby');
+    input.removeAttribute('data-had-error');
+  }
+}
+// Marks the exact boxes to fix, and goes to the first one.
+function showFieldErrors(form, fields) {
+  let first = null;
+  for (const [name, message] of Object.entries(fields || {})) {
+    const input = form.elements[name];
+    if (!(input instanceof HTMLElement)) continue;
+    const target =
+      input.type === 'hidden'
+        ? form.querySelector('[data-email-new]') || input
+        : input;
+    const note = document.createElement('span');
+    note.className = 'field-problem';
+    note.dataset.fieldError = '';
+    note.id = `problem-${name}`;
+    note.textContent = message;
+    target.after(note);
+    target.setAttribute('aria-invalid', 'true');
+    target.setAttribute('aria-describedby', note.id);
+    target.dataset.hadError = '';
+    first ||= target;
+  }
+  first?.focus();
+}
 document.querySelectorAll('[data-owner-form]').forEach((form) => {
   const formError = form.querySelector('[data-owner-form-error]');
   const reportError = (message) => {
@@ -352,10 +383,13 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
   };
   let busy = false;
   let confirming = false;
+  let acknowledged = false;
   form.addEventListener('submit', async (event) => {
+    // A preview opens in its own tab instead of saving.
+    if (event.submitter?.hasAttribute('data-native-submit')) return;
     event.preventDefault();
     if (busy || confirming) return;
-    if (form.dataset.confirm) {
+    if (form.dataset.confirm && !acknowledged) {
       confirming = true;
       const accepted = await confirmAction(form);
       confirming = false;
@@ -365,6 +399,8 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
     if (event.submitter?.name)
       data.set(event.submitter.name, event.submitter.value);
     const body = Object.fromEntries(data);
+    if (acknowledged) body.acknowledge = 'true';
+    acknowledged = false;
     if (data.has('addonIds')) body.addonIds = data.getAll('addonIds');
     if (data.has('styleIds')) body.styleIds = data.getAll('styleIds');
     for (const input of form.querySelectorAll('[data-money]')) {
@@ -392,7 +428,9 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
       submitter.textContent =
         form.enctype === 'multipart/form-data' ? 'Uploading…' : 'Saving…';
     form.setAttribute('aria-busy', 'true');
-    let navigating = false;
+    let navigating = false,
+      acceptedWarning = false;
+    clearFieldErrors(form);
     try {
       // A control named "action" shadows HTMLFormElement.action. Read the
       // attribute so booking actions and hidden action fields cannot replace
@@ -427,10 +465,24 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
             : 'Unable to save. Refresh the page and try again.',
         );
       const result = await response.json();
-      if (!response.ok)
+      if (response.status === 409 && result.confirm) {
+        const asked = { ...form.dataset };
+        form.dataset.confirm = result.confirm.title;
+        form.dataset.confirmDetail = result.confirm.detail;
+        form.dataset.confirmLabel = result.confirm.label;
+        const accepted = await confirmAction(form);
+        for (const key of ['confirm', 'confirmDetail', 'confirmLabel'])
+          if (asked[key] === undefined) delete form.dataset[key];
+          else form.dataset[key] = asked[key];
+        acceptedWarning = accepted;
+        return;
+      }
+      if (!response.ok) {
+        showFieldErrors(form, result.fields);
         throw new Error(
           result.message || result.error || 'Unable to save. Please try again.',
         );
+      }
       if (result.url) {
         navigating = true;
         sessionStorage.setItem('owner-message', result.message || 'Saved.');
@@ -454,6 +506,10 @@ document.querySelectorAll('[data-owner-form]').forEach((form) => {
         for (const { button, disabled, text } of originalButtons) {
           button.disabled = disabled;
           button.textContent = text;
+        }
+        if (acceptedWarning) {
+          acknowledged = true;
+          form.requestSubmit(submitter);
         }
       }
     }

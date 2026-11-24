@@ -8,6 +8,7 @@ import {
 import {
   calendarBlock,
   calendarBooking,
+  calendarShade,
   money,
   phoneLabel,
   showOnCalendar,
@@ -25,6 +26,7 @@ import {
   accessToken,
 } from '../../services/bookingService.js';
 import { BookingError } from '../../services/bookingErrors.js';
+import { specialShades } from '../../services/openingHours.js';
 import { generateToken } from '../../middleware/csrf.js';
 import { holdSchema } from '../public/booking.js';
 import { daySlots, ZONE } from '../../services/availabilityService.js';
@@ -254,12 +256,16 @@ export function adminRouter(
     }),
   );
   if (notifications) router.use(ownerNotifications(notifications));
-  router.get('/settings', (req, res, next) => {
-    if (req.query.tab !== 'security') return next();
-    res.render('admin/security', {
-      enabled: Boolean(res.locals.admin.totpSecret),
-    });
-  });
+  router.get(
+    '/settings',
+    asyncRoute(async (req, res, next) => {
+      if (req.query.tab !== 'security') return next();
+      res.render('admin/security', {
+        enabled: Boolean(res.locals.admin.totpSecret),
+        owners: (await management?.owners?.()) || [],
+      });
+    }),
+  );
   if (management) router.use(managementRouter(management, config));
   const finish = (req, res, url, message) =>
     req.accepts(['html', 'json']) === 'json'
@@ -301,6 +307,14 @@ export function adminRouter(
       );
       req.session.destroy(() => {});
       finish(req, res, '/admin/login', 'Security updated. Sign in again.');
+    }),
+  );
+  router.post(
+    '/security/sign-out',
+    asyncRoute(async (req, res) => {
+      await auth.signOutEverywhere(res.locals.admin.id, req.ip);
+      req.session.destroy(() => {});
+      finish(req, res, '/admin/login', 'Signed out on every device.');
     }),
   );
   router.get(
@@ -627,7 +641,10 @@ export function adminRouter(
     '/calendar',
     asyncRoute(async (_req, res) => {
       const { settings } = await repository.catalog();
-      res.render('admin/calendar', { hours: settings.hours.weekly });
+      res.render('admin/calendar', {
+        hours: settings.hours.weekly,
+        special: settings.hours.special || [],
+      });
     }),
   );
   router.get(
@@ -677,7 +694,7 @@ export function adminRouter(
           'INVALID_RANGE',
           'Choose a calendar range of 62 days or less.',
         );
-      const [rows, { timeBlocks }] = await Promise.all([
+      const [rows, { timeBlocks }, { settings }] = await Promise.all([
         admins.list({
           from: start.toJSDate(),
           to: end.toJSDate(),
@@ -685,11 +702,15 @@ export function adminRouter(
           order: 'nearest',
         }),
         repository.schedule(start.toJSDate(), end.toJSDate()),
+        repository.catalog(),
       ]);
       const now = new Date();
       res.json([
         ...rows.filter((row) => showOnCalendar(row, now)).map(calendarBooking),
         ...timeBlocks.map(calendarBlock),
+        ...specialShades(settings.hours, start.toJSDate(), end.toJSDate()).map(
+          calendarShade,
+        ),
       ]);
     }),
   );
