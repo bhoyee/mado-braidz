@@ -37,7 +37,7 @@ export const dollars = z
   });
 const optionalDollars = z
   .union([z.literal('').transform(() => null), dollars])
-  .default('');
+  .default(null);
 export const styleInput = z.object({
   name: text().refine(Boolean, 'Name is required'),
   slug: z
