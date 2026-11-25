@@ -56,7 +56,7 @@ export const emailTemplates = {
   'booking-cancelled': {
     subject: 'Your appointment is cancelled',
     intro:
-      'Your appointment has been cancelled. Your deposit is non-refundable under the studio policy. Any separately agreed refund will appear in your payment details.',
+      'Your appointment has been cancelled. The deposit is not refunded when a client cancels. Any separately agreed refund will appear in your payment details.',
   },
   'payment-conflict': {
     subject: 'Let’s arrange another time',

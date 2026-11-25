@@ -1701,6 +1701,9 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       await saveAs('/settings/policies', {
         rescheduleHours: '24',
         freeReschedules: '2',
+        cancelHours: '24',
+        lateFeeMinutes: '15',
+        lateFee: '10',
         policyText: 'Be kind.',
       }).expect(200);
       expect(
@@ -1733,6 +1736,7 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       expect(after.policy).toMatchObject({
         freeReschedules: 2,
         depositRefundable: false,
+        lateFeeCents: 1000,
         text: 'Be kind.',
       });
       expect(after.emails.adminAlertEmails).toEqual(['one@example.com']);

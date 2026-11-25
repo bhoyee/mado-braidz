@@ -68,6 +68,12 @@
     deposit.addEventListener('input', show);
     show();
   }
+  const cancelNotice = (hours) =>
+    hours === 24
+      ? 'a day'
+      : hours && hours % 24 === 0
+        ? `${hours / 24} days`
+        : `${hours} hours`;
   const policy = $('[data-policy-preview]');
   if (policy) {
     const form = policy.closest('form');
@@ -79,10 +85,12 @@
         `Deposit: ${amount}, applied to your total.`,
         form.elements.depositRefundable.checked
           ? 'Please contact the studio about a deposit refund for your appointment.'
-          : 'The deposit is non-refundable, except where we are unable to provide the time you paid for or where the law requires a refund.',
+          : 'The deposit is non-refundable if you cancel. If you paid in full and cancel or do not arrive, the rest is refunded.',
         free
           ? `You may reschedule ${free === 1 ? 'once' : `up to ${free} times`} at no charge with at least ${hours} hours of notice before your appointment.`
           : 'Please contact the studio as early as possible to ask about a change.',
+        `If you need to cancel, please call the studio at least ${cancelNotice(Number(form.elements.cancelHours.value) || 0)} before your appointment.`,
+        `Up to ${Number(form.elements.lateFeeMinutes.value) || 0} minutes late is fine. Arriving more than ${Number(form.elements.lateFeeMinutes.value) || 0} minutes late has a late fee${Number(form.elements.lateFee.value) > 0 ? ' of ' + usd(Math.round(Number(form.elements.lateFee.value) * 100)) : ''}.`,
       ];
       policy.replaceChildren(
         ...lines.map((text) => {

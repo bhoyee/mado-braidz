@@ -1105,7 +1105,12 @@ export function managementRouter(service, config) {
       },
     };
   });
-  settingsPage('/settings/policies', 'settings-policies');
+  settingsPage('/settings/policies', 'settings-policies', async () => ({
+    rules: {
+      ...publicSettings.policy,
+      ...(await service.all()).settings.policy,
+    },
+  }));
   settingsPage('/settings/emails', 'settings-emails', async () => {
     const { settings } = await service.all();
     const saved = settings.emails?.reminderHours || 48;
@@ -1231,10 +1236,17 @@ export function managementRouter(service, config) {
       rescheduleHours: whole(0, 168, 'Enter 0 to 168 hours'),
       freeReschedules: whole(0, 10, 'Enter 0 to 10'),
       depositRefundable: checked,
+      cancelHours: whole(0, 168, 'Enter 0 to 168 hours'),
+      lateFeeMinutes: whole(0, 120, 'Enter 0 to 120 minutes'),
+      lateFee: z
+        .string()
+        .trim()
+        .regex(/^(?:\d{1,4}(?:\.\d{1,2})?)?$/, 'Enter an amount, such as 10')
+        .transform((value) => Math.round(Number(value || 0) * 100)),
       policyText: text(5000),
     }),
-    ({ policyText, ...policy }) => ({
-      policy: { ...policy, text: policyText },
+    ({ policyText, lateFee, ...policy }) => ({
+      policy: { ...policy, lateFeeCents: lateFee, text: policyText },
     }),
   );
   saveSection(

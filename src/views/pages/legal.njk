@@ -2,7 +2,7 @@
 {% from "legal/sections.njk" import policies, privacy, terms with context %}
 {% block content %}
 {% if legalPage == 'policies' %}{% set heading = 'Appointment policies' %}{% set intro = 'What to know about your deposit, making changes and preparing for your visit.' %}
-{% set contents = [['booking','Booking and confirmation'],['deposit','Deposit'],['payment','Payment and balance'],['changes','Rescheduling'],['cancellations','Cancellations and no-shows'],['late','Arriving late'],['preparation','Preparing your hair'],['hair','Hair and extras'],['studio','If we need to make a change']] %}
+{% set contents = [['booking','Booking and confirmation'],['deposit','Deposit'],['happy','If you are not happy'],['payment','Payment and balance'],['changes','Rescheduling'],['cancellations','Cancellations and no-shows'],['late','Arriving late'],['guests','Children, guests and pets'],['preparation','Preparing your hair'],['hair','Hair and extras'],['studio','If we need to make a change']] %}
 {% if policy.text %}{% set contents = contents.concat([['more','More from the studio']]) %}{% endif %}
 {% elif legalPage == 'privacy' %}{% set heading = 'Privacy policy' %}{% set intro = 'The information we collect, why we need it and the choices you have.' %}
 {% set contents = [['collect','Information we collect'],['use','How we use it'],['share','Who we share it with'],['payments','Payment information'],['cookies','Cookies and browser storage'],['marketing','Marketing emails'],['keep','Keeping information'],['choices','Your choices'],['updates','Updates to this policy']] %}
@@ -12,7 +12,7 @@
   <div class="wrap">
     <h1>{{ heading }}</h1>
     <p class="intro">{{ intro }}</p>
-    <p class="legal-updated">Last updated November 23, 2026</p>
+    <p class="legal-updated">Last updated November 25, 2026</p>
   </div>
 </section>
 <div class="wrap section legal-layout">

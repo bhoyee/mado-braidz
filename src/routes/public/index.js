@@ -341,6 +341,8 @@ export function decorateCatalog(data) {
     // Earlier setups stored the domain spelling.
     name: studioName(data.settings.business.name),
   };
+  // Rules added later have a value before the owner first saves them.
+  const policy = { ...publicSettings.policy, ...data.settings.policy };
   const pages = { ...(data.settings.seo?.pages || {}) };
   const openingHours = publicHours(data.settings.hours);
   if (pages.faq)
@@ -349,12 +351,11 @@ export function decorateCatalog(data) {
         (row) => row.question === item.question,
       );
       if (!initial || initial.answer !== item.answer) return item;
-      const booking = data.settings.booking,
-        policy = data.settings.policy;
+      const booking = data.settings.booking;
       if (item.question === 'How does the deposit work?')
         return {
           ...item,
-          answer: `Your ${money(booking.depositCents)} deposit reserves your chair and is applied toward your total. ${policy.depositRefundable ? 'Refunds follow the studio policy.' : 'The deposit is non-refundable.'} Pay the remaining balance online or at your appointment.`,
+          answer: `Your ${money(booking.depositCents)} deposit reserves your chair and is applied toward your total. ${policy.depositRefundable ? 'Refunds follow the studio policy.' : 'The deposit is non-refundable if you cancel.'} Pay the remaining balance online or at your appointment.`,
         };
       if (item.question === 'Can I reschedule?')
         return {
@@ -378,6 +379,21 @@ export function decorateCatalog(data) {
       }
       return item;
     });
+  if (pages.faq)
+    for (const item of [
+      {
+        question: 'What if I am running late?',
+        answer: `Call us right away. Up to ${policy.lateFeeMinutes} minutes late is fine. Arriving more than ${policy.lateFeeMinutes} minutes late has a late fee${policy.lateFeeCents ? ' of ' + money(policy.lateFeeCents) : ''}.`,
+      },
+      {
+        question: 'Can I bring my child or a guest?',
+        answer:
+          'Yes. Children are welcome, and we braid children’s hair. You may also bring guests. Please leave pets at home.',
+      },
+    ])
+      // The owner's own answer to the same question wins.
+      if (!pages.faq.some((row) => row.question === item.question))
+        pages.faq.push(item);
   // Upgrade only the original scaffold copy; preserve owner-written content.
   if (
     !pages.home ||
@@ -414,7 +430,7 @@ export function decorateCatalog(data) {
     booking: data.settings.booking,
     pages,
     hours: openingHours,
-    policy: data.settings.policy,
+    policy,
     phoneDisplay: b.phone === '+14437434979' ? '(443) 743-4979' : b.phone,
     directions:
       'https://www.google.com/maps/search/?api=1&query=' +

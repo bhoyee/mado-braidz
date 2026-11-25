@@ -33,6 +33,10 @@ export const publicSettings = {
     rescheduleHours: 48,
     freeReschedules: 1,
     depositRefundable: false,
+    cancelHours: 24,
+    lateFeeMinutes: 15,
+    // 0 means no amount is shown.
+    lateFeeCents: 2000,
     hairIncluded: true,
     includedHumanHairPercent: 50,
     humanHairUpgradeSlug: 'human-hair-upgrade',

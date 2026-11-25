@@ -482,7 +482,12 @@ export function customerBookingMail(
             }
           : `Have your ${usd(booking.balanceCents)} balance ready.`,
       );
-    prep.push('Running late? Please call us.');
+    prep.push(
+      'Tell us about any allergies or recent scalp or hair treatments, and bring along your own hair products.',
+    );
+    prep.push(
+      `Running late? Please call us. Arriving more than ${policy.lateFeeMinutes} minutes late has a late fee${policy.lateFeeCents ? ' of ' + usd(policy.lateFeeCents) : ''}.`,
+    );
     if (reminder)
       prep.push(
         policy.freeReschedules > 0 && when !== 'today'
@@ -499,7 +504,7 @@ export function customerBookingMail(
       prep.push(
         policy.depositRefundable
           ? 'Your deposit goes toward your total.'
-          : 'Your deposit goes toward your total and is non-refundable.',
+          : 'Your deposit goes toward your total and is non-refundable if you cancel.',
       );
   }
   const name = firstName(client);

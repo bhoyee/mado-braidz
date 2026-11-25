@@ -1,8 +1,10 @@
-{% macro policies() %}
+{% macro policies() %}{% set cancelNotice %}{% if policy.cancelHours == 24 %}a day{% elif policy.cancelHours and policy.cancelHours % 24 == 0 %}{{ policy.cancelHours / 24 }} days{% else %}{{ policy.cancelHours }} hours{% endif %}{% endset %}
 <dl class="legal-facts">
   <div><dt>Deposit</dt><dd>{{ booking.depositCents | money }}, applied to your total</dd></div>
-  <div><dt>Deposit refunds</dt><dd>{% if policy.depositRefundable %}Contact the studio{% else %}Non-refundable{% endif %}</dd></div>
+  <div><dt>Deposit refunds</dt><dd>{% if policy.depositRefundable %}Contact the studio{% else %}Non-refundable if you cancel{% endif %}</dd></div>
   <div><dt>Rescheduling</dt><dd>{% if policy.freeReschedules %}{{ policy.freeReschedules }} free with {{ policy.rescheduleHours }} hours of notice{% else %}Call the studio{% endif %}</dd></div>
+  <div><dt>Cancelling</dt><dd>Call at least {{ cancelNotice }} before</dd></div>
+  <div><dt>Late arrival</dt><dd>{% if policy.lateFeeCents %}{{ policy.lateFeeCents | money }} fee{% else %}A fee{% endif %} after {{ policy.lateFeeMinutes }} minutes</dd></div>
   <div><dt>Hair</dt><dd>50% human hair included</dd></div>
 </dl>
 <section id="booking"><h2>Booking and confirmation</h2>
@@ -11,22 +13,28 @@
 <p>Please make sure your name, email and phone number are correct so we can reach you.</p></section>
 <section id="deposit"><h2>Deposit</h2>
 <p>A {{ booking.depositCents | money }} deposit is required to reserve your chair, unless you choose to pay in full. The deposit is applied to your appointment total and is not an extra fee.</p>
-<p>{% if policy.depositRefundable %}Please contact the studio about a deposit refund for your appointment.{% else %}The deposit is non-refundable, except where we are unable to provide the time you paid for or where the law requires a refund.{% endif %}</p></section>
+<p>{% if policy.depositRefundable %}Please contact the studio about a deposit refund for your appointment.{% else %}The deposit is non-refundable if you cancel. It is refunded if we are unable to provide the time you paid for, if you are not happy with the service as explained below, or where the law requires a refund.{% endif %}</p></section>
+<section id="happy"><h2>If you are not happy with your braids</h2>
+<p>Please tell us. If you do not love the service, your deposit will be refunded. The braided hair must be taken down before the refund is made.</p></section>
 <section id="payment"><h2>Payment and balance</h2>
 <p>The price of your style and extras is shown before you pay. All prices are in US dollars.</p>
 <p>Any remaining balance can be paid on our <a href="/pay">payment page</a> or at the studio. The payment methods available for your balance are shown with your booking.</p>
 <p>For styles priced on consultation, your deposit reserves the appointment and the final price is agreed with you.</p></section>
 <section id="changes"><h2>Rescheduling</h2>
 <p>{% if policy.freeReschedules %}You may reschedule {% if policy.freeReschedules == 1 %}once{% else %}up to {{ policy.freeReschedules }} times{% endif %} at no charge with at least {{ policy.rescheduleHours }} hours of notice before your appointment.{% else %}Please contact the studio as early as possible to ask about a change.{% endif %} New dates and times depend on availability.</p>
-<p>To reschedule, call us at <a href="tel:{{ business.phone }}">{{ phoneDisplay }}</a> with your booking code.</p></section>
+<p>To reschedule, call us at <a href="tel:{{ business.phone }}">{{ phoneDisplay }}</a> with your booking code.</p>
+<p>If something unforeseen means you have to cancel, call the studio to arrange another time. Your deposit will still be valid.</p></section>
 <section id="cancellations"><h2>Cancellations and no-shows</h2>
-<p>If you cannot make your appointment, please call us as early as you can so the time can be offered to someone else.</p>
-{% if not policy.depositRefundable %}<p>Your deposit is forfeited if you cancel late or do not arrive for your appointment.</p>{% endif %}
-<p>If you paid more than the deposit, contact the studio about your payment.</p></section>
+<p>If you need to cancel, please call the studio at least {{ cancelNotice }} before your appointment.</p>
+{% if not policy.depositRefundable %}<p>Your deposit is kept if you cancel or do not arrive for your appointment.</p>
+<p>If you paid in full and cancel or do not arrive, the deposit is kept and the rest is refunded.</p>{% else %}<p>If you paid more than the deposit, contact the studio about your payment.</p>{% endif %}</section>
 <section id="late"><h2>Arriving late</h2>
-<p>If you are running late, please call us right away at <a href="tel:{{ business.phone }}">{{ phoneDisplay }}</a>. We will let you know whether your appointment can go ahead as planned or needs a new time.</p></section>
+<p>If you are running late, please call us right away at <a href="tel:{{ business.phone }}">{{ phoneDisplay }}</a>. We will let you know whether your appointment can go ahead as planned or needs a new time.</p>
+<p>Up to {{ policy.lateFeeMinutes }} minutes late is fine. Arriving more than {{ policy.lateFeeMinutes }} minutes late has a late fee{% if policy.lateFeeCents %} of {{ policy.lateFeeCents | money }}{% endif %}.</p></section>
+<section id="guests"><h2>Children, guests and pets</h2>
+<p>Children are welcome, and we braid children’s hair. You may also bring guests. Please leave pets at home.</p></section>
 <section id="preparation"><h2>Preparing your hair</h2>
-<ul><li>Arrive with your hair washed and detangled, unless you added a head wash to your booking.</li><li>Tell us about any scalp sensitivity, allergy or recent hair treatment before your appointment.</li><li>Bring or upload a photo if you have a particular look in mind.</li><li>Most styles reserve {{ booking.defaultDurationMin / 60 }} hours. Your booking confirmation shows your start and end time.</li></ul></section>
+<ul><li>Arrive with your hair washed and detangled, unless you added a head wash to your booking.</li><li>Tell us about any allergy, scalp condition or recent scalp or hair treatment before your appointment.</li><li>Bring along your own hair products.</li><li>Bring or upload a photo if you have a particular look in mind.</li><li>Most styles reserve {{ booking.defaultDurationMin / 60 }} hours. Your booking confirmation shows your start and end time.</li></ul></section>
 <section id="hair"><h2>Hair and extras</h2>
 <p>Hair with 50% human hair is included in the price of your style. {% if humanHairUpgrade %}You can upgrade to 100% human hair for {{ humanHairUpgrade.priceCents | money }}.{% endif %} Other extras and their prices are shown when you book.</p></section>
 <section id="studio"><h2>If we need to make a change</h2>
@@ -58,7 +66,7 @@
 <p>We keep booking and payment records for as long as we need them to run the studio, resolve questions and meet our legal and accounting responsibilities. Technical logs are removed on a regular schedule.</p>
 <p>We use reasonable safeguards to protect your information, including encrypted connections and restricted access. No online service can be guaranteed to be completely secure.</p></section>
 <section id="choices"><h2>Your choices</h2>
-<p>You can contact us to ask about the personal information we hold about you, to correct it, or to request that it be deleted. We may need to confirm your identity, and we may need to keep some records where the law or our accounting responsibilities require it.</p></section>
+<p>You have the right to see the personal information we hold about you. You can also ask us to correct it or delete it. Contact us to make a request. We may need to confirm your identity, and we may need to keep some records where the law or our accounting responsibilities require it.</p></section>
 <section id="updates"><h2>Updates to this policy</h2>
 <p>We may update this policy as our services change. The date at the top of the page shows when it was last updated.</p></section>
 {% endmacro %}
@@ -74,11 +82,11 @@
 <section id="appointments"><h2>Appointments</h2>
 <p>Choosing a time does not confirm an appointment. Your appointment is confirmed after your payment is received and, for transfers, approved by the studio. Unpaid holds end automatically.</p></section>
 <section id="payments"><h2>Payments</h2>
-<p>Card payments are processed by Stripe. The amount due is shown before you pay. {% if not policy.depositRefundable %}Deposits are non-refundable as described in our <a href="/policies#deposit">deposit policy</a>.{% endif %} Any remaining balance is due as agreed for your appointment.</p></section>
+<p>Card payments are processed by Stripe. The amount due is shown before you pay. {% if not policy.depositRefundable %}Deposits are non-refundable if you cancel, as described in our <a href="/policies#deposit">deposit policy</a>.{% endif %} Any remaining balance is due as agreed for your appointment.</p></section>
 <section id="changes"><h2>Changes and cancellations</h2>
-<p>Rescheduling, cancellations, no-shows and late arrivals are covered by our <a href="/policies#changes">appointment policies</a>.</p></section>
+<p>Rescheduling, cancellations, refunds, no-shows and late arrivals are covered by our <a href="/policies#changes">appointment policies</a>.</p></section>
 <section id="responsibilities"><h2>Your responsibilities</h2>
-<ul><li>Give accurate contact and booking details.</li><li>Tell us about allergies, scalp conditions or recent hair treatments that could affect your service.</li><li>Send only photos and screenshots that you have the right to share.</li></ul></section>
+<ul><li>Give accurate contact and booking details.</li><li>Tell us about allergies, scalp conditions or recent scalp or hair treatments that could affect your service.</li><li>Arrive on time, and leave pets at home.</li><li>Send only photos and screenshots that you have the right to share.</li></ul></section>
 <section id="content"><h2>Website content</h2>
 <p>The text, photos, videos, logo and design on this website belong to {{ business.name }} or are used with permission. Please ask us before copying or using them.</p></section>
 <section id="links"><h2>Other websites</h2>

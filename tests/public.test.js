@@ -487,6 +487,32 @@ describe('published legal pages', () => {
     expect(text).toContain('&lt;b&gt;by arrangement');
   });
 });
+it('tells clients the owner’s own rules, with and without a fee amount', async () => {
+  const data = await fixtureCatalog().load();
+  const page = async () =>
+    (
+      await request(makeApp({ load: async () => data }))
+        .get('/policies')
+        .expect(200)
+    ).text;
+  const text = await page();
+  for (const rule of [
+    'non-refundable if you cancel',
+    'must be taken down before the refund',
+    'call the studio at least a day before',
+    'cancel or do not arrive, the deposit is kept and the rest is refunded',
+    'Up to 15 minutes late is fine',
+    'more than 15 minutes late has a late fee of $20.',
+    'leave pets at home',
+    'Your deposit will still be valid',
+    'your own hair products',
+  ])
+    expect(text).toContain(rule);
+  data.settings.policy = { ...data.settings.policy, lateFeeCents: 0 };
+  expect(await page()).toContain('has a late fee.');
+  data.settings.policy.lateFeeCents = 1000;
+  expect(await page()).toContain('late fee of $10');
+});
 it('shows every style photo in one gallery, the chosen size first, without repeats', () => {
   const photo = (id, size) => ({ path: `/img/${id}.webp`, variants: { size } });
   const cover = photo('cover'),

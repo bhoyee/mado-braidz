@@ -267,7 +267,7 @@ export function siteGuide(data, root) {
     `- Address: ${[b.street, b.city, b.region].map(oneLine).join(', ')} ${oneLine(b.postalCode)}`,
     `- Phone: ${oneLine(data.phoneDisplay || b.phone)}`,
     `- Book online: ${base}/book`,
-    `- Deposit: ${dollars(booking.depositCents)}, applied to the total${policy?.depositRefundable === false ? ' (non-refundable)' : ''}`,
+    `- Deposit: ${dollars(booking.depositCents)}, applied to the total${policy?.depositRefundable === false ? ' (non-refundable if you cancel)' : ''}`,
     '',
     '## Opening hours (Eastern time)',
     ...open,
