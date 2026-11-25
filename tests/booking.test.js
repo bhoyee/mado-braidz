@@ -188,6 +188,23 @@ describe('capacity over whole appointment intervals', () => {
     );
     expect(() => localDay('2026-02-30')).toThrow();
   });
+  it('blocks exactly the time the owner chose, with nothing added', async () => {
+    const repo = await memoryBookingRepository();
+    const at = (time) => new Date(`2026-12-05T${time}:00-05:00`);
+    const slots = daySlots({
+      date: '2026-12-05',
+      durationMin: 240,
+      settings: repo.data.settings,
+      now,
+      timeBlocks: [{ startAt: at('13:00'), endAt: at('15:00') }],
+    });
+    expect(
+      slots
+        .filter((slot) => !slot.available)
+        .map((slot) => slot.label.split(' – ')[0]),
+    ).toEqual(['1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM']);
+    expect(slots.filter((slot) => slot.blocked)).toHaveLength(4);
+  });
   it.each([
     ['2026-03-08', '-04:00'],
     ['2026-11-01', '-05:00'],

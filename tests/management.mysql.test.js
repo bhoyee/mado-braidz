@@ -1460,7 +1460,7 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
           },
           actor,
         ),
-      ).rejects.toThrow('overlaps');
+      ).rejects.toThrow('starts in this time');
       await service.addBlocks(
         {
           date: '2026-12-04',

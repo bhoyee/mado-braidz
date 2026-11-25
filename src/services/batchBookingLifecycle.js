@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { payableBalance } from './paymentEligibility.js';
 import { BookingError } from './bookingErrors.js';
-import { remainingCapacity } from './availabilityService.js';
+import { remainingCapacity, startBlocked } from './availabilityService.js';
 
 const decode = (value) =>
   typeof value === 'string' ? JSON.parse(value) : value;
@@ -370,9 +370,7 @@ export function batchBookingLifecycle(
                     catalog.settings.booking.capacity,
                     now,
                   ) > 0;
-                const blocked = schedule.timeBlocks.some(
-                  (b) => b.startAt < row.blockEndAt && b.endAt > row.startAt,
-                );
+                const blocked = startBlocked(row.startAt, schedule.timeBlocks);
                 const conflict =
                   !free || blocked || row.startAt <= now.toJSDate();
                 await change(

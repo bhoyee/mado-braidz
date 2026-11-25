@@ -3227,3 +3227,9 @@
 .password-eye:not(.is-showing) .password-eye-slash {
   display: none;
 }
+
+/* A month of appointments scrolls inside its box */
+.owner-app .fc-listUpcoming-view .fc-scroller {
+  max-height: 640px;
+  overflow-y: auto !important;
+}

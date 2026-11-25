@@ -992,3 +992,7 @@ Alerts are worded from the live appointment when shown. Read state is kept per o
 ## Owner amendment — studio policies (November 25, 2026)
 
 The owner's rules: the deposit is kept when a client cancels or does not arrive, and the rest of a full payment is refunded. A client who is not happy with the service gets the deposit back once the braids are taken down, with no time limit. Clients call the studio at least a day before to cancel, and 48 hours before to reschedule. After something unforeseen they call to arrange another time and the deposit stays valid. Up to 15 minutes late is fine; more has a $20 late fee. Children and guests are welcome, pets are not. Clients mention allergies and recent scalp or hair treatments and bring their own hair products. Clients may see the information held about them. The hours, minutes and late fee amount are owner settings (Settings, Policies) and are wording only; nothing is charged or refunded automatically.
+
+## Owner amendment — exact time off (November 25, 2026)
+
+Time off closes exactly the hours the owner sets: no visit may start in them, for clients or the owner. A visit that starts earlier may run into them, and no gap is added around them. The same rule applies when a payment is confirmed. Blocking is refused only when an appointment starts inside the blocked time. Clients see such times as "Not available"; "Fully booked" means all three chairs are taken.

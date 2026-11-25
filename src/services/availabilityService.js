@@ -31,6 +31,14 @@ export function remainingCapacity(start, end, rows, capacity, now) {
   }
   return Math.max(0, capacity - peak);
 }
+// Time off closes exactly the hours the owner chose: no visit may start in them.
+// A visit that starts earlier may run into them.
+export function startBlocked(startAt, timeBlocks) {
+  const start = typeof startAt === 'number' ? startAt : millis(startAt);
+  return timeBlocks.some(
+    (block) => millis(block.startAt) <= start && start < millis(block.endAt),
+  );
+}
 export function localDay(date) {
   const day = DateTime.fromISO(date, { zone: ZONE });
   if (
@@ -79,11 +87,7 @@ export function daySlots({
     const end = start.plus({ minutes: durationMin });
     const blockEnd = end.plus({ minutes: config.bufferMinutes });
     if (blockEnd > close || start < earliest || start > latest) continue;
-    const blocked = timeBlocks.some(
-      (b) =>
-        millis(b.startAt) < blockEnd.toMillis() &&
-        millis(b.endAt) > start.toMillis(),
-    );
+    const blocked = startBlocked(start.toMillis(), timeBlocks);
     const remaining = blocked
       ? 0
       : remainingCapacity(start, blockEnd, bookings, config.capacity, now);
@@ -94,6 +98,7 @@ export function daySlots({
       label: `${start.toFormat('h:mm a')} – ${end.toFormat('h:mm a')}`,
       remaining,
       available: remaining > 0,
+      blocked,
     });
   }
   return result;

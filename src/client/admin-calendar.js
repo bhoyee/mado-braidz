@@ -78,7 +78,7 @@ if (element) {
   );
   const views = ['listUpcoming', 'timeGridDay', 'timeGridWeek', 'dayGridMonth'];
   const savedView = remembered('sessionStorage', 'mado-calendar-view');
-  const savedDate = remembered('sessionStorage', 'mado-calendar-date');
+  const savedDate = remembered('sessionStorage', 'mado-calendar-day');
   let showCancelled =
     remembered('localStorage', 'mado-calendar-cancelled') === '1';
   let latest = '',
@@ -288,6 +288,39 @@ if (element) {
       }
     });
 
+  const todayKey = () =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(new Date());
+  const dayKey = (date) => calendar.formatIso(date).slice(0, 10);
+  const showsToday = (view) =>
+    dayKey(view.currentStart) <= todayKey() &&
+    todayKey() < dayKey(view.currentEnd);
+  // The month list opens at today, with earlier days above it.
+  let listScroll = false;
+  function scrollList() {
+    if (!listScroll || calendar.view.type !== 'listUpcoming') return;
+    listScroll = false;
+    const scroller = element.querySelector('.fc-list .fc-scroller');
+    const next = [...element.querySelectorAll('.fc-list-day')].find(
+      (row) => row.dataset.date >= todayKey(),
+    );
+    if (scroller && next && showsToday(calendar.view))
+      scroller.scrollTop +=
+        next.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+  }
+  // Choosing List, Day, Week or Month while today is on screen stays on today.
+  element.addEventListener(
+    'click',
+    (event) => {
+      const button = event.target.closest('.fc-toolbar button');
+      if (
+        button &&
+        views.some((name) => button.classList.contains(`fc-${name}-button`)) &&
+        showsToday(calendar.view)
+      )
+        calendar.gotoDate(todayKey());
+    },
+    true,
+  );
   const calendar = new Calendar(element, {
     plugins: [
       dayGridPlugin,
@@ -306,7 +339,11 @@ if (element) {
       ? { initialDate: savedDate }
       : {}),
     views: {
-      listUpcoming: { type: 'list', duration: { days: 7 }, buttonText: 'List' },
+      listUpcoming: {
+        type: 'list',
+        duration: { months: 1 },
+        buttonText: 'List',
+      },
       dayGridMonth: { dayMaxEvents: phone ? 2 : 3 },
     },
     headerToolbar: {
@@ -320,6 +357,7 @@ if (element) {
       prev: 'Previous',
       next: 'Next',
       today: 'Today',
+      listUpcoming: 'List',
       month: 'Month',
       week: 'Week',
       day: 'Day',
@@ -332,7 +370,7 @@ if (element) {
     moreLinkDidMount({ el }) {
       el.setAttribute('role', 'button');
     },
-    noEventsContent: 'No appointments in these seven days.',
+    noEventsContent: 'No appointments this month.',
     listDayFormat: { weekday: 'long', month: 'long', day: 'numeric' },
     listDaySideFormat: false,
     allDaySlot: false,
@@ -372,14 +410,19 @@ if (element) {
       );
       sayUpdated();
       setTimeout(() => fitHours(items));
+      setTimeout(scrollList, 60);
     },
     datesSet({ view }) {
       remember('sessionStorage', 'mado-calendar-view', view.type);
       remember(
         'sessionStorage',
-        'mado-calendar-date',
-        calendar.formatIso(calendar.getDate()).slice(0, 10),
+        'mado-calendar-day',
+        // A month that includes today is remembered as today, not as the 1st.
+        showsToday(view)
+          ? todayKey()
+          : calendar.formatIso(calendar.getDate()).slice(0, 10),
       );
+      listScroll = view.type === 'listUpcoming';
     },
     eventDidMount({ event, el }) {
       el.dataset.eventId = event.id;

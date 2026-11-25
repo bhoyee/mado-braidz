@@ -1,7 +1,12 @@
 import { randomBytes, createHash, createHmac } from 'node:crypto';
 import { DateTime } from 'luxon';
 import { priceBooking } from './pricingService.js';
-import { daySlots, remainingCapacity, ZONE } from './availabilityService.js';
+import {
+  daySlots,
+  remainingCapacity,
+  startBlocked,
+  ZONE,
+} from './availabilityService.js';
 import { BookingError } from './bookingErrors.js';
 import { batchBookingLifecycle } from './batchBookingLifecycle.js';
 import { adminBookingLifecycle } from './adminBookingLifecycle.js';
@@ -281,10 +286,7 @@ function paymentLifecycle(repository, clock) {
             if (
               booking.startAt <= now.toJSDate() ||
               remaining < 1 ||
-              schedule.timeBlocks.some(
-                (b) =>
-                  b.startAt < booking.blockEndAt && b.endAt > booking.startAt,
-              )
+              startBlocked(booking.startAt, schedule.timeBlocks)
             )
               throw new BookingError(
                 'PAYMENT_CONFLICT',
@@ -544,11 +546,7 @@ function paymentLifecycle(repository, clock) {
                 schedule.bookings.filter((b) => b.id !== id),
                 catalog.settings.booking.capacity,
                 now,
-              ) > 0 &&
-              !schedule.timeBlocks.some(
-                (b) =>
-                  b.startAt < booking.blockEndAt && b.endAt > booking.startAt,
-              );
+              ) > 0 && !startBlocked(booking.startAt, schedule.timeBlocks);
             if (free) {
               await save(tx, booking, { holdExpiresAt: until }, now);
               await tx.queueJob({
@@ -798,9 +796,9 @@ function paymentLifecycle(repository, clock) {
                   catalog.settings.booking.capacity,
                   now,
                 );
-                const blocked = schedule.timeBlocks.some(
-                  (b) =>
-                    b.startAt < booking.blockEndAt && b.endAt > booking.startAt,
+                const blocked = startBlocked(
+                  booking.startAt,
+                  schedule.timeBlocks,
                 );
                 conflict = remaining < 1 || blocked;
                 await change(

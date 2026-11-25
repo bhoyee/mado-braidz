@@ -1144,7 +1144,7 @@ export function createManagementService(db, clock = () => new Date()) {
             .where(
               and(
                 lt(s.bookings.startAt, row.endAt),
-                gt(s.bookings.blockEndAt, row.startAt),
+                gte(s.bookings.startAt, row.startAt),
                 sql`(${s.bookings.status} IN ('confirmed','completed') OR (${s.bookings.status} = 'pending_payment' AND hold_expires_at > ${clock()}))`,
               ),
             )
@@ -1153,7 +1153,7 @@ export function createManagementService(db, clock = () => new Date()) {
         }
         if (clashes.length)
           throw new ManagementError(
-            `This time overlaps an existing appointment or payment hold: ${named(clashes)}. Move ${clashes.length === 1 ? 'it' : 'them'} first.`,
+            `An existing appointment or payment hold starts in this time: ${named(clashes)}. Move ${clashes.length === 1 ? 'it' : 'them'} first.`,
           );
         for (const row of rows) {
           const [created] = await tx

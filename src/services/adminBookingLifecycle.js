@@ -1,5 +1,10 @@
 import { DateTime } from 'luxon';
-import { daySlots, remainingCapacity, ZONE } from './availabilityService.js';
+import {
+  daySlots,
+  remainingCapacity,
+  startBlocked,
+  ZONE,
+} from './availabilityService.js';
 import { priceBooking } from './pricingService.js';
 import { BookingError } from './bookingErrors.js';
 
@@ -103,12 +108,7 @@ export function adminBookingLifecycle(
       catalog.settings.booking.capacity,
       now,
     );
-    if (
-      capacity < 1 ||
-      schedule.timeBlocks.some(
-        (block) => block.startAt < row.blockEndAt && block.endAt > row.startAt,
-      )
-    )
+    if (capacity < 1 || startBlocked(row.startAt, schedule.timeBlocks))
       fail(
         'This chair is no longer available. Reschedule the booking before confirming.',
         'SLOT_TAKEN',
