@@ -265,6 +265,13 @@ export function managementRouter(service, config) {
     }),
   );
   router.post(
+    '/styles/:id/delete',
+    run(async (req, res) => {
+      await service.deleteStyle(entityId.parse(req.params.id), actor(req, res));
+      finish(req, res, '/admin/styles');
+    }),
+  );
+  router.post(
     '/styles/:id/duplicate',
     run(async (req, res) => {
       const id = await service.duplicateStyle(

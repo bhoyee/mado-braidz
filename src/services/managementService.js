@@ -725,6 +725,56 @@ export function createManagementService(db, clock = () => new Date()) {
         return copyId;
       });
     },
+    // Only a style nobody has ever booked. Appointments must keep their style.
+    async deleteStyle(id, actor) {
+      await db.transaction(async (tx) => {
+        const style = exists(
+          (
+            await tx
+              .select()
+              .from(s.styles)
+              .where(eq(s.styles.id, id))
+              .for('update')
+          )[0],
+        );
+        const [{ count }] = await tx
+          .select({ count: sql`COUNT(*)` })
+          .from(s.bookings)
+          .where(eq(s.bookings.styleId, id));
+        if (Number(count))
+          throw new ManagementError(
+            `${style.name} has ${Number(count)} booking${Number(count) === 1 ? '' : 's'} in your records, so it cannot be deleted. Switch off Published to hide it from clients.`,
+          );
+        // Photos stay in the library, hidden, ready for another style.
+        const photos = await tx
+          .select()
+          .from(s.media)
+          .where(eq(s.media.styleId, id));
+        for (const photo of photos) {
+          const variants = { ...photoVariants(photo), hidden: true };
+          delete variants.size;
+          await tx
+            .update(s.media)
+            .set({ styleId: null, variants })
+            .where(eq(s.media.id, photo.id));
+        }
+        await tx.delete(s.addonStyles).where(eq(s.addonStyles.styleId, id));
+        await tx.delete(s.styleVariants).where(eq(s.styleVariants.styleId, id));
+        await tx
+          .delete(s.redirects)
+          .where(eq(s.redirects.target, '/styles/' + style.slug));
+        await tx.delete(s.styles).where(eq(s.styles.id, id));
+        const { catalog } = await heldSettings(tx);
+        if (catalog?.styleOrder?.includes(id))
+          await setting(
+            tx,
+            'catalog',
+            { styleOrder: catalog.styleOrder.filter((item) => item !== id) },
+            actor,
+          );
+        await audit(tx, actor, 'style', id, style, null);
+      });
+    },
     async priceHistory(styleId) {
       const variants = await db
         .select()

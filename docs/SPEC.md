@@ -996,3 +996,7 @@ The owner's rules: the deposit is kept when a client cancels or does not arrive,
 ## Owner amendment — exact time off (November 25, 2026)
 
 Time off closes exactly the hours the owner sets: no visit may start in them, for clients or the owner. A visit that starts earlier may run into them, and no gap is added around them. The same rule applies when a payment is confirmed. Blocking is refused only when an appointment starts inside the blocked time. Clients see such times as "Not available"; "Fully booked" means all three chairs are taken.
+
+## Owner amendment — deleting styles (November 25, 2026)
+
+A style with no booking of any status can be deleted for good with its prices. Its photos stay in the library, hidden and without a style. A style with any booking cannot be deleted, only unpublished.

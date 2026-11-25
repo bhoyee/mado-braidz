@@ -505,6 +505,64 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
       await flags({}).expect(refused);
       await flags({ featured: 'yes' }).expect(refused);
     });
+    it('deletes a style nobody booked, keeps its photos hidden, and never one with bookings', async () => {
+      const copyId = await service.duplicateStyle(1, actor);
+      await service.reorderStyles?.([copyId], actor).catch(() => {});
+      const [{ id: photoId }] = await db
+        .insert(s.media)
+        .values({
+          styleId: copyId,
+          path: 'delete-test.webp',
+          alt: 'Copy photo',
+          kind: 'style',
+          variants: { size: 'small' },
+        })
+        .$returningId();
+      const url = `/admin/styles/${copyId}/delete`;
+      const send = (path, id = copyId) =>
+        agent
+          .post(path.replace(String(copyId), String(id)))
+          .set('Accept', 'application/json')
+          .send({ _csrf: token });
+      await request(app).post(url).expect(403);
+      await send(url).expect(200);
+      expect(
+        await db.select().from(s.styles).where(eq(s.styles.id, copyId)),
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(s.styleVariants)
+          .where(eq(s.styleVariants.styleId, copyId)),
+      ).toEqual([]);
+      const [photo] = await db
+        .select()
+        .from(s.media)
+        .where(eq(s.media.id, photoId));
+      expect(photo.styleId).toBe(null);
+      const variants =
+        typeof photo.variants === 'string'
+          ? JSON.parse(photo.variants)
+          : photo.variants;
+      expect(variants).toEqual({ hidden: true });
+      await db.delete(s.media).where(eq(s.media.id, photoId));
+      await agent.get('/admin/styles').expect(200);
+      await agent.get('/admin/gallery').expect(200);
+      const hold = await bookings.createHold({
+        ...validHold,
+        startAt: '2026-12-21T15:00:00Z',
+        email: 'delete-style@example.test',
+      });
+      const refused = await send(url, validHold.styleId);
+      expect(refused.status).toBe(400);
+      expect(refused.body.message).toContain('cannot be deleted');
+      const [row] = await db
+        .select()
+        .from(s.bookings)
+        .where(eq(s.bookings.id, hold.id));
+      await db.delete(s.bookings).where(eq(s.bookings.id, hold.id));
+      await db.delete(s.clients).where(eq(s.clients.id, row.clientId));
+    });
     it('orders, duplicates and groups styles without moving anything until asked', async () => {
       const before = (await service.all()).styles.map((x) => x.id);
       await expect(
