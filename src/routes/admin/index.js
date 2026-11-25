@@ -949,7 +949,13 @@ export function adminRouter(
           requestKey: uuid,
         })
         .parse(blankOptional(req.body));
-      if (input.changeStyle) selection.parse(input);
+      // Only the style fields: the rest of the form is checked above.
+      if (input.changeStyle)
+        selection.parse({
+          styleId: input.styleId,
+          styleVariantId: input.styleVariantId,
+          addonIds: input.addonIds,
+        });
       const bookingId = id.parse(req.params.id);
       await bookings.adminEdit(
         bookingId,

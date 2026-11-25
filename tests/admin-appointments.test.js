@@ -180,6 +180,70 @@ describe('new appointment', () => {
   });
 });
 
+describe('saving the edit form', () => {
+  it.each([
+    ['details only', {}],
+    [
+      'a new style and extras',
+      {
+        changeStyle: 'on',
+        styleId: '1',
+        styleVariantId: '101',
+        addonIds: ['2'],
+      },
+    ],
+    [
+      'a new style without extras',
+      { changeStyle: 'on', styleId: '1', styleVariantId: '101' },
+    ],
+  ])('accepts %s', async (_name, style) => {
+    const f = await setup();
+    const text = await f.page('/admin/bookings/1/edit');
+    const token = text.match(/name="csrf-token" content="([^"]+)"/)[1];
+    const local = DateTime.fromJSDate(new Date(f.repo.rows[0].startAt), {
+      zone: 'America/New_York',
+    });
+    const response = await f.agent
+      .post('/admin/bookings/1/edit')
+      .set('Accept', 'application/json')
+      .send({
+        _csrf: token,
+        name: 'Renamed Client',
+        email: 'client@example.test',
+        phone: '+14437434979',
+        date: local.toISODate(),
+        time: local.toFormat('HH:mm'),
+        notes: '',
+        adminNotes: '',
+        expectedUpdatedAt: new Date(f.repo.rows[0].updatedAt).toISOString(),
+        requestKey: '6f0e7a52-8d6f-4c3c-9c0c-5b7c8f1b2a3d',
+        ...style,
+      });
+    expect(response.body.message || response.text).toBe('Appointment updated.');
+    expect(f.repo.clients[0].name).toBe('Renamed Client');
+  });
+  it('still needs a style when the style is being changed', async () => {
+    const f = await setup();
+    const text = await f.page('/admin/bookings/1/edit');
+    const response = await f.agent
+      .post('/admin/bookings/1/edit')
+      .set('Accept', 'application/json')
+      .send({
+        _csrf: text.match(/name="csrf-token" content="([^"]+)"/)[1],
+        name: 'Renamed Client',
+        email: 'client@example.test',
+        phone: '+14437434979',
+        date: '2030-01-07',
+        time: '10:00',
+        changeStyle: 'on',
+        expectedUpdatedAt: new Date().toISOString(),
+        requestKey: '6f0e7a52-8d6f-4c3c-9c0c-5b7c8f1b2a3d',
+      });
+    expect(response.status).toBe(400);
+    expect(f.repo.clients[0].name).not.toBe('Renamed Client');
+  });
+});
+
 describe('appointment details', () => {
   const now = new Date('2026-12-01T15:00:00Z');
   const base = {
