@@ -90,6 +90,15 @@ npm run admin:add -- --email=person@example.com --name="Person Name"
 
 No restart is needed. Existing accounts are untouched and rerunning is safe. The new owner opens `/admin/forgot`, sets a password from the emailed link (email must be configured and `run-jobs.js` running), and can then enable their own two-factor. Alert emails are separate: use Settings or `ADMIN_ALERT_EMAILS`.
 
+### Clear every appointment (test data only)
+
+Run on the server in the app root. The first command only lists; the second deletes every appointment with its client, payment, message and alert records, after saving a private copy in `~/mado-backups/appointments`. Styles, prices, photos, hours, settings and accounts stay. It refuses while a card payment or refund is open, and while money has not been refunded unless `--payments-settled` is added.
+
+```bash
+node scripts/clear-appointments.js
+node scripts/clear-appointments.js --confirm=<number from the list>
+```
+
 ## Checks
 
 ```powershell

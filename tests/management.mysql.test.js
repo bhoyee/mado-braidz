@@ -5,12 +5,16 @@ import argon2 from 'argon2';
 import { randomBytes, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import sharp from 'sharp';
-import { rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 import { migrate } from 'drizzle-orm/mysql2/migrator';
 import { eq } from 'drizzle-orm';
 import { createDatabase } from '../src/db/index.js';
 import * as s from '../src/db/schema.js';
+import {
+  clearAppointments,
+  previewClear,
+} from '../src/services/clearAppointments.js';
 import { createManagementService } from '../src/services/managementService.js';
 import { createBookingRepository } from '../src/services/bookingRepository.js';
 import { createBookingService } from '../src/services/bookingService.js';
@@ -1967,6 +1971,83 @@ describe.skipIf(process.env.BOOKING_DATABASE_TEST !== '1')(
         .set({ role: 'owner' })
         .where(eq(s.admins.id, 1));
       expect(response.status).toBe(401);
+    });
+    it('clears every appointment only when confirmed and settled, and keeps the studio', async () => {
+      const directory = resolve('tmp', 'clear-' + database);
+      const hold = await bookings.createHold({
+        ...validHold,
+        startAt: '2026-12-22T15:00:00Z',
+        email: 'clear@example.test',
+      });
+      await db.insert(s.payments).values({
+        bookingId: hold.id,
+        type: 'deposit',
+        provider: 'manual',
+        method: 'zelle',
+        amountCents: 3000,
+        createdAt: new Date(),
+      });
+      await db.insert(s.jobs).values({
+        type: 'email',
+        payload: { template: 'password-reset' },
+        runAt: new Date(),
+        status: 'done',
+        dedupeKey: 'clear-keep',
+      });
+      await db.insert(s.emailSuppressions).values({
+        email: 'stop@example.test',
+        reason: 'unsubscribed',
+      });
+      const kept = async () =>
+        Promise.all(
+          [s.styles, s.styleVariants, s.addons, s.admins, s.timeBlocks].map(
+            async (table) => (await db.select().from(table)).length,
+          ),
+        );
+      const before = await kept();
+      const found = await previewClear(db);
+      const confirm = found.bookings.length;
+      expect(confirm).toBeGreaterThan(0);
+      const clear = (options) =>
+        clearAppointments(db, { directory, ...options });
+      await expect(clear({ confirm: confirm + 1 })).rejects.toThrow(
+        'Nothing was deleted',
+      );
+      await db.delete(s.checkoutAttempts);
+      await db.delete(s.paymentBatches);
+      await db
+        .update(s.jobs)
+        .set({ status: 'done' })
+        .where(eq(s.jobs.type, 'refundConflict'));
+      await expect(clear({ confirm })).rejects.toThrow('not been refunded');
+      expect(await db.select().from(s.bookings)).toHaveLength(confirm);
+      const result = await clear({ confirm, settled: true });
+      const copy = JSON.parse(await readFile(result.file, 'utf8'));
+      expect(copy.bookings).toHaveLength(confirm);
+      for (const table of [
+        s.bookings,
+        s.clients,
+        s.payments,
+        s.paymentProofs,
+        s.emailLog,
+        s.notifications,
+      ])
+        expect(await db.select().from(table)).toEqual([]);
+      expect(await kept()).toEqual(before);
+      expect(await db.select().from(s.emailSuppressions)).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(s.jobs)
+          .where(eq(s.jobs.dedupeKey, 'clear-keep')),
+      ).toHaveLength(1);
+      for (const path of ['', '/bookings', '/clients', '/calendar'])
+        await agent.get('/admin' + path).expect(200);
+      await bookings.createHold({
+        ...validHold,
+        startAt: '2026-12-22T15:00:00Z',
+      });
+      await rm(directory, { recursive: true, force: true });
     });
   },
 );
