@@ -116,7 +116,8 @@
   </div>
   <div class="wrap footer-bottom">
     <p>© {{ year }} {{ business.name }} · African hair braiding in {{ business.city }}, {{ business.region }}</p>
-    <p>Powered by <a href="https://giddyhost.com" target="_blank" rel="noopener">GiddyHost</a></p>
+    {% if ownerPortal %}<p><a href="/admin" rel="nofollow">Owner portal</a></p>
+    {% endif %}<p>Powered by <a href="https://giddyhost.com" target="_blank" rel="noopener">GiddyHost</a></p>
   </div>
 </footer>
 

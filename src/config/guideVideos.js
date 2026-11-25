@@ -3,35 +3,67 @@
 // locally for testing, but never on the live site.
 export const SAMPLE = 'https://www.youtube.com/watch?v=M7lc1UVf-VE';
 
+const VIDEOS = {
+  overview: 'https://youtu.be/GTWGu7vsyeU',
+  calendar: 'https://youtu.be/Vpn33EOpDv4',
+  appointments: 'https://youtu.be/yvx4qjZhV8M',
+  styles: 'https://youtu.be/aVEI8h4xntM',
+  photos: 'https://youtu.be/YrFswQ4MNdg',
+  clients: 'https://youtu.be/S5YZPCtakBQ',
+  settings: 'https://youtu.be/ytfpvh8y_Wk',
+  notifications: 'https://youtu.be/ctOB_gbRyf4',
+};
+
+// Inner pages use their section's video until they have their own.
 // The first match wins, so put longer paths before shorter ones.
 export const guideVideos = [
-  { path: '/bookings/new', title: 'New appointment', video: SAMPLE },
-  { path: '/bookings/*/edit', title: 'Edit an appointment', video: SAMPLE },
-  { path: '/bookings/*', title: 'Appointment details', video: SAMPLE },
-  { path: '/bookings', title: 'Appointments', video: SAMPLE },
-  { path: '/payment-reviews', title: 'Payment reviews', video: SAMPLE },
+  {
+    path: '/bookings/new',
+    title: 'New appointment',
+    video: VIDEOS.appointments,
+  },
+  {
+    path: '/bookings/*/edit',
+    title: 'Edit an appointment',
+    video: VIDEOS.appointments,
+  },
+  {
+    path: '/bookings/*',
+    title: 'Appointment details',
+    video: VIDEOS.appointments,
+  },
+  { path: '/bookings', title: 'Appointments', video: VIDEOS.appointments },
+  {
+    path: '/payment-reviews',
+    title: 'Payment reviews',
+    video: VIDEOS.appointments,
+  },
   { path: '/balances', title: 'Balances outstanding', video: SAMPLE },
   { path: '/payments', title: 'Payments received', video: SAMPLE },
-  { path: '/calendar', title: 'Calendar', video: SAMPLE },
-  { path: '/styles/*', title: 'Edit a style', video: SAMPLE },
-  { path: '/styles', title: 'Styles & prices', video: SAMPLE },
-  { path: '/addons', title: 'Extras', video: SAMPLE },
-  { path: '/gallery', title: 'Photos & Our Work', video: SAMPLE },
-  { path: '/clients/*', title: 'Client details', video: SAMPLE },
-  { path: '/clients', title: 'Clients', video: SAMPLE },
-  { path: '/availability', title: 'Opening hours', video: SAMPLE },
-  { path: '/time-off', title: 'Time off', video: SAMPLE },
-  { path: '/email-templates', title: 'Email wording', video: SAMPLE },
-  { path: '/settings/*', title: 'Settings', video: SAMPLE },
-  { path: '/seo', title: 'Search & AI', video: SAMPLE },
+  { path: '/calendar', title: 'Calendar', video: VIDEOS.calendar },
+  { path: '/styles/*', title: 'Edit a style', video: VIDEOS.styles },
+  { path: '/styles', title: 'Styles & prices', video: VIDEOS.styles },
+  { path: '/addons', title: 'Extras', video: VIDEOS.styles },
+  { path: '/gallery', title: 'Photos & Our Work', video: VIDEOS.photos },
+  { path: '/clients/*', title: 'Client details', video: VIDEOS.clients },
+  { path: '/clients', title: 'Clients', video: VIDEOS.clients },
+  { path: '/availability', title: 'Opening hours', video: VIDEOS.settings },
+  { path: '/time-off', title: 'Time off', video: VIDEOS.settings },
+  { path: '/email-templates', title: 'Email wording', video: VIDEOS.settings },
+  { path: '/settings/*', title: 'Settings', video: VIDEOS.settings },
+  { path: '/seo', title: 'Search & AI', video: VIDEOS.settings },
   {
     path: '/settings?tab=security',
     title: 'Sign-in & security',
-    video: SAMPLE,
+    video: VIDEOS.settings,
   },
-  { path: '/settings', title: 'Studio details', video: SAMPLE },
-  { path: '/notifications', title: 'Notifications', video: SAMPLE },
-  { path: '/', title: 'Overview', video: SAMPLE },
+  { path: '/settings', title: 'Studio details', video: VIDEOS.settings },
+  {
+    path: '/notifications',
+    title: 'Notifications',
+    video: VIDEOS.notifications,
+  },
+  { path: '/', title: 'Overview', video: VIDEOS.overview },
 ];
 
 // Accepts the links YouTube gives: watch, share, Shorts, live and embed.

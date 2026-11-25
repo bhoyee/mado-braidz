@@ -48,6 +48,20 @@ describe('owner guide videos', () => {
     );
     expect(guideFor('/nowhere', undefined, false)).toBeNull();
   });
+  it.each([
+    ['/', 'GTWGu7vsyeU'],
+    ['/calendar', 'Vpn33EOpDv4'],
+    ['/bookings', 'yvx4qjZhV8M'],
+    ['/bookings/12/edit', 'yvx4qjZhV8M'],
+    ['/styles', 'aVEI8h4xntM'],
+    ['/gallery', 'YrFswQ4MNdg'],
+    ['/clients', 'S5YZPCtakBQ'],
+    ['/settings', 'ytfpvh8y_Wk'],
+    ['/time-off', 'ytfpvh8y_Wk'],
+    ['/notifications', 'ctOB_gbRyf4'],
+  ])('plays the real video on %s on the live site', (path, id) =>
+    expect(guideFor(path, undefined, true).id).toBe(id),
+  );
   it('never shows a sample on the live site, but shows a real video', () => {
     for (const { path } of guideVideos.filter((g) => g.video === SAMPLE))
       expect(
